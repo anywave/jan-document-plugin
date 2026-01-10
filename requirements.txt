@@ -1,0 +1,31 @@
+# Jan Document Plugin - Windows Dependencies
+# Fully offline operation (after initial model download)
+
+# Web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+httpx>=0.25.0
+python-multipart>=0.0.6
+
+# Document extraction
+pymupdf>=1.23.0          # PDF extraction (also known as fitz)
+python-docx>=1.1.0       # DOCX extraction
+openpyxl>=3.1.0          # XLSX extraction
+Pillow>=10.0.0           # Image handling
+pytesseract>=0.3.10      # OCR (requires Tesseract installed)
+
+# Embeddings & Vector Store (offline-capable)
+sentence-transformers>=2.2.0   # Local embeddings
+chromadb>=0.4.0                # Local vector database
+
+# Pydantic for data validation
+pydantic>=2.0.0
+
+# Resource monitoring
+psutil>=5.9.0                  # System resource monitoring
+
+# Build tools (optional - for creating standalone .exe)
+pyinstaller>=6.0.0
+
+# Optional: For legacy .doc support
+# textract>=1.6.0  # Requires antiword/poppler system deps

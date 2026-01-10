@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Discussion Forum
+    url: https://github.com/AnyWaveCreations/jan-document-plugin/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: Jan AI Community
+    url: https://discord.gg/jan
+    about: For questions about Jan AI itself
