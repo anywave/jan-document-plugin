@@ -209,8 +209,8 @@ If adding automated tests:
 
 ## Getting Help
 
-- **Questions**: Open a [GitHub Discussion](https://github.com/AnyWaveCreations/jan-document-plugin/discussions)
-- **Bugs**: Open a [GitHub Issue](https://github.com/AnyWaveCreations/jan-document-plugin/issues)
+- **Questions**: Open a [GitHub Discussion](https://github.com/anywave/jan-document-plugin/discussions)
+- **Bugs**: Open a [GitHub Issue](https://github.com/anywave/jan-document-plugin/issues)
 - **Security**: Email security concerns privately (do not open public issues)
 
 ## License

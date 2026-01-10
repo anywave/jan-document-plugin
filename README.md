@@ -36,7 +36,7 @@ Jan Document Plugin is a **local proxy server** that adds document understanding
 
 1. **Download** the latest release or clone this repository:
    ```bash
-   git clone https://github.com/AnyWaveCreations/jan-document-plugin.git
+   git clone https://github.com/anywave/jan-document-plugin.git
    cd jan-document-plugin
    ```
 
@@ -428,8 +428,8 @@ Built for **AVACHATTER** by [Anywave Creations](https://anywavecreations.com)
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/AnyWaveCreations/jan-document-plugin/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/AnyWaveCreations/jan-document-plugin/discussions)
+- **Issues**: [GitHub Issues](https://github.com/anywave/jan-document-plugin/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/anywave/jan-document-plugin/discussions)
 
 ---
 
