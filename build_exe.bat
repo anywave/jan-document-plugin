@@ -6,9 +6,13 @@ REM Prerequisites:
 REM   - Python 3.10+
 REM   - All dependencies installed (run install.bat first)
 REM   - PyInstaller: pip install pyinstaller
+REM
+REM This script:
+REM   1. Builds the standalone .exe with PyInstaller
+REM   2. Prepares all files needed for the Inno Setup installer
 REM ============================================================================
 
-setlocal
+setlocal EnableDelayedExpansion
 
 echo.
 echo ========================================================================
@@ -22,11 +26,28 @@ if exist "venv\Scripts\activate.bat" (
     call venv\Scripts\activate.bat
 )
 
-REM Install PyInstaller if not present
+REM Install required packages if not present
+echo Checking dependencies...
 pip show pyinstaller >nul 2>nul
 if %ERRORLEVEL% NEQ 0 (
     echo Installing PyInstaller...
     pip install pyinstaller
+)
+
+pip show pillow >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo Installing Pillow for icon generation...
+    pip install pillow
+)
+
+REM Generate icon if it doesn't exist
+if not exist "assets\icon.ico" (
+    echo.
+    echo Generating application icon...
+    python assets\create_icon.py
+    if %ERRORLEVEL% NEQ 0 (
+        echo WARNING: Could not generate icon, using default
+    )
 )
 
 REM Clean previous builds
@@ -37,7 +58,7 @@ if exist "dist" rmdir /s /q dist
 
 REM Build the executable
 echo.
-echo Building executable...
+echo Building executable with PyInstaller...
 echo This may take several minutes...
 echo.
 
@@ -45,33 +66,55 @@ pyinstaller JanDocumentPlugin.spec --noconfirm
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo ERROR: Build failed!
+    echo ERROR: PyInstaller build failed!
     pause
     exit /b 1
 )
 
-REM Copy additional files to dist
+REM Copy additional files to dist folder
 echo.
 echo Copying additional files...
 
-copy config.env dist\JanDocumentPlugin\ >nul 2>nul
-copy README.md dist\JanDocumentPlugin\ >nul 2>nul
-copy start_proxy.bat dist\JanDocumentPlugin\ >nul 2>nul
+REM Config file (example version for fresh installs)
+copy config.env.example dist\JanDocumentPlugin\config.env >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    copy config.env dist\JanDocumentPlugin\ >nul 2>nul
+)
 
-REM Create tesseract folder in dist
+REM Documentation
+copy README.md dist\JanDocumentPlugin\ >nul 2>nul
+copy LICENSE dist\JanDocumentPlugin\ >nul 2>nul
+
+REM Create calibration folder and copy test PDF
+mkdir dist\JanDocumentPlugin\calibration 2>nul
+copy calibration\JanDocPlugin_Calibration.pdf dist\JanDocumentPlugin\calibration\ >nul 2>nul
+
+REM Create tesseract folder placeholder
 mkdir dist\JanDocumentPlugin\tesseract 2>nul
+echo Tesseract OCR files can be placed here for portable installation > dist\JanDocumentPlugin\tesseract\README.txt
+
+REM Create data directory
+mkdir dist\JanDocumentPlugin\jan_doc_store 2>nul
+
+REM Create installer output directory
+mkdir dist\installer 2>nul
 
 echo.
 echo ========================================================================
 echo    Build Complete!
 echo ========================================================================
 echo.
-echo Executable location: dist\JanDocumentPlugin\JanDocumentPlugin.exe
+echo Executable: dist\JanDocumentPlugin\JanDocumentPlugin.exe
 echo.
-echo To distribute:
-echo   1. Copy the entire dist\JanDocumentPlugin folder
-echo   2. Users should install Tesseract to the 'tesseract' subfolder
-echo      or have it installed system-wide
+echo NEXT STEPS:
+echo.
+echo   Option 1 - Direct Distribution:
+echo     Copy the entire dist\JanDocumentPlugin folder
+echo.
+echo   Option 2 - Create Installer (Recommended):
+echo     1. Install Inno Setup: https://jrsoftware.org/isinfo.php
+echo     2. Open installer\setup.iss in Inno Setup
+echo     3. Compile to create JanDocumentPlugin_Setup_1.2.0.exe
 echo.
 echo ========================================================================
 echo.

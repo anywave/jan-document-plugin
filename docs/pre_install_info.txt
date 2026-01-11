@@ -1,0 +1,48 @@
+Jan Document Plugin - Pre-Installation Information
+==================================================
+
+WHAT THIS DOES
+--------------
+Jan Document Plugin adds document understanding to Jan AI.
+Upload PDFs, Word docs, Excel files, and images - then chat
+about their contents using your local LLM.
+
+Everything runs 100% offline. Your documents never leave
+your computer.
+
+
+REQUIREMENTS
+------------
+- Windows 10 or Windows 11 (64-bit)
+- Jan AI installed and running (https://jan.ai)
+- 2GB free disk space
+- 4GB RAM minimum (8GB recommended)
+
+
+OPTIONAL: OCR FOR SCANNED DOCUMENTS
+-----------------------------------
+To extract text from scanned PDFs and images, install
+Tesseract OCR after setup:
+
+  winget install UB-Mannheim.TesseractOCR
+
+Or download from:
+  https://github.com/UB-Mannheim/tesseract/wiki
+
+
+HOW IT WORKS
+------------
+1. Start Jan AI and enable Local API Server
+2. Launch Jan Document Plugin
+3. Upload documents via the web interface (localhost:1338)
+4. Chat with your documents in Jan!
+
+The plugin runs as a local proxy between you and Jan,
+automatically injecting relevant document context into
+your conversations.
+
+
+SUPPORT
+-------
+GitHub: https://github.com/anywave/jan-document-plugin
+Issues: https://github.com/anywave/jan-document-plugin/issues
