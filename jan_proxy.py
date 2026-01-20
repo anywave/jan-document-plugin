@@ -756,14 +756,14 @@ def main():
     )
     
     print(f"""
-╔══════════════════════════════════════════════════════════════╗
-║            Jan Document Plugin v1.0.0                       ║
-╠══════════════════════════════════════════════════════════════╣
-║  Proxy listening on:  http://localhost:{config.proxy_port:<5}                ║
-║  Forwarding to Jan:   {config.jan_base_url:<30} ║
-║  Document storage:    {config.persist_directory:<30} ║
-║  Auto-inject context: {str(config.auto_inject):<30} ║
-╚══════════════════════════════════════════════════════════════╝
++==============================================================+
+|            Jan Document Plugin v1.0.0                        |
++==============================================================+
+|  Proxy listening on:  http://localhost:{config.proxy_port:<5}                |
+|  Forwarding to Jan:   {config.jan_base_url:<30} |
+|  Document storage:    {config.persist_directory:<30} |
+|  Auto-inject context: {str(config.auto_inject):<30} |
++==============================================================+
     """)
     
     uvicorn.run(

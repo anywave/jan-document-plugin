@@ -22,6 +22,13 @@ import openpyxl
 from PIL import Image
 import pytesseract
 
+# OCR Processing Pipeline (pre/post-processing for artifact handling)
+try:
+    from ocr_processor import OCRPipeline, preprocess_image, postprocess_text
+    OCR_PIPELINE_AVAILABLE = True
+except ImportError:
+    OCR_PIPELINE_AVAILABLE = False
+
 # Chunking & Embeddings
 from sentence_transformers import SentenceTransformer
 import chromadb
@@ -158,7 +165,11 @@ class DocumentExtractor:
     def _extract_pdf(self, path: Path) -> tuple[str, bool, int]:
         """
         Extract text from PDF with OCR fallback for scanned pages.
-        
+
+        Uses two-step OCR processing:
+        1. Pre-processing: Image enhancement (contrast, denoise, deskew)
+        2. Post-processing: Text cleanup (fix artifacts, normalize whitespace)
+
         Returns:
             Tuple of (extracted_text, ocr_was_used, ocr_page_count)
         """
@@ -166,16 +177,34 @@ class DocumentExtractor:
         text_parts = []
         ocr_used = False
         ocr_page_count = 0
-        
+
+        # Initialize OCR pipeline if available
+        ocr_pipeline = None
+        if OCR_PIPELINE_AVAILABLE and self._tesseract_available:
+            ocr_pipeline = OCRPipeline()
+
         for page_num, page in enumerate(doc):
             text = page.get_text()
-            
-            # If page has minimal text, attempt OCR
+
+            # If page has minimal text, attempt OCR with pre/post processing
             if len(text.strip()) < 50 and self._tesseract_available:
                 try:
-                    pix = page.get_pixmap(dpi=150)
+                    # Render page to image at higher DPI for better OCR
+                    pix = page.get_pixmap(dpi=200)
                     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                    ocr_text = pytesseract.image_to_string(img)
+
+                    if ocr_pipeline:
+                        # Full pipeline: preprocess -> OCR -> postprocess
+                        ocr_text, metadata = ocr_pipeline.process_image(img)
+                        logger.debug(
+                            f"OCR page {page_num + 1}: "
+                            f"{metadata['raw_length']} -> {metadata['clean_length']} chars "
+                            f"({metadata['reduction_pct']}% reduction)"
+                        )
+                    else:
+                        # Fallback: basic OCR without pre/post processing
+                        ocr_text = pytesseract.image_to_string(img)
+
                     if ocr_text.strip():
                         text = f"[OCR]\n{ocr_text}"
                         ocr_used = True
@@ -183,10 +212,13 @@ class DocumentExtractor:
                         logger.debug(f"OCR applied to page {page_num + 1}")
                 except Exception as e:
                     logger.warning(f"OCR failed for page {page_num + 1}: {e}")
-            
+            elif text.strip() and OCR_PIPELINE_AVAILABLE:
+                # Even for native text, apply post-processing to clean up
+                text = postprocess_text(text)
+
             if text.strip():
                 text_parts.append(f"[Page {page_num + 1}]\n{text.strip()}")
-        
+
         doc.close()
         return "\n\n".join(text_parts), ocr_used, ocr_page_count
     
@@ -285,8 +317,12 @@ class DocumentExtractor:
     
     def _extract_image_ocr(self, path: Path) -> tuple[str, bool, int]:
         """
-        Extract text from image using OCR.
-        
+        Extract text from image using OCR with pre/post processing.
+
+        Uses two-step processing:
+        1. Pre-processing: Image enhancement (contrast, denoise, threshold)
+        2. Post-processing: Text cleanup (fix artifacts, common errors)
+
         Returns:
             Tuple of (extracted_text, ocr_was_used, ocr_page_count)
         """
@@ -295,16 +331,28 @@ class DocumentExtractor:
                 "Tesseract OCR not available. Please install Tesseract: "
                 "https://github.com/tesseract-ocr/tesseract"
             )
-        
+
         img = Image.open(path)
-        
+
         # Convert to RGB if necessary
         if img.mode != 'RGB':
             img = img.convert('RGB')
-        
-        text = pytesseract.image_to_string(img)
+
+        if OCR_PIPELINE_AVAILABLE:
+            # Full pipeline: preprocess -> OCR -> postprocess
+            ocr_pipeline = OCRPipeline()
+            text, metadata = ocr_pipeline.process_image(img)
+            logger.info(
+                f"OCR image {path.name}: "
+                f"{metadata['raw_length']} -> {metadata['clean_length']} chars "
+                f"({metadata['reduction_pct']}% artifact reduction)"
+            )
+        else:
+            # Fallback: basic OCR
+            text = pytesseract.image_to_string(img)
+
         img.close()
-        
+
         # Images always use OCR, count as 1 page
         return text, True, 1
 
