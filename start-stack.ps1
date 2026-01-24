@@ -9,8 +9,14 @@ param(
 )
 
 # Configuration
-$LlamaServer = "$env:APPDATA\jan\data\engines\llama.cpp\win-avx2-x64\b5857\llama-server.exe"
-$ModelPath = "$env:USERPROFILE\Documents\JAN AI  INSTALLS 065 TO 070\JAN AI  MODELS\Jan-nano-128k-gguf\jan-nano-128k-iQ4_XS.gguf"
+# Path options - uncomment the one that matches your system
+# Option 1: Standard Jan AppData location
+# $LlamaServer = "$env:APPDATA\jan\data\engines\llama.cpp\win-avx2-x64\b5857\llama-server.exe"
+# $ModelPath = "$env:APPDATA\Jan\data\models\huggingface.co\Menlo\Jan-nano-128k-gguf\jan-nano-128k-iQ4_XS.gguf"
+
+# Option 2: Custom D: drive location (RADIX-Interface)
+$LlamaServer = "D:\jan appdata\engines\llama.cpp\win-avx2-x64\b5857\llama-server.exe"
+$ModelPath = "$env:APPDATA\Jan\data\models\huggingface.co\Menlo\Jan-nano-128k-gguf\jan-nano-128k-iQ4_XS.gguf"
 
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Cyan
