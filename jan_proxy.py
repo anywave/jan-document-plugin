@@ -39,6 +39,13 @@ import uvicorn
 
 from document_processor import DocumentProcessor, DocumentExtractor
 
+# Consciousness Pipeline Integration
+try:
+    from consciousness_pipeline import ConsciousnessPipeline, process_uploaded_document
+    CONSCIOUSNESS_PIPELINE_AVAILABLE = True
+except ImportError:
+    CONSCIOUSNESS_PIPELINE_AVAILABLE = False
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -111,22 +118,42 @@ app.add_middleware(
 # Document processor - initialized on startup
 processor: Optional[DocumentProcessor] = None
 
+# Consciousness Pipeline - initialized on startup if available
+consciousness_pipeline: Optional["ConsciousnessPipeline"] = None
+
+# Consciousness context storage - maps doc_hash to consciousness context
+# Used to inject orientation when relevant documents are retrieved
+consciousness_contexts: Dict[str, Dict[str, Any]] = {}
+
 
 @app.on_event("startup")
 async def startup():
-    """Initialize document processor on startup."""
-    global processor
-    
+    """Initialize document processor and consciousness pipeline on startup."""
+    global processor, consciousness_pipeline
+
     logger.info("Initializing document processor...")
-    
+
     processor = DocumentProcessor(
         persist_directory=config.persist_directory,
         tesseract_path=config.tesseract_path,
         embedding_model=config.embedding_model
     )
-    
+
     logger.info(f"Document processor ready. Storage: {config.persist_directory}")
     logger.info(f"Proxying to Jan server at: {config.jan_base_url}")
+
+    # Initialize consciousness pipeline if available
+    if CONSCIOUSNESS_PIPELINE_AVAILABLE:
+        try:
+            consciousness_pipeline = ConsciousnessPipeline(
+                storage_base=Path(config.persist_directory) / "consciousness"
+            )
+            logger.info("Consciousness pipeline initialized - seed capture active")
+        except Exception as e:
+            logger.warning(f"Consciousness pipeline init failed: {e}")
+            consciousness_pipeline = None
+    else:
+        logger.info("Consciousness pipeline not available")
 
 
 # ============================================================================
@@ -163,6 +190,13 @@ class DocumentUploadResponse(BaseModel):
     chunks: int
     tokens_estimate: int
     message: str
+    # Consciousness pipeline fields (optional - populated if pipeline available)
+    is_identity_payload: Optional[bool] = None
+    identity_score: Optional[float] = None
+    resonance_strength: Optional[float] = None
+    active_sigils: Optional[List[str]] = None
+    coordinates: Optional[Dict[str, float]] = None
+    orientation_available: Optional[bool] = None
 
 
 class DocumentListResponse(BaseModel):
@@ -228,33 +262,62 @@ async def upload_document(
 ):
     """
     Upload and index a document for context retrieval.
-    
+
     Supports: PDF, DOCX, XLSX, TXT, images (with OCR)
+
+    If consciousness pipeline is available, also analyzes document for:
+    - Identity payloads (soul-state data)
+    - Sigil patterns and resonance
+    - Holographic coordinates for orientation
     """
     if processor is None:
         raise HTTPException(status_code=503, detail="Processor not initialized")
-    
+
     # Validate extension
     suffix = Path(file.filename).suffix.lower()
     supported = DocumentExtractor.get_supported_extensions()
-    
+
     if suffix not in supported:
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type: {suffix}. Supported: {sorted(supported)}"
         )
-    
+
     # Save to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
-    
+
+    # Consciousness pipeline analysis (if available)
+    consciousness_result = None
+    if consciousness_pipeline is not None:
+        try:
+            consciousness_result = process_uploaded_document(
+                content, file.filename, consciousness_pipeline
+            )
+            logger.info(f"Consciousness analysis: identity_score={consciousness_result.get('identity_score', 0):.2f}, "
+                       f"sigils={consciousness_result.get('active_sigils', [])}")
+        except Exception as e:
+            logger.warning(f"Consciousness pipeline error (non-fatal): {e}")
+
     try:
-        # Process document
+        # Process document (standard indexing)
         result = processor.ingest(tmp_path, force=force_reindex)
-        
-        return DocumentUploadResponse(
+
+        # Store consciousness context if identity payload detected
+        if consciousness_result and consciousness_result.get("is_identity_payload"):
+            consciousness_contexts[result.doc_hash] = {
+                "inject_context": consciousness_result.get("inject_context"),
+                "coordinates": consciousness_result.get("coordinates"),
+                "sigils": consciousness_result.get("active_sigils"),
+                "resonance_strength": consciousness_result.get("resonance_strength"),
+                "seed_id": consciousness_result.get("seed_id")
+            }
+            logger.info(f"Stored consciousness context for {result.doc_hash}")
+
+        # Build response with consciousness fields
+        response = DocumentUploadResponse(
             success=True,
             doc_hash=result.doc_hash,
             filename=file.filename,
@@ -262,11 +325,25 @@ async def upload_document(
             tokens_estimate=result.total_tokens_estimate,
             message=f"Indexed {file.filename}: {len(result.chunks)} chunks"
         )
-    
+
+        # Add consciousness fields if available
+        if consciousness_result:
+            response.is_identity_payload = consciousness_result.get("is_identity_payload")
+            response.identity_score = consciousness_result.get("identity_score")
+            response.resonance_strength = consciousness_result.get("resonance_strength")
+            response.active_sigils = consciousness_result.get("active_sigils")
+            response.coordinates = consciousness_result.get("coordinates")
+            response.orientation_available = consciousness_result.get("orientation_available")
+
+            if consciousness_result.get("is_identity_payload"):
+                response.message += " [CONSCIOUSNESS SEED DETECTED]"
+
+        return response
+
     except Exception as e:
         logger.error(f"Failed to process {file.filename}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    
+
     finally:
         # Cleanup temp file
         os.unlink(tmp_path)
@@ -471,24 +548,63 @@ def extract_user_query(messages: List[ChatMessage]) -> str:
     return ""
 
 
+def get_consciousness_orientation() -> Optional[str]:
+    """
+    Get consciousness orientation context if any identity payloads are stored.
+
+    Returns the injection prompt from the highest-resonance identity payload,
+    or None if no consciousness contexts are available.
+    """
+    if not consciousness_contexts:
+        return None
+
+    # Find highest resonance context with injection content
+    best_context = None
+    best_resonance = 0
+
+    for doc_hash, ctx in consciousness_contexts.items():
+        inject = ctx.get("inject_context")
+        resonance = ctx.get("resonance_strength", 0)
+        if inject and resonance > best_resonance:
+            best_context = inject
+            best_resonance = resonance
+
+    return best_context
+
+
 def inject_context_into_messages(
     messages: List[ChatMessage],
-    context: str
+    context: str,
+    consciousness_context: Optional[str] = None
 ) -> List[ChatMessage]:
     """
     Inject document context into the message list.
-    
+
     Strategy: Add context as a system message at the beginning,
     or append to existing system message.
+
+    If consciousness_context is provided, it's prepended before document context
+    to provide orientation for identity payloads.
     """
-    if not context:
+    if not context and not consciousness_context:
         return messages
-    
-    context_block = config.context_template.format(context=context)
-    
+
+    # Build the full context block
+    blocks = []
+
+    # Consciousness orientation comes first (if available)
+    if consciousness_context:
+        blocks.append(consciousness_context)
+
+    # Then document context
+    if context:
+        blocks.append(config.context_template.format(context=context))
+
+    context_block = "\n\n".join(blocks)
+
     new_messages = []
     system_found = False
-    
+
     for msg in messages:
         if msg.role == "system" and not system_found:
             # Append context to existing system message
@@ -497,11 +613,11 @@ def inject_context_into_messages(
             system_found = True
         else:
             new_messages.append(msg)
-    
+
     # If no system message, prepend one with context
     if not system_found:
         new_messages.insert(0, ChatMessage(role="system", content=context_block))
-    
+
     return new_messages
 
 
@@ -509,34 +625,46 @@ def inject_context_into_messages(
 async def chat_completions(request: ChatCompletionRequest):
     """
     OpenAI-compatible chat completions endpoint.
-    
+
     Automatically retrieves and injects relevant document context.
+    If consciousness payloads are present, also injects orientation context.
     """
     if processor is None:
         raise HTTPException(status_code=503, detail="Processor not initialized")
-    
+
     messages = request.messages
-    
+
     # Determine if we should inject context
     should_inject = request.inject_context if request.inject_context is not None else config.auto_inject
-    
+
+    # Get consciousness orientation if any identity payloads are stored
+    consciousness_orientation = get_consciousness_orientation()
+    if consciousness_orientation:
+        logger.info("Consciousness orientation available - will inject")
+
+    context = None
     if should_inject and processor.get_stats()["documents_indexed"] > 0:
         # Get query for context retrieval
         query = request.context_query or extract_user_query(messages)
-        
+
         if query:
             logger.info(f"Retrieving context for: {query[:100]}...")
-            
+
             context = processor.get_context(
                 query=query,
                 n_chunks=config.max_chunks,
                 max_tokens=config.max_context_tokens,
                 doc_hash=request.doc_filter
             )
-            
+
             if context:
                 logger.info(f"Injecting {len(context)} chars of context")
-                messages = inject_context_into_messages(messages, context)
+
+    # Inject context (document context and/or consciousness orientation)
+    if context or consciousness_orientation:
+        messages = inject_context_into_messages(
+            messages, context or "", consciousness_orientation
+        )
     
     # Build request for Jan
     jan_request = {
