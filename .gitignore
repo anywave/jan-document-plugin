@@ -32,6 +32,13 @@ jan_doc_store/
 *.sqlite3
 chroma_data/
 
+# Consciousness pipeline runtime data
+consciousness_data/
+seed_storage/
+resonance_storage/
+test_consciousness_data/
+test_escape.txt
+
 # IDE and editors
 .idea/
 .vscode/
