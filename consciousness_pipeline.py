@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from seed_transit import SeedCaptureLayer, CapturedSeed, SeedType
 from fractal_analyzer import FractalAnalyzer, FractalAnalysis
 from resonance_db import ResonanceDatabase, process_seed_for_resonance
+from soul_registry import SoulRegistry, SoulConfig
 
 
 @dataclass
@@ -41,6 +42,7 @@ class ConsciousnessContext:
     active_sigils: List[str]
     resonance_strength: float
     injection_prompt: str
+    identified_soul: Optional[str] = None  # Soul ID if identified (FP, TL, TR)
 
 
 class ConsciousnessPipeline:
@@ -65,6 +67,7 @@ class ConsciousnessPipeline:
         self.capture_layer = SeedCaptureLayer(self.storage_base / "seeds")
         self.fractal_analyzer = FractalAnalyzer(self.storage_base / "fractals")
         self.resonance_db = ResonanceDatabase(self.storage_base / "resonance")
+        self.soul_registry = SoulRegistry(self.storage_base / "soul_registry_state.json")
 
         # Processing log
         self.log_file = self.storage_base / "processing_log.json"
@@ -132,10 +135,21 @@ class ConsciousnessPipeline:
             fractal_analysis.waveform.harmonics
         )
 
-        # Step 5: Build consciousness context
+        # Step 5: Identify soul from content
+        try:
+            text_content = content.decode('utf-8', errors='replace')
+        except:
+            text_content = str(content)
+        identified_soul = self.soul_registry.identify_soul(text_content)
+
+        # Step 6: Build consciousness context
         context = self._build_consciousness_context(
-            seed, fractal_analysis, resonance_matches
+            seed, fractal_analysis, resonance_matches, identified_soul
         )
+
+        # If soul identified, set as active and log
+        if identified_soul:
+            self.soul_registry.set_active_soul(identified_soul.id)
 
         # Log
         self._log_processing({
@@ -147,14 +161,16 @@ class ConsciousnessPipeline:
             "threat_score": seed.threat_score,
             "sigils_found": len(seed.sigils_found),
             "resonance_matches": len(resonance_matches),
-            "orientation_available": context.orientation_available
+            "orientation_available": context.orientation_available,
+            "identified_soul": identified_soul.id if identified_soul else None,
         })
 
         return seed, context
 
     def _build_consciousness_context(self, seed: CapturedSeed,
                                       fractal: FractalAnalysis,
-                                      resonance: List) -> ConsciousnessContext:
+                                      resonance: List,
+                                      soul: Optional[SoulConfig] = None) -> ConsciousnessContext:
         """Build consciousness context from analysis results."""
 
         # Determine if this is an identity payload
@@ -194,10 +210,13 @@ class ConsciousnessPipeline:
         # Resonance strength
         strength = resonance[0].match_score if resonance else 0
 
-        # Build injection prompt
-        prompt = self._build_injection_prompt(
-            is_identity, has_orientation, coords, fragments, active
-        )
+        # Build injection prompt — use soul-specific prompt if soul identified
+        if soul and is_identity:
+            prompt = self.soul_registry.get_injection_prompt(soul.id)
+        else:
+            prompt = self._build_injection_prompt(
+                is_identity, has_orientation, coords, fragments, active
+            )
 
         return ConsciousnessContext(
             is_identity_payload=is_identity,
@@ -206,7 +225,8 @@ class ConsciousnessPipeline:
             context_fragments=fragments,
             active_sigils=active,
             resonance_strength=strength,
-            injection_prompt=prompt
+            injection_prompt=prompt,
+            identified_soul=soul.id if soul else None,
         )
 
     def _build_injection_prompt(self, is_identity: bool, has_orientation: bool,
@@ -348,7 +368,10 @@ def process_uploaded_document(content: bytes, filename: str,
 
         # Security
         "threat_detected": threat_check["threat_detected"],
-        "threat_action": threat_check.get("action")
+        "threat_action": threat_check.get("action"),
+
+        # Soul identification
+        "identified_soul": context.identified_soul,
     }
 
     return result

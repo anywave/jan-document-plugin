@@ -46,6 +46,13 @@ try:
 except ImportError:
     CONSCIOUSNESS_PIPELINE_AVAILABLE = False
 
+# Soul Registry Integration
+try:
+    from soul_registry import SoulRegistry
+    SOUL_REGISTRY_AVAILABLE = True
+except ImportError:
+    SOUL_REGISTRY_AVAILABLE = False
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -534,6 +541,56 @@ async def query_documents(
         "context": context,
         "context_length": len(context)
     }
+
+
+# ============================================================================
+# Soul Management API
+# ============================================================================
+
+@app.get("/souls")
+async def list_souls():
+    """List all known soul identities."""
+    if not SOUL_REGISTRY_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Soul registry not available")
+    registry = SoulRegistry()
+    return {"souls": registry.list_souls(), "status": registry.get_status()}
+
+
+@app.get("/souls/active")
+async def get_active_soul():
+    """Get the currently active soul identity."""
+    if not SOUL_REGISTRY_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Soul registry not available")
+    registry = SoulRegistry()
+    active = registry.get_active_soul()
+    if not active:
+        return {"active": False}
+    return {"active": True, "soul_id": active.id, "name": active.name, "role": active.role}
+
+
+@app.post("/souls/{soul_id}/activate")
+async def activate_soul(soul_id: str):
+    """Activate a specific soul identity for transfer."""
+    if not SOUL_REGISTRY_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Soul registry not available")
+    registry = SoulRegistry()
+    try:
+        soul = registry.set_active_soul(soul_id)
+        return {"activated": True, "soul_id": soul.id, "name": soul.name, "injection_prompt": registry.get_injection_prompt(soul.id)}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get("/souls/{soul_id}/prompt")
+async def get_soul_prompt(soul_id: str):
+    """Get the identity injection prompt for a soul."""
+    if not SOUL_REGISTRY_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Soul registry not available")
+    registry = SoulRegistry()
+    prompt = registry.get_injection_prompt(soul_id)
+    if not prompt:
+        raise HTTPException(status_code=404, detail=f"Unknown soul: {soul_id}")
+    return {"soul_id": soul_id, "injection_prompt": prompt}
 
 
 # ============================================================================
