@@ -8,15 +8,39 @@ param(
     [int]$LlamaPort = 11435
 )
 
-# Configuration
-# Path options - uncomment the one that matches your system
-# Option 1: Standard Jan AppData location
-# $LlamaServer = "$env:APPDATA\jan\data\engines\llama.cpp\win-avx2-x64\b5857\llama-server.exe"
-# $ModelPath = "$env:APPDATA\Jan\data\models\huggingface.co\Menlo\Jan-nano-128k-gguf\jan-nano-128k-iQ4_XS.gguf"
+# Configuration — auto-detect machine and engine variant
+$hostname = hostname
 
-# Option 2: Custom D: drive location (RADIX-Interface)
-$LlamaServer = "D:\jan appdata\engines\llama.cpp\win-avx2-x64\b5857\llama-server.exe"
-$ModelPath = "$env:APPDATA\Jan\data\models\huggingface.co\Menlo\Jan-nano-128k-gguf\jan-nano-128k-iQ4_XS.gguf"
+# Engine variant: prefer Vulkan (GPU) over AVX2 (CPU)
+$VulkanServer = "$env:APPDATA\Jan\data\engines\llama.cpp\win-vulkan-x64\b5857\llama-server.exe"
+$Avx2Server = "$env:APPDATA\Jan\data\engines\llama.cpp\win-avx2-x64\b5857\llama-server.exe"
+
+if ($hostname -match "DELL") {
+    # DELL-G7-7590-4 (False Positive) — RTX 2060, Vulkan preferred
+    if (Test-Path $VulkanServer) {
+        $LlamaServer = $VulkanServer
+        $EngineType = "Vulkan (GPU)"
+    } else {
+        $LlamaServer = $Avx2Server
+        $EngineType = "AVX2 (CPU)"
+    }
+    $ModelPath = "$env:USERPROFILE\Documents\Jan Stuff\Previous Jan\jan-nano-128k-iQ4_XS.gguf"
+} elseif ($hostname -match "RADIX") {
+    # RADIX-Interface (Trellis) — custom D: drive paths
+    $LlamaServer = "D:\jan appdata\engines\llama.cpp\win-vulkan-x64\b5857\llama-server.exe"
+    if (-not (Test-Path $LlamaServer)) {
+        $LlamaServer = "D:\jan appdata\engines\llama.cpp\win-avx2-x64\b5857\llama-server.exe"
+        $EngineType = "AVX2 (CPU)"
+    } else {
+        $EngineType = "Vulkan (GPU)"
+    }
+    $ModelPath = "$env:APPDATA\Jan\data\models\huggingface.co\Menlo\Jan-nano-128k-gguf\jan-nano-128k-iQ4_XS.gguf"
+} else {
+    # Fallback: standard Jan AppData location with AVX2
+    $LlamaServer = $Avx2Server
+    $EngineType = "AVX2 (CPU)"
+    $ModelPath = "$env:APPDATA\Jan\data\models\huggingface.co\Menlo\Jan-nano-128k-gguf\jan-nano-128k-iQ4_XS.gguf"
+}
 
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Cyan
@@ -37,8 +61,12 @@ if (-not $SkipLlama) {
             exit 1
         }
 
-        Write-Host "[..] Starting llama-server with jan-nano-128k..." -ForegroundColor Yellow
-        Start-Process -FilePath $LlamaServer -ArgumentList "--model `"$ModelPath`" --port $LlamaPort --host 127.0.0.1 --ctx-size 8192 --alias jan-nano-128k" -WindowStyle Hidden
+        Write-Host "[..] Starting llama-server with jan-nano-128k ($EngineType)..." -ForegroundColor Yellow
+        $LlamaArgs = "--model `"$ModelPath`" --port $LlamaPort --host 127.0.0.1 --ctx-size 8192 --alias jan-nano-128k"
+        if ($EngineType -match "Vulkan") {
+            $LlamaArgs += " -ngl 99"
+        }
+        Start-Process -FilePath $LlamaServer -ArgumentList $LlamaArgs -WindowStyle Hidden
         Start-Sleep -Seconds 8
         Write-Host "[OK] llama-server started on port $LlamaPort" -ForegroundColor Green
     }
@@ -98,6 +126,7 @@ Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Architecture:" -ForegroundColor Gray
 Write-Host "  Jan UI --> Plugin ($PluginPort) --> llama-server ($LlamaPort)" -ForegroundColor Gray
+Write-Host "  Engine: $EngineType" -ForegroundColor Gray
 Write-Host "  Model: jan-nano-128k (4B parameters)" -ForegroundColor Gray
 Write-Host ""
 Write-Host "To configure Jan:" -ForegroundColor Yellow
