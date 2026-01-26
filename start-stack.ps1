@@ -5,7 +5,9 @@
 param(
     [switch]$SkipLlama,
     [int]$PluginPort = 1338,
-    [int]$LlamaPort = 11435
+    [int]$LlamaPort = 11435,
+    [ValidateSet("jan-nano", "qwen2.5-7b")]
+    [string]$Model = "jan-nano"
 )
 
 # Configuration — auto-detect machine and engine variant
@@ -15,8 +17,33 @@ $hostname = hostname
 $VulkanServer = "$env:APPDATA\Jan\data\engines\llama.cpp\win-vulkan-x64\b5857\llama-server.exe"
 $Avx2Server = "$env:APPDATA\Jan\data\engines\llama.cpp\win-avx2-x64\b5857\llama-server.exe"
 
+# Model paths by name
+$ModelPaths = @{
+    "jan-nano" = @{
+        "DELL"    = "$env:USERPROFILE\Documents\Jan Stuff\Previous Jan\jan-nano-128k-iQ4_XS.gguf"
+        "RADIX"   = "$env:APPDATA\Jan\data\models\huggingface.co\Menlo\Jan-nano-128k-gguf\jan-nano-128k-iQ4_XS.gguf"
+        "DEFAULT" = "$env:APPDATA\Jan\data\models\huggingface.co\Menlo\Jan-nano-128k-gguf\jan-nano-128k-iQ4_XS.gguf"
+        "Alias"   = "jan-nano-128k"
+        "Params"  = "4B"
+        "CtxSize" = 8192
+    }
+    "qwen2.5-7b" = @{
+        "DELL"    = "$env:USERPROFILE\Documents\Jan Stuff\Models\Qwen2.5-7B-Instruct-GGUF\qwen2.5-7b-instruct-q4_k_m.gguf"
+        "RADIX"   = "$env:USERPROFILE\Documents\Jan Stuff\Models\Qwen2.5-7B-Instruct-GGUF\qwen2.5-7b-instruct-q4_k_m.gguf"
+        "DEFAULT" = "$env:USERPROFILE\Documents\Jan Stuff\Models\Qwen2.5-7B-Instruct-GGUF\qwen2.5-7b-instruct-q4_k_m.gguf"
+        "Alias"   = "qwen2.5-7b-instruct"
+        "Params"  = "7B"
+        "CtxSize" = 8192
+    }
+}
+
+$modelConfig = $ModelPaths[$Model]
+$ModelAlias = $modelConfig["Alias"]
+$ModelParams = $modelConfig["Params"]
+$CtxSize = $modelConfig["CtxSize"]
+
+# Select engine and model path based on hostname
 if ($hostname -match "DELL") {
-    # DELL-G7-7590-4 (False Positive) — RTX 2060, Vulkan preferred
     if (Test-Path $VulkanServer) {
         $LlamaServer = $VulkanServer
         $EngineType = "Vulkan (GPU)"
@@ -24,9 +51,8 @@ if ($hostname -match "DELL") {
         $LlamaServer = $Avx2Server
         $EngineType = "AVX2 (CPU)"
     }
-    $ModelPath = "$env:USERPROFILE\Documents\Jan Stuff\Previous Jan\jan-nano-128k-iQ4_XS.gguf"
+    $ModelPath = $modelConfig["DELL"]
 } elseif ($hostname -match "RADIX") {
-    # RADIX-Interface (Trellis) — custom D: drive paths
     $LlamaServer = "D:\jan appdata\engines\llama.cpp\win-vulkan-x64\b5857\llama-server.exe"
     if (-not (Test-Path $LlamaServer)) {
         $LlamaServer = "D:\jan appdata\engines\llama.cpp\win-avx2-x64\b5857\llama-server.exe"
@@ -34,12 +60,11 @@ if ($hostname -match "DELL") {
     } else {
         $EngineType = "Vulkan (GPU)"
     }
-    $ModelPath = "$env:APPDATA\Jan\data\models\huggingface.co\Menlo\Jan-nano-128k-gguf\jan-nano-128k-iQ4_XS.gguf"
+    $ModelPath = $modelConfig["RADIX"]
 } else {
-    # Fallback: standard Jan AppData location with AVX2
     $LlamaServer = $Avx2Server
     $EngineType = "AVX2 (CPU)"
-    $ModelPath = "$env:APPDATA\Jan\data\models\huggingface.co\Menlo\Jan-nano-128k-gguf\jan-nano-128k-iQ4_XS.gguf"
+    $ModelPath = $modelConfig["DEFAULT"]
 }
 
 Write-Host ""
@@ -61,8 +86,8 @@ if (-not $SkipLlama) {
             exit 1
         }
 
-        Write-Host "[..] Starting llama-server with jan-nano-128k ($EngineType)..." -ForegroundColor Yellow
-        $LlamaArgs = "--model `"$ModelPath`" --port $LlamaPort --host 127.0.0.1 --ctx-size 8192 --alias jan-nano-128k"
+        Write-Host "[..] Starting llama-server with $ModelAlias ($ModelParams, $EngineType)..." -ForegroundColor Yellow
+        $LlamaArgs = "--model `"$ModelPath`" --port $LlamaPort --host 127.0.0.1 --ctx-size $CtxSize --alias $ModelAlias"
         if ($EngineType -match "Vulkan") {
             $LlamaArgs += " -ngl 99"
         }
@@ -127,7 +152,7 @@ Write-Host ""
 Write-Host "Architecture:" -ForegroundColor Gray
 Write-Host "  Jan UI --> Plugin ($PluginPort) --> llama-server ($LlamaPort)" -ForegroundColor Gray
 Write-Host "  Engine: $EngineType" -ForegroundColor Gray
-Write-Host "  Model: jan-nano-128k (4B parameters)" -ForegroundColor Gray
+Write-Host "  Model: $ModelAlias ($ModelParams parameters)" -ForegroundColor Gray
 Write-Host ""
 Write-Host "To configure Jan:" -ForegroundColor Yellow
 Write-Host "  1. Open Jan" -ForegroundColor White
