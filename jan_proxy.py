@@ -75,9 +75,9 @@ class ProxyConfig(BaseModel):
     
     # Context injection settings
     auto_inject: bool = True           # Automatically inject context
-    max_context_tokens: int = 8000     # Max tokens for injected context
-    max_chunks: int = 5                # Max chunks to retrieve
-    relevance_threshold: float = 0.3   # Minimum relevance score
+    max_context_tokens: int = 400      # Max tokens for injected context (very small for slow models)
+    max_chunks: int = 1                # Max chunks to retrieve (1 for speed)
+    relevance_threshold: float = 0.5   # Minimum relevance score (higher = more selective)
     
     # System prompt template for context injection
     context_template: str = """You have access to the following document context to help answer the user's question.
@@ -669,7 +669,7 @@ async def chat_completions(request: ChatCompletionRequest):
     # Build request for Jan
     jan_request = {
         "model": request.model,
-        "messages": [m.dict(exclude_none=True) for m in messages],
+        "messages": [m.model_dump(exclude_none=True) for m in messages],
         "temperature": request.temperature,
         "stream": request.stream
     }
@@ -699,17 +699,24 @@ async def chat_completions(request: ChatCompletionRequest):
 
 async def forward_jan_request(url: str, data: dict) -> JSONResponse:
     """Forward non-streaming request to Jan and return response."""
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(url, json=data)
-        
-        if response.status_code != 200:
-            logger.error(f"Jan error: {response.status_code} - {response.text}")
-            raise HTTPException(
-                status_code=response.status_code,
-                detail=f"Jan server error: {response.text}"
-            )
-        
-        return JSONResponse(content=response.json())
+    try:
+        async with httpx.AsyncClient(timeout=300.0) as client:  # Increased to 5 min
+            response = await client.post(url, json=data)
+
+            if response.status_code != 200:
+                logger.error(f"Jan error: {response.status_code} - {response.text}")
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Jan server error: {response.text}"
+                )
+
+            return JSONResponse(content=response.json())
+    except httpx.TimeoutException as e:
+        logger.error(f"Timeout forwarding to Jan: {e}")
+        raise HTTPException(status_code=504, detail="Jan server response timed out")
+    except Exception as e:
+        logger.error(f"Error forwarding to Jan: {e}")
+        raise HTTPException(status_code=500, detail=f"Proxy error: {str(e)}")
 
 
 async def stream_jan_response(url: str, data: dict) -> StreamingResponse:
