@@ -38,6 +38,7 @@ seed_storage/
 resonance_storage/
 test_consciousness_data/
 test_escape.txt
+soul_registry_state.json
 
 # IDE and editors
 .idea/
