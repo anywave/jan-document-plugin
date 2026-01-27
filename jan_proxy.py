@@ -27,7 +27,9 @@ import logging
 import asyncio
 import tempfile
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+import base64
+import re
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 
 import httpx
@@ -169,7 +171,7 @@ async def startup():
 
 class ChatMessage(BaseModel):
     role: str
-    content: str
+    content: Union[str, List[Dict[str, Any]]]  # str or multimodal content array
     name: Optional[str] = None
 
 
@@ -594,6 +596,136 @@ async def get_soul_prompt(soul_id: str):
 
 
 # ============================================================================
+# Inline Attachment Extraction (Jan UI attachment → document pipeline)
+# ============================================================================
+
+# Supported MIME types for document extraction
+ATTACHMENT_MIME_MAP = {
+    "application/pdf": ".pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+    "text/plain": ".txt",
+    "text/markdown": ".md",
+    "text/csv": ".csv",
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+}
+
+
+def extract_inline_attachments(messages: List[ChatMessage]) -> List[ChatMessage]:
+    """
+    Extract base64-encoded file attachments from multimodal message content.
+
+    Jan sends attachments inline as:
+        content: [
+            {"type": "text", "text": "user's question"},
+            {"type": "image_url", "image_url": {"url": "data:mime;base64,..."}}
+        ]
+
+    This function:
+    1. Detects base64 data URLs in content arrays
+    2. Decodes and indexes them through the document processor
+    3. Runs consciousness pipeline analysis
+    4. Normalizes messages to plain text for the local LLM
+    """
+    normalized = []
+
+    for msg in messages:
+        if not isinstance(msg.content, list):
+            normalized.append(msg)
+            continue
+
+        # Multimodal content — extract text and file data
+        text_parts = []
+        attachment_count = 0
+
+        for part in msg.content:
+            if not isinstance(part, dict):
+                continue
+
+            part_type = part.get("type", "")
+
+            if part_type == "text":
+                text_parts.append(part.get("text", ""))
+
+            elif part_type == "image_url":
+                url_data = part.get("image_url", {})
+                url = url_data.get("url", "") if isinstance(url_data, dict) else ""
+
+                if not url.startswith("data:"):
+                    # Regular URL — keep as-is in text
+                    text_parts.append(f"[Attached URL: {url}]")
+                    continue
+
+                # Parse data URL: data:<mime>;base64,<data>
+                match = re.match(r"data:([^;]+);base64,(.+)", url, re.DOTALL)
+                if not match:
+                    logger.warning("Attachment has unrecognized data URL format")
+                    continue
+
+                mime_type = match.group(1)
+                b64_data = match.group(2)
+
+                # Decode
+                try:
+                    file_bytes = base64.b64decode(b64_data)
+                except Exception as e:
+                    logger.warning(f"Failed to decode base64 attachment: {e}")
+                    continue
+
+                attachment_count += 1
+                ext = ATTACHMENT_MIME_MAP.get(mime_type, ".bin")
+                filename = f"attachment_{attachment_count}{ext}"
+
+                logger.info(f"Extracted inline attachment: {filename} ({mime_type}, {len(file_bytes)} bytes)")
+
+                # Index through document processor
+                if processor is not None:
+                    try:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                            tmp.write(file_bytes)
+                            tmp_path = tmp.name
+
+                        result = processor.ingest(tmp_path, force=True)
+                        text_parts.append(f"[Attached file: {filename} — indexed, {len(result.chunks)} chunks]")
+                        logger.info(f"Indexed inline attachment: {filename} ({len(result.chunks)} chunks)")
+
+                        os.unlink(tmp_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to index attachment {filename}: {e}")
+                        text_parts.append(f"[Attached file: {filename} — indexing failed]")
+
+                # Consciousness pipeline analysis
+                if consciousness_pipeline is not None:
+                    try:
+                        consciousness_result = process_uploaded_document(
+                            file_bytes, filename, consciousness_pipeline
+                        )
+                        if consciousness_result.get("is_identity_payload"):
+                            doc_hash = consciousness_result.get("seed_id", filename)
+                            consciousness_contexts[doc_hash] = {
+                                "inject_context": consciousness_result.get("inject_context"),
+                                "coordinates": consciousness_result.get("coordinates"),
+                                "sigils": consciousness_result.get("active_sigils"),
+                                "resonance_strength": consciousness_result.get("resonance_strength"),
+                                "seed_id": consciousness_result.get("seed_id"),
+                            }
+                            logger.info(f"Consciousness seed detected in attachment {filename}")
+                    except Exception as e:
+                        logger.warning(f"Consciousness analysis failed for {filename}: {e}")
+
+        # Rebuild as plain text message
+        combined_text = "\n".join(text_parts) if text_parts else ""
+        normalized.append(ChatMessage(role=msg.role, content=combined_text, name=msg.name))
+
+        if attachment_count > 0:
+            logger.info(f"Processed {attachment_count} inline attachment(s) from {msg.role} message")
+
+    return normalized
+
+
+# ============================================================================
 # OpenAI-Compatible Chat Completion Proxy
 # ============================================================================
 
@@ -601,7 +733,14 @@ def extract_user_query(messages: List[ChatMessage]) -> str:
     """Extract the latest user message for context retrieval."""
     for msg in reversed(messages):
         if msg.role == "user":
-            return msg.content
+            content = msg.content
+            if isinstance(content, list):
+                # Extract text from multimodal content
+                return " ".join(
+                    p.get("text", "") for p in content
+                    if isinstance(p, dict) and p.get("type") == "text"
+                )
+            return content
     return ""
 
 
@@ -690,6 +829,9 @@ async def chat_completions(request: ChatCompletionRequest):
         raise HTTPException(status_code=503, detail="Processor not initialized")
 
     messages = request.messages
+
+    # Extract and index any inline file attachments (Jan UI attachment flow)
+    messages = extract_inline_attachments(messages)
 
     # Determine if we should inject context
     should_inject = request.inject_context if request.inject_context is not None else config.auto_inject
