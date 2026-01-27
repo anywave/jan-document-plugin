@@ -48,6 +48,8 @@ hidden_imports = [
     'pydantic_core',
     'starlette',
     'fastapi',
+    'speech_recognition',
+    'pyaudio',
 ]
 
 # Add all chromadb submodules
@@ -61,8 +63,20 @@ a = Analysis(
     datas=[
         ('document_processor.py', '.'),
         ('jan_proxy.py', '.'),
-        ('config.env', '.'),
+        ('chat_ui.html', '.'),
+        ('config.env.example', '.'),
         ('README.md', '.'),
+        # Consciousness pipeline
+        ('consciousness_pipeline.py', '.'),
+        ('soul_registry.py', '.'),
+        ('soul_registry_state.json', '.'),
+        ('seed_transit.py', '.'),
+        ('fractal_analyzer.py', '.'),
+        ('resonance_db.py', '.'),
+        # Supporting modules
+        ('resource_monitor.py', '.'),
+        ('ocr_processor.py', '.'),
+        ('batch_processor.py', '.'),
     ] + sentence_transformers_datas + chromadb_datas,
     hiddenimports=hidden_imports,
     hookspath=[],

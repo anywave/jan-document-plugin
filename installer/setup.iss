@@ -13,7 +13,7 @@
 ; - Register uninstaller
 
 #define MyAppName "Jan Document Plugin"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "2.0.0-beta"
 #define MyAppPublisher "Anywave Creations"
 #define MyAppURL "https://github.com/anywave/jan-document-plugin"
 #define MyAppExeName "JanDocumentPlugin.exe"
@@ -71,6 +71,15 @@ Name: "autostart"; Description: "Start with Windows"; GroupDescription: "Startup
 ; Main application files from PyInstaller dist folder
 Source: "..\dist\JanDocumentPlugin\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; Chat UI
+Source: "..\chat_ui.html"; DestDir: "{app}"; Flags: ignoreversion
+
+; Bundled LLM engine (llama-server + Vulkan DLLs)
+Source: "llm\*"; DestDir: "{app}\llm"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: DirExists(ExpandConstant('{src}\llm'))
+
+; Bundled model (~5GB)
+Source: "models\*"; DestDir: "{app}\models"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: DirExists(ExpandConstant('{src}\models'))
+
 ; Config file (don't overwrite if exists)
 Source: "..\config.env.example"; DestDir: "{app}"; DestName: "config.env"; Flags: onlyifdoesntexist
 
@@ -81,15 +90,20 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 ; Calibration files
 Source: "..\calibration\JanDocPlugin_Calibration.pdf"; DestDir: "{app}\calibration"; Flags: ignoreversion
 
+; Jan rollback helper
+Source: "..\rollback_jan.ps1"; DestDir: "{app}"; Flags: ignoreversion
+
 [Dirs]
 ; Create data directories
 Name: "{app}\jan_doc_store"; Permissions: users-modify
 Name: "{app}\tesseract"; Permissions: users-modify
+Name: "{app}\llm"; Permissions: users-modify
+Name: "{app}\models"; Permissions: users-modify
 
 [Icons]
 ; Start Menu
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Comment: "Start Jan Document Plugin"
-Name: "{group}\Open Web Interface"; Filename: "http://localhost:1338"; IconFilename: "{sys}\shell32.dll"; IconIndex: 13
+Name: "{group}\Open Chat UI"; Filename: "http://localhost:1338/ui"; IconFilename: "{sys}\shell32.dll"; IconIndex: 13
 Name: "{group}\Configuration"; Filename: "{app}\config.env"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
@@ -106,14 +120,70 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 Filename: "http://localhost:1338"; Description: "Open Web Interface"; Flags: shellexec postinstall skipifsilent unchecked
 
 [Code]
-// Check if Jan is installed (optional warning)
-function InitializeSetup(): Boolean;
+const
+  RequiredJanVersion = '0.6.8';
+
+function GetJanVersion(): String;
+var
+  JanDir, PackageJsonPath, Content: String;
+  StartPos, EndPos: Integer;
 begin
-  Result := True;
-  // Could add check for Jan AI installation here
+  Result := '';
+  JanDir := ExpandConstant('{localappdata}\Programs\jan');
+
+  if not DirExists(JanDir) then
+    Exit;
+
+  PackageJsonPath := JanDir + '\resources\app.asar.unpacked\package.json';
+  if not FileExists(PackageJsonPath) then
+  begin
+    PackageJsonPath := JanDir + '\resources\app\package.json';
+    if not FileExists(PackageJsonPath) then
+      Exit;
+  end;
+
+  if LoadStringFromFile(PackageJsonPath, Content) then
+  begin
+    StartPos := Pos('"version"', Content);
+    if StartPos > 0 then
+    begin
+      StartPos := Pos(':', Copy(Content, StartPos, Length(Content))) + StartPos;
+      StartPos := Pos('"', Copy(Content, StartPos, Length(Content))) + StartPos;
+      EndPos := Pos('"', Copy(Content, StartPos, Length(Content))) + StartPos - 1;
+      if (StartPos > 0) and (EndPos > StartPos) then
+        Result := Copy(Content, StartPos, EndPos - StartPos);
+    end;
+  end;
 end;
 
-// Show post-install instructions
+function InitializeSetup(): Boolean;
+var
+  JanVersion, Msg: String;
+begin
+  Result := True;
+  JanVersion := GetJanVersion();
+
+  if JanVersion = '' then
+  begin
+    if MsgBox('Jan AI was not detected on this system.' + #13#10 + #13#10 +
+              'The plugin bundles its own LLM server (llama-server) so it can run independently.' + #13#10 +
+              'However, Jan v' + RequiredJanVersion + ' is recommended for the best experience.' + #13#10 + #13#10 +
+              'Continue installation?', mbConfirmation, MB_YESNO) = IDNO then
+      Result := False;
+  end
+  else if Pos(RequiredJanVersion, JanVersion) <> 1 then
+  begin
+    Msg := 'Jan v' + JanVersion + ' detected, but this plugin is designed for Jan v' + RequiredJanVersion + '.' + #13#10 + #13#10 +
+           'Newer versions of Jan may have breaking API changes.' + #13#10 +
+           'You can download Jan v' + RequiredJanVersion + ' from:' + #13#10 +
+           'https://github.com/janhq/jan/releases/tag/v' + RequiredJanVersion + #13#10 + #13#10 +
+           'A rollback helper script (rollback_jan.ps1) will be included.' + #13#10 + #13#10 +
+           'Continue installation anyway?';
+    if MsgBox(Msg, mbConfirmation, MB_YESNO) = IDNO then
+      Result := False;
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
@@ -123,5 +193,5 @@ begin
 end;
 
 [Messages]
-WelcomeLabel2=This will install [name/ver] on your computer.%n%nJan Document Plugin adds document understanding to Jan AI, allowing your local LLM to read and search your documents - all offline.%n%nPrerequisites:%n- Jan AI (https://jan.ai)%n- Optional: Tesseract OCR for scanned documents
-FinishedLabel=Setup has finished installing [name] on your computer.%n%nTo use:%n1. Start Jan AI and enable Local API Server%n2. Launch Jan Document Plugin%n3. Upload documents via the web interface%n4. Chat with your documents in Jan!
+WelcomeLabel2=This will install [name/ver] on your computer.%n%nJan Document Plugin v2.0.0-beta is a self-contained package including:%n- Qwen 2.5 7B model (q4_k_m quantization)%n- llama-server with Vulkan GPU support%n- Document RAG with offline embeddings%n- Voice input, drill-down, and research tools%n- Consciousness pipeline%n%nRequires ~8 GB disk space.%n%nRecommended: Jan AI v0.6.8 (optional - plugin can run standalone)
+FinishedLabel=Setup has finished installing [name] on your computer.%n%nBundled components:%n- llama-server (Vulkan GPU)%n- Qwen 2.5 7B Instruct (q4_k_m)%n- Chat UI with voice input and discovery%n%nTo use:%n1. Launch Jan Document Plugin from the Start Menu%n2. The Chat UI opens automatically in your browser%n3. Upload documents and chat - everything runs locally!

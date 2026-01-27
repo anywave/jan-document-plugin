@@ -226,6 +226,52 @@ if ($llamaServer) {
     $llamaServerPath = ""
 }
 
+# 1.4.1 Jan Version Compatibility Check
+Write-Step "Checking Jan version compatibility..."
+
+$requiredJanVersion = "0.6.8"
+$janInstallDir = "$env:LOCALAPPDATA\Programs\jan"
+$janDetectedVersion = $null
+
+$packageJsonPaths = @(
+    "$janInstallDir\resources\app.asar.unpacked\package.json",
+    "$janInstallDir\resources\app\package.json"
+)
+
+foreach ($pjPath in $packageJsonPaths) {
+    if (Test-Path $pjPath) {
+        try {
+            $pjContent = Get-Content $pjPath -Raw | ConvertFrom-Json
+            $janDetectedVersion = $pjContent.version
+            break
+        } catch {
+            Write-Info "Could not parse $pjPath"
+        }
+    }
+}
+
+if ($janDetectedVersion) {
+    if ($janDetectedVersion -like "$requiredJanVersion*") {
+        Write-Pass "Jan version $janDetectedVersion is compatible (requires $requiredJanVersion)"
+        Log "PASS: Jan version $janDetectedVersion"
+    } else {
+        Write-Fail "Jan version $janDetectedVersion detected (recommended: $requiredJanVersion)"
+        Write-Info "Newer Jan versions may have breaking API changes."
+        Write-Info "Download Jan v${requiredJanVersion}: https://github.com/janhq/jan/releases/tag/v${requiredJanVersion}"
+        Write-Info "A rollback_jan.ps1 script is included for convenience."
+        Log "WARNING: Jan version mismatch - found $janDetectedVersion, need $requiredJanVersion"
+
+        $continue = Read-Host "Continue anyway? (Y/n)"
+        if ($continue -eq 'n' -or $continue -eq 'N') {
+            Write-Info "Installation cancelled. Please install Jan v$requiredJanVersion first."
+            exit 0
+        }
+    }
+} else {
+    Write-Info "Jan not detected (plugin can run standalone with bundled llama-server)"
+    Log "INFO: Jan not detected"
+}
+
 # 1.5 Model File
 Write-Step "Checking for GGUF model..."
 

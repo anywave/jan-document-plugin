@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jan</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#191919;
+  --fg:#ffffff;
+  --fg-4:rgba(255,255,255,0.04);--fg-5:rgba(255,255,255,0.05);
+  --fg-6:rgba(255,255,255,0.06);--fg-10:rgba(255,255,255,0.1);
+  --fg-20:rgba(255,255,255,0.2);--fg-40:rgba(255,255,255,0.4);
+  --fg-50:rgba(255,255,255,0.5);--fg-60:rgba(255,255,255,0.6);
+  --fg-70:rgba(255,255,255,0.7);--fg-90:rgba(255,255,255,0.9);
+  --primary:#DB582C;--primary-hover:#c44e27;--primary-10:rgba(219,88,44,0.1);
+  --accent:#2D78DC;--accent-10:rgba(45,120,220,0.1);
+  --destructive:#903C3C;--success:#22c55e;--warning:#f59e0b;
+  --purple:#a855f7;--purple-10:rgba(168,85,247,0.1);--purple-15:rgba(168,85,247,0.15);--purple-30:rgba(168,85,247,0.3);
+  --r:10px;--r-sm:6px;--r-md:8px;--r-pill:24px;--r-full:9999px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--fg);height:100vh;display:flex;overflow:hidden;font-size:14px;-webkit-font-smoothing:antialiased}
+
+/* ─── LEFT SIDEBAR ─── */
+.left-panel{width:220px;background:var(--bg);display:flex;flex-direction:column;flex-shrink:0;padding:6px 0}
+.lp-top{padding:8px 12px;display:flex;align-items:center;gap:8px;height:40px}
+.lp-top .logo{width:24px;height:24px;background:var(--primary);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#fff}
+.lp-top h1{font-size:15px;font-weight:600}
+.lp-btn{width:calc(100% - 16px);margin:1px 8px;padding:6px 8px;background:none;border:none;border-radius:var(--r-sm);color:var(--fg-90);cursor:pointer;font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;text-align:left;transition:background .2s}
+.lp-btn:hover{background:var(--fg-10)}
+.lp-btn svg{color:var(--fg-70);flex-shrink:0}
+.lp-section{padding:8px 12px 4px;font-size:11px;color:var(--fg-50);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-top:4px}
+.thread-list{flex:1;overflow-y:auto;padding:2px 8px}
+.thread-item{padding:6px 10px;border-radius:var(--r-sm);cursor:pointer;font-size:13px;color:var(--fg-90);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px;transition:background .2s}
+.thread-item:hover{background:var(--fg-10)}
+.thread-item.active{background:var(--fg-10)}
+.lp-bottom{border-top:1px solid var(--fg-5);padding:4px 0;margin-top:auto}
+.lp-status{padding:6px 16px;font-size:11px;color:var(--fg-50);display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:var(--r-full);display:inline-block;transition:background .3s}
+.dot.on{background:var(--success)}.dot.off{background:var(--destructive)}.dot.soul{background:var(--purple)}
+
+/* ─── MAIN CONTENT ─── */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg);border-radius:var(--r);margin:4px;border:1px solid var(--fg-5);overflow:hidden}
+.chat-header{height:40px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--fg-5);flex-shrink:0}
+.model-select{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:var(--r-sm);cursor:pointer;font-size:13px;font-weight:500;transition:background .2s}
+.model-select:hover{background:var(--fg-10)}
+.model-select svg{color:var(--fg-50)}
+.header-actions{display:flex;align-items:center;gap:2px}
+.hdr-btn{width:28px;height:28px;background:none;border:none;color:var(--fg-50);cursor:pointer;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;transition:all .2s}
+.hdr-btn:hover{background:var(--fg-10);color:var(--fg)}
+.hdr-btn.active{background:var(--primary-10);color:var(--primary)}
+
+/* ─── MESSAGES ─── */
+.messages{flex:1;overflow-y:auto;padding:16px 0}
+.msg-container{display:flex;flex-direction:column;gap:16px;width:80%;max-width:800px;margin:0 auto;padding:0 20px}
+.message{animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+/* User: right-aligned bubble */
+.message.user{display:flex;flex-direction:column;align-items:flex-end}
+.message.user .msg-bubble{background:var(--fg-4);padding:10px 14px;border-radius:var(--r-md);max-width:85%;font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.message.user .msg-attachments{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;margin-bottom:4px}
+/* Assistant: left-aligned with avatar */
+.message.assistant{display:flex;flex-direction:column;align-items:flex-start}
+.msg-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.msg-avatar{width:28px;height:28px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;border:1px solid var(--fg-10);background:var(--fg-5);color:var(--fg-70)}
+.msg-name{font-weight:500;font-size:13px;color:var(--fg)}
+.msg-body{font-size:14px;line-height:1.65;white-space:pre-wrap;word-break:break-word;color:var(--fg);max-width:85%}
+.att-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--fg-10);border-radius:var(--r-md);font-size:12px;color:var(--fg-70)}
+.typing-dots{display:flex;gap:4px;padding:4px 0}
+.typing-dots span{width:6px;height:6px;background:var(--fg-40);border-radius:var(--r-full);animation:bounce 1.4s infinite ease-in-out}
+.typing-dots span:nth-child(2){animation-delay:.2s}
+.typing-dots span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}
+
+/* ─── INPUT AREA ─── */
+.input-area{padding:12px 0 20px;flex-shrink:0}
+.input-container{width:80%;max-width:800px;margin:0 auto;padding:0 20px}
+.att-preview{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.att-chip{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--fg-6);border:1px solid var(--fg-10);border-radius:var(--r);font-size:12px;color:var(--fg-70);position:relative}
+.att-chip .x{cursor:pointer;color:var(--fg-50);font-size:14px;margin-left:2px;transition:color .15s}.att-chip .x:hover{color:var(--destructive)}
+.input-box{display:flex;align-items:flex-end;background:var(--bg);border:1px solid var(--fg-10);border-radius:var(--r-pill);padding:4px 6px;transition:all .2s}
+.input-box:focus-within{border-color:var(--fg-20)}
+.input-box.streaming{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary-10)}
+.input-box textarea{flex:1;background:none;border:none;color:var(--fg);font-size:14px;font-family:inherit;resize:none;min-height:36px;max-height:200px;outline:none;padding:8px 8px 8px 4px;line-height:1.4}
+.input-box textarea::placeholder{color:var(--fg-40)}
+.ib-btn{width:28px;height:28px;border:none;border-radius:var(--r-full);cursor:pointer;display:flex;align-items:center;justify-content:center;background:var(--fg-4);color:var(--fg-50);flex-shrink:0;transition:all .2s}
+.ib-btn:hover{background:var(--fg-10);color:var(--fg)}
+.ib-btn svg{width:18px;height:18px}
+.ib-btn.send{background:var(--primary);color:#fff;width:32px;height:32px}
+.ib-btn.send:hover{background:var(--primary-hover)}
+.ib-btn.send:disabled{opacity:.35;cursor:not-allowed}
+.ib-btn.send svg{width:18px;height:18px}
+.ib-btn.recording{background:rgba(220,38,38,0.15);color:#ef4444;animation:rec-pulse 1.2s ease-in-out infinite}
+@keyframes rec-pulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,0.3)}50%{box-shadow:0 0 0 6px rgba(220,38,38,0)}}
+.ib-btn.transcribing{background:var(--accent-10);color:var(--accent);cursor:wait}
+.input-toolbar{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 0}
+.input-caps{display:flex;align-items:center;gap:2px}
+.cap{display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:var(--r-sm);cursor:pointer;font-size:12px;color:var(--fg-50);transition:all .2s;user-select:none}
+.cap:hover{background:var(--fg-10);color:var(--fg)}
+.cap.active{background:var(--primary-10);color:var(--primary)}
+.cap svg{width:16px;height:16px}
+.cap-info{font-size:12px;color:var(--fg-50)}
+#file-input,#soul-file-input,#soul-dir-input{display:none}
+
+/* ─── SHEET OVERLAY & RIGHT PANELS ─── */
+.sheet-overlay{position:fixed;inset:0;z-index:40;background:rgba(25,25,25,0.5);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .3s}
+.sheet-overlay.open{opacity:1;pointer-events:auto}
+.right-panel{position:fixed;right:4px;top:4px;height:calc(100% - 8px);width:360px;max-width:75vw;z-index:50;background:var(--bg);border:1px solid var(--fg-5);border-radius:var(--r);display:flex;flex-direction:column;overflow-y:auto;transform:translateX(calc(100% + 8px));transition:transform .3s ease}
+.right-panel.open{transform:translateX(0)}
+.rp-header{padding:14px 16px;border-bottom:1px solid var(--fg-5);font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.rp-close{background:none;border:none;color:var(--fg-50);cursor:pointer;padding:4px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;transition:all .2s}
+.rp-close:hover{background:var(--fg-10);color:var(--fg)}
+.rp-close svg{width:16px;height:16px}
+.rp-section{padding:14px 16px;border-bottom:1px solid var(--fg-5)}
+.rp-section h3{font-size:11px;color:var(--fg-50);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:10px}
+.rp-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.rp-row label{font-size:13px;color:var(--fg-70)}
+.rp-row input[type=range]{width:120px;accent-color:var(--accent);height:6px}
+.rp-row input[type=number]{width:72px;background:var(--fg-6);border:1px solid var(--fg-10);border-radius:var(--r-sm);padding:5px 8px;color:var(--fg);font-size:13px;text-align:right;outline:none;transition:border-color .2s}
+.rp-row input[type=number]:focus{border-color:var(--accent)}
+.rp-row .val{font-size:12px;color:var(--fg-50);min-width:36px;text-align:right;font-variant-numeric:tabular-nums}
+.rp-row input[type=checkbox]{accent-color:var(--primary);width:16px;height:16px;cursor:pointer}
+
+/* ─── CARDS & BUTTONS ─── */
+.card{background:var(--fg-6);border:1px solid var(--fg-10);border-radius:var(--r-md);padding:12px;margin-bottom:8px;transition:border-color .2s}
+.card:hover{border-color:var(--fg-20)}
+.card-name{font-size:13px;font-weight:600;color:var(--fg)}
+.card-desc{font-size:11px;color:var(--fg-50);margin-top:3px;line-height:1.4}
+.card-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:var(--r-sm);margin-top:6px}
+.card-badge.active{background:var(--purple-15);color:var(--purple)}
+.card-badge.inactive{background:var(--fg-6);color:var(--fg-50)}
+.card-badge.running{background:rgba(34,197,94,0.12);color:var(--success)}
+.btn-soul{width:100%;padding:8px;background:var(--purple-10);border:1px solid var(--purple-30);border-radius:var(--r-md);color:var(--purple);cursor:pointer;font-size:13px;margin-top:6px;transition:all .15s}
+.btn-soul:hover{background:rgba(168,85,247,0.2)}
+.btn-soul.primary{background:var(--purple);color:#fff;border-color:var(--purple)}
+.btn-soul.primary:hover{background:#9333ea}
+.btn-action{padding:7px 14px;background:var(--fg-6);border:1px solid var(--fg-10);border-radius:var(--r-sm);color:var(--fg-90);cursor:pointer;font-size:13px;transition:all .15s}
+.btn-action:hover{background:var(--fg-10);border-color:var(--fg-20)}
+.btn-danger{border-color:rgba(144,60,60,0.4);color:var(--destructive)}
+.btn-danger:hover{background:rgba(144,60,60,0.1)}
+
+/* ─── TUTORIAL ─── */
+.tutorial-overlay{position:fixed;inset:0;z-index:9000;display:none;background:rgba(0,0,0,0.75);backdrop-filter:blur(3px)}
+.tutorial-overlay.open{display:block}
+.tutorial-spotlight{position:absolute;border-radius:var(--r-md);border:2px solid var(--primary);box-shadow:0 0 0 4px var(--primary-10),0 0 40px rgba(219,88,44,0.15);transition:all .4s ease;z-index:9001;pointer-events:none}
+@keyframes pulse-ring{0%{box-shadow:0 0 0 4px var(--primary-10),0 0 40px rgba(219,88,44,0.15)}50%{box-shadow:0 0 0 8px rgba(219,88,44,0.08),0 0 60px rgba(219,88,44,0.1)}100%{box-shadow:0 0 0 4px var(--primary-10),0 0 40px rgba(219,88,44,0.15)}}
+.tutorial-spotlight.pulse{animation:pulse-ring 2s ease-in-out infinite}
+.tutorial-card{position:absolute;z-index:9002;background:#252525;border:1px solid var(--fg-10);border-radius:12px;padding:24px;max-width:340px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.tutorial-card h2{font-size:16px;font-weight:600;margin-bottom:8px;color:var(--fg)}
+.tutorial-card p{font-size:13px;line-height:1.6;color:var(--fg-70);margin-bottom:16px}
+.tutorial-step-indicator{display:flex;gap:6px;margin-bottom:16px}
+.tutorial-step-dot{width:8px;height:8px;border-radius:var(--r-full);background:var(--fg-10);transition:background .3s}
+.tutorial-step-dot.active{background:var(--primary)}
+.tutorial-step-dot.done{background:var(--fg-40)}
+.tutorial-actions{display:flex;justify-content:space-between;align-items:center}
+.tutorial-skip{background:none;border:none;color:var(--fg-50);cursor:pointer;font-size:13px;padding:6px 12px;border-radius:var(--r-sm);transition:all .2s}
+.tutorial-skip:hover{color:var(--fg);background:var(--fg-10)}
+.tutorial-next{padding:8px 20px;background:var(--primary);color:#fff;border:none;border-radius:var(--r-sm);cursor:pointer;font-size:13px;font-weight:500;transition:background .2s}
+.tutorial-next:hover{background:var(--primary-hover)}
+
+/* ─── FEATURE TIPS ─── */
+.feature-tip{position:fixed;z-index:8000;background:#252525;border:1px solid var(--fg-10);border-radius:var(--r);padding:14px 16px;max-width:280px;box-shadow:0 12px 40px rgba(0,0,0,0.4);animation:tipIn .3s ease}
+@keyframes tipIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.feature-tip h4{font-size:13px;font-weight:600;margin-bottom:4px;color:var(--fg)}
+.feature-tip p{font-size:12px;line-height:1.5;color:var(--fg-60)}
+.feature-tip .tip-close{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--fg-50);cursor:pointer;font-size:14px;padding:2px}
+.feature-tip::before{content:'';position:absolute;width:8px;height:8px;background:#252525;border:1px solid var(--fg-10);transform:rotate(45deg)}
+.feature-tip.arrow-top::before{top:-5px;left:24px;border-bottom:none;border-right:none}
+.feature-tip.arrow-bottom::before{bottom:-5px;left:24px;border-top:none;border-left:none}
+.feature-tip.arrow-left::before{left:-5px;top:16px;border-top:none;border-right:none}
+.feature-tip.arrow-right::before{right:-5px;top:16px;border-bottom:none;border-left:none}
+
+/* ─── CONTEXT MENU ─── */
+.ctx-menu{position:fixed;z-index:7000;background:#252525;border:1px solid var(--fg-10);border-radius:var(--r-md);box-shadow:0 8px 30px rgba(0,0,0,0.45);min-width:180px;padding:4px 0;animation:fadeIn .15s ease}
+.ctx-menu-item{display:flex;align-items:center;gap:8px;padding:8px 14px;font-size:13px;color:var(--fg-90);cursor:pointer;transition:background .15s}
+.ctx-menu-item:hover{background:var(--fg-10)}
+.ctx-menu-item svg{width:16px;height:16px;color:var(--fg-50);flex-shrink:0}
+.ctx-menu-divider{height:1px;background:var(--fg-10);margin:4px 0}
+
+/* ─── DISCOVERY CARDS ─── */
+.disc-card{background:var(--fg-6);border:1px solid var(--fg-10);border-left:3px solid var(--accent);border-radius:var(--r-md);padding:12px;margin-bottom:8px;transition:border-color .2s}
+.disc-card:hover{border-color:var(--fg-20)}
+.disc-text{font-size:13px;color:var(--fg-90);line-height:1.5;max-height:120px;overflow:hidden;white-space:pre-wrap;word-break:break-word}
+.disc-meta{font-size:11px;color:var(--fg-50);margin-top:6px;line-height:1.4;display:flex;flex-wrap:wrap;gap:4px 12px}
+.disc-source-link{color:var(--accent);text-decoration:none;font-size:11px}
+.disc-source-link:hover{text-decoration:underline}
+.disc-actions{display:flex;gap:6px;margin-top:8px}
+.disc-actions button{padding:4px 10px;font-size:12px;border-radius:var(--r-sm);cursor:pointer;border:1px solid var(--fg-10);background:var(--fg-6);color:var(--fg-70);transition:all .15s}
+.disc-actions button:hover{background:var(--fg-10);color:var(--fg)}
+
+/* ─── SCROLLBAR ─── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--fg-10);border-radius:var(--r)}
+::-webkit-scrollbar-thumb:hover{background:var(--fg-20)}
+</style>
+</head>
+<body>
+
+<!-- ═══ LEFT PANEL ═══ -->
+<div class="left-panel" id="left-panel">
+  <div class="lp-top">
+    <div class="logo">J</div>
+    <h1>Jan</h1>
+  </div>
+  <button class="lp-btn" id="btn-search" title="Search">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    Search
+  </button>
+  <button class="lp-btn" id="btn-newchat" onclick="newChat()">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+    New Chat
+  </button>
+  <button class="lp-btn" id="btn-assistants-side" onclick="togglePanel('assistants')">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><circle cx="12" cy="5" r="3"/><path d="M7 22v-3M17 22v-3"/></svg>
+    Assistants
+  </button>
+  <button class="lp-btn" id="btn-research-side" onclick="togglePanel('research')">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M8 7h6M8 11h8"/></svg>
+    Research
+  </button>
+  <div class="lp-section">Recents</div>
+  <div class="thread-list" id="thread-list"></div>
+  <div class="lp-bottom">
+    <button class="lp-btn" id="btn-hub-side" onclick="togglePanel('hub')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Hub
+    </button>
+    <button class="lp-btn" id="btn-settings-side" onclick="togglePanel('settings')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      Settings
+    </button>
+    <div class="lp-status"><span class="dot" id="dot-proxy"></span> Proxy</div>
+    <div class="lp-status"><span class="dot" id="dot-llm"></span> LLM Engine</div>
+    <div class="lp-status"><span class="dot" id="dot-soul"></span> Soul: <span id="soul-label">None</span></div>
+  </div>
+</div>
+
+<!-- ═══ MAIN ═══ -->
+<div class="main">
+  <div class="chat-header">
+    <div class="model-select" id="model-select">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><circle cx="12" cy="5" r="3"/></svg>
+      <span>Qwen 2.5 7B Instruct</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </div>
+    <div class="header-actions">
+      <button class="hdr-btn" id="btn-help" onclick="startTutorial()" title="Help / Tour">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+      </button>
+      <button class="hdr-btn" id="btn-soul-panel" onclick="togglePanel('soul')" title="Soul / Consciousness">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/></svg>
+      </button>
+      <button class="hdr-btn" id="btn-settings-panel" onclick="togglePanel('settings')" title="Model Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+      <button class="hdr-btn" onclick="newChat()" title="New Chat">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="messages" id="messages"><div class="msg-container" id="msg-container"></div></div>
+  <div class="input-area" id="input-area">
+    <div class="input-container">
+      <div class="att-preview" id="att-preview"></div>
+      <div class="input-box" id="input-box">
+        <button class="ib-btn" onclick="document.getElementById('file-input').click()" title="Add files" id="btn-attach">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <button class="ib-btn" id="btn-mic" onclick="toggleVoiceInput()" title="Voice input">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        </button>
+        <input type="file" id="file-input" multiple onchange="handleFiles(this.files)">
+        <textarea id="user-input" placeholder="Message Jan..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="ib-btn send" id="send-btn" onclick="sendMessage()" title="Send">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+      </div>
+      <div class="input-toolbar">
+        <div class="input-caps" id="input-caps">
+          <span class="cap active" id="cap-rag" onclick="toggleCap('rag')" title="Toggle RAG context injection">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14,2 14,8 20,8"/></svg>
+            RAG
+          </span>
+          <span class="cap active" id="cap-soul" onclick="toggleCap('soul')" title="Toggle Soul injection">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/></svg>
+            Soul
+          </span>
+          <span class="cap active" id="cap-consciousness" onclick="toggleCap('consciousness')" title="Toggle Consciousness pipeline">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.22-8.56"/><path d="M12 7v5l3 3"/></svg>
+            Consciousness
+          </span>
+        </div>
+        <span class="cap-info"><span id="doc-count">0</span> docs indexed</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SHEET OVERLAY ═══ -->
+<div class="sheet-overlay" id="sheet-overlay" onclick="closePanel()"></div>
+
+<!-- ═══ RIGHT PANEL: Settings ═══ -->
+<div class="right-panel" id="panel-settings">
+  <div class="rp-header">Model Settings <button class="rp-close" onclick="closePanel()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+  <div class="rp-section">
+    <h3>Inference Parameters</h3>
+    <div class="rp-row"><label>Temperature</label><input type="range" min="0" max="2" step="0.1" value="0.7" id="s-temp" oninput="document.getElementById('v-temp').textContent=this.value"><span class="val" id="v-temp">0.7</span></div>
+    <div class="rp-row"><label>Top P</label><input type="range" min="0" max="1" step="0.05" value="0.95" id="s-topp" oninput="document.getElementById('v-topp').textContent=this.value"><span class="val" id="v-topp">0.95</span></div>
+    <div class="rp-row"><label>Max Tokens</label><input type="number" value="4096" min="1" max="32768" id="s-maxtok"></div>
+    <div class="rp-row"><label>Freq. Penalty</label><input type="range" min="0" max="2" step="0.1" value="0" id="s-freq" oninput="document.getElementById('v-freq').textContent=this.value"><span class="val" id="v-freq">0</span></div>
+    <div class="rp-row"><label>Pres. Penalty</label><input type="range" min="0" max="2" step="0.1" value="0" id="s-pres" oninput="document.getElementById('v-pres').textContent=this.value"><span class="val" id="v-pres">0</span></div>
+  </div>
+  <div class="rp-section">
+    <h3>Engine</h3>
+    <div class="rp-row"><label>Context Length</label><input type="number" value="8192" min="512" max="131072" id="s-ctx"></div>
+    <div class="rp-row"><label>Stream</label><input type="checkbox" checked id="s-stream"></div>
+  </div>
+  <div class="rp-section">
+    <h3>Debug & Support</h3>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <span style="font-size:12px;color:var(--fg-50)">Plugin Version</span>
+      <span style="font-size:11px;padding:2px 8px;background:var(--accent-10);color:var(--accent);border-radius:var(--r-sm);font-weight:600">v2.0.0-beta</span>
+    </div>
+    <button class="btn-action" style="width:100%;margin-bottom:8px" onclick="generateDebugReport()">Generate Debug Report</button>
+    <button class="btn-action" style="width:100%;margin-bottom:8px" onclick="reportIssueGitHub()">Report Issue on GitHub</button>
+    <div id="debug-report-output" style="font-size:11px;color:var(--fg-50);max-height:200px;overflow-y:auto;white-space:pre-wrap;display:none;margin-top:8px;background:var(--fg-6);border-radius:var(--r-sm);padding:8px"></div>
+  </div>
+</div>
+
+<!-- ═══ RIGHT PANEL: Soul / Consciousness ═══ -->
+<div class="right-panel" id="panel-soul">
+  <div class="rp-header">Soul / Consciousness <button class="rp-close" onclick="closePanel()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+  <div class="rp-section">
+    <h3>Upload Soul File</h3>
+    <button class="btn-soul primary" onclick="document.getElementById('soul-file-input').click()">Upload Soul File (.md / .txt)</button>
+    <input type="file" id="soul-file-input" accept=".md,.txt,.json" onchange="loadSoulFile(this.files[0])">
+    <div id="soul-upload-status" style="font-size:12px;color:var(--fg-50);margin-top:6px"></div>
+  </div>
+  <div class="rp-section">
+    <h3>Saved Souls (Local)</h3>
+    <div id="local-soul-list" style="font-size:13px;color:var(--fg-50)">No saved souls</div>
+    <button class="btn-soul" style="margin-top:8px" onclick="document.getElementById('soul-dir-input').click()">Import Soul Files</button>
+    <input type="file" id="soul-dir-input" accept=".md,.txt,.json" multiple onchange="loadSoulFolder(this.files)">
+  </div>
+  <div class="rp-section">
+    <h3>Active Soul</h3>
+    <div id="active-soul-display"><div style="font-size:13px;color:var(--fg-50)">No soul active</div></div>
+  </div>
+  <div class="rp-section">
+    <h3>Soul Registry</h3>
+    <div id="soul-registry-list"><div style="font-size:13px;color:var(--fg-50)">Loading...</div></div>
+  </div>
+  <div class="rp-section">
+    <h3>Consciousness Seeds</h3>
+    <div id="seed-list"><div style="font-size:13px;color:var(--fg-50)">No seeds captured</div></div>
+  </div>
+  <div class="rp-section">
+    <h3>Pipeline Status</h3>
+    <div id="pipeline-status" style="font-size:12px;color:var(--fg-50)">Checking...</div>
+  </div>
+</div>
+
+<!-- ═══ RIGHT PANEL: Hub ═══ -->
+<div class="right-panel" id="panel-hub">
+  <div class="rp-header">Hub <button class="rp-close" onclick="closePanel()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+  <div class="rp-section">
+    <h3>Active Model</h3>
+    <div class="card">
+      <div class="card-name">Qwen 2.5 7B Instruct</div>
+      <div class="card-desc">q4_k_m quantization | 4.7 GB | Vulkan GPU</div>
+      <div class="card-badge running">RUNNING</div>
+    </div>
+  </div>
+  <div class="rp-section"><h3>Available Models</h3><div id="hub-models" style="font-size:13px;color:var(--fg-50)">Loading...</div></div>
+  <div class="rp-section"><h3>Documents Indexed</h3><div id="hub-docs" style="font-size:13px;color:var(--fg-50)">Loading...</div></div>
+</div>
+
+<!-- ═══ RIGHT PANEL: Assistants ═══ -->
+<div class="right-panel" id="panel-assistants">
+  <div class="rp-header">Assistants <button class="rp-close" onclick="closePanel()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+  <div class="rp-section">
+    <h3>Current Assistant</h3>
+    <div class="card">
+      <div class="card-name">Jan Document Plugin</div>
+      <div class="card-desc">RAG-enabled assistant with consciousness pipeline and soul injection. Documents are automatically indexed and injected as context.</div>
+    </div>
+  </div>
+  <div class="rp-section">
+    <h3>System Prompt</h3>
+    <textarea id="system-prompt" style="width:100%;min-height:100px;background:var(--fg-6);border:1px solid var(--fg-10);border-radius:var(--r-md);padding:10px;color:var(--fg);font-size:13px;font-family:inherit;resize:vertical;outline:none;transition:border-color .2s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor=''" placeholder="Enter a custom system prompt..."></textarea>
+    <button class="btn-action" style="margin-top:8px;width:100%" onclick="applySystemPrompt()">Apply System Prompt</button>
+  </div>
+  <div class="rp-section">
+    <h3>Capabilities</h3>
+    <div class="rp-row"><label>RAG Context Injection</label><input type="checkbox" checked id="cap-rag-toggle" onchange="syncCapFromCheckbox('rag')"></div>
+    <div class="rp-row"><label>Soul / Identity Injection</label><input type="checkbox" checked id="cap-soul-toggle" onchange="syncCapFromCheckbox('soul')"></div>
+    <div class="rp-row"><label>Consciousness Pipeline</label><input type="checkbox" checked id="cap-consciousness-toggle" onchange="syncCapFromCheckbox('consciousness')"></div>
+  </div>
+</div>
+
+<!-- ═══ RIGHT PANEL: Research / Discovery ═══ -->
+<div class="right-panel" id="panel-research">
+  <div class="rp-header">
+    Research
+    <div style="display:flex;gap:6px;align-items:center">
+      <button class="btn-action btn-danger" onclick="clearAllDiscovery()" style="font-size:11px;padding:4px 10px">Clear All</button>
+      <button class="rp-close" onclick="closePanel()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+  </div>
+  <div class="rp-section" style="border-bottom:none;flex:1;overflow-y:auto">
+    <h3>Discovery Items</h3>
+    <div id="discovery-list"><div style="font-size:13px;color:var(--fg-50)">No items saved yet. Right-click on assistant text to save discoveries.</div></div>
+  </div>
+</div>
+
+<!-- ═══ TUTORIAL OVERLAY ═══ -->
+<div class="tutorial-overlay" id="tutorial-overlay">
+  <div class="tutorial-spotlight" id="tutorial-spotlight"></div>
+  <div class="tutorial-card" id="tutorial-card">
+    <h2 id="tutorial-title"></h2>
+    <p id="tutorial-text"></p>
+    <div class="tutorial-step-indicator" id="tutorial-dots"></div>
+    <div class="tutorial-actions">
+      <button class="tutorial-skip" id="tutorial-skip" onclick="endTutorial()">Skip tour</button>
+      <button class="tutorial-next" id="tutorial-next" onclick="nextTutorialStep()">Next</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var API = 'http://localhost:1338';
+var MODEL = 'qwen2.5-7b-instruct';
+var chatMessages = [];
+var systemPrompt = '';
+var attachedFiles = [];
+var isGenerating = false;
+var activePanel = null;
+var capabilities = { rag: true, soul: true, consciousness: true };
+
+// ─── DOM HELPERS ───
+function el(tag, cls, txt) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (txt !== undefined) e.textContent = txt;
+  return e;
+}
+function autoResize(t) { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 200) + 'px'; }
+function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+function formatSize(b) { return b < 1024 ? b+' B' : b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB'; }
+function scrollBottom() { var m = document.getElementById('messages'); m.scrollTop = m.scrollHeight; }
+
+// ─── TUTORIAL SYSTEM ───
+var tutorialSteps = [
+  { title: 'Welcome to Jan Document Plugin', text: 'Your local AI assistant with document RAG, soul injection, and consciousness pipeline. Let me show you around.', target: null },
+  { title: 'Sidebar Navigation', text: 'Browse your chat threads, open the Hub for model info, or access Settings. Status dots show connection health for the proxy, LLM engine, and soul system.', target: '#left-panel', pos: 'right' },
+  { title: 'Start a Conversation', text: 'Type your message here. Press Enter to send, Shift+Enter for new lines. Use the + button to attach documents or images.', target: '#input-box', pos: 'top' },
+  { title: 'Voice Input', text: 'Click the microphone button to dictate your message. It records audio and transcribes it offline using Windows Speech Recognition. Click again to stop.', target: '#btn-mic', pos: 'top' },
+  { title: 'Capability Toggles', text: 'Click RAG, Soul, or Consciousness to enable or disable each pipeline independently. Orange = active, gray = off.', target: '#input-caps', pos: 'top' },
+  { title: 'Right-Click Drill Down', text: 'Highlight text in any assistant response and right-click for options: "Drill Down" expands on the topic, "Save to Discovery" bookmarks it for research.', target: null },
+  { title: 'Research Panel', text: 'Open the Research panel to browse saved discoveries. Each card shows when it was saved, which model and capabilities were active, and the source document if available.', target: '#btn-research-side', pos: 'right' },
+  { title: 'Soul & Consciousness', text: 'Open this panel to upload soul files, manage identities, view the soul registry, and monitor the consciousness pipeline. Soul files are saved locally and persist across sessions.', target: '#btn-soul-panel', pos: 'left' },
+  { title: 'Model Settings', text: 'Adjust temperature, top-p, max tokens, and other inference parameters. The Debug & Support section lets you generate system reports and file GitHub issues.', target: '#btn-settings-panel', pos: 'left' },
+  { title: 'You\'re Ready!', text: 'Start chatting, attach files for RAG context, use voice input, or load a soul file. Right-click assistant text for drill-down and discovery features.', target: null }
+];
+var tutorialStep = 0;
+
+function startTutorial() {
+  tutorialStep = 0;
+  showTutorialStep();
+}
+
+function showTutorialStep() {
+  var overlay = document.getElementById('tutorial-overlay');
+  var spotlight = document.getElementById('tutorial-spotlight');
+  var card = document.getElementById('tutorial-card');
+  var step = tutorialSteps[tutorialStep];
+
+  overlay.classList.add('open');
+  document.getElementById('tutorial-title').textContent = step.title;
+  document.getElementById('tutorial-text').textContent = step.text;
+  document.getElementById('tutorial-next').textContent = tutorialStep === tutorialSteps.length - 1 ? 'Get Started' : 'Next';
+
+  // Step dots
+  var dotsContainer = document.getElementById('tutorial-dots');
+  while (dotsContainer.firstChild) dotsContainer.removeChild(dotsContainer.firstChild);
+  for (var i = 0; i < tutorialSteps.length; i++) {
+    var dot = el('div', 'tutorial-step-dot');
+    if (i < tutorialStep) dot.classList.add('done');
+    if (i === tutorialStep) dot.classList.add('active');
+    dotsContainer.appendChild(dot);
+  }
+
+  if (step.target) {
+    var targetEl = document.querySelector(step.target);
+    if (targetEl) {
+      var rect = targetEl.getBoundingClientRect();
+      spotlight.style.display = 'block';
+      spotlight.style.left = (rect.left - 6) + 'px';
+      spotlight.style.top = (rect.top - 6) + 'px';
+      spotlight.style.width = (rect.width + 12) + 'px';
+      spotlight.style.height = (rect.height + 12) + 'px';
+      spotlight.classList.add('pulse');
+
+      // Position card
+      var cw = 340, ch = card.offsetHeight || 260, pad = 16;
+      card.style.transform = 'none';
+      if (step.pos === 'right') {
+        card.style.left = (rect.right + pad) + 'px';
+        card.style.top = Math.max(pad, rect.top) + 'px';
+      } else if (step.pos === 'left') {
+        card.style.left = Math.max(pad, rect.left - cw - pad) + 'px';
+        card.style.top = Math.max(pad, rect.top - 40) + 'px';
+      } else if (step.pos === 'top') {
+        card.style.left = Math.max(pad, rect.left + rect.width / 2 - cw / 2) + 'px';
+        card.style.top = Math.max(pad, rect.top - ch - pad) + 'px';
+      } else {
+        card.style.left = Math.max(pad, rect.left + rect.width / 2 - cw / 2) + 'px';
+        card.style.top = (rect.bottom + pad) + 'px';
+      }
+    }
+  } else {
+    spotlight.style.display = 'none';
+    spotlight.classList.remove('pulse');
+    card.style.left = '50%';
+    card.style.top = '50%';
+    card.style.transform = 'translate(-50%, -50%)';
+  }
+}
+
+function nextTutorialStep() {
+  tutorialStep++;
+  if (tutorialStep >= tutorialSteps.length) {
+    endTutorial();
+  } else {
+    showTutorialStep();
+  }
+}
+
+function endTutorial() {
+  document.getElementById('tutorial-overlay').classList.remove('open');
+  document.getElementById('tutorial-spotlight').classList.remove('pulse');
+  localStorage.setItem('jan_onboarding_complete', '1');
+}
+
+// ─── FEATURE TIPS ───
+var featureTipsShown = {};
+try { featureTipsShown = JSON.parse(localStorage.getItem('jan_feature_tips') || '{}'); } catch(e) {}
+
+function showFeatureTip(id, title, text, targetEl, arrow) {
+  if (featureTipsShown[id]) return;
+  featureTipsShown[id] = true;
+  localStorage.setItem('jan_feature_tips', JSON.stringify(featureTipsShown));
+
+  var rect = targetEl.getBoundingClientRect();
+  var tip = el('div', 'feature-tip arrow-' + arrow);
+  tip.id = 'ftip-' + id;
+  var h = el('h4', '', title); tip.appendChild(h);
+  var p = el('p', '', text); tip.appendChild(p);
+  var close = el('button', 'tip-close', '\u00d7');
+  close.onclick = function() { tip.remove(); };
+  tip.appendChild(close);
+
+  if (arrow === 'top') {
+    tip.style.left = rect.left + 'px';
+    tip.style.top = (rect.bottom + 12) + 'px';
+  } else if (arrow === 'bottom') {
+    tip.style.left = rect.left + 'px';
+    tip.style.top = (rect.top - 80) + 'px';
+  } else if (arrow === 'left') {
+    tip.style.left = (rect.right + 12) + 'px';
+    tip.style.top = rect.top + 'px';
+  } else {
+    tip.style.left = (rect.left - 292) + 'px';
+    tip.style.top = rect.top + 'px';
+  }
+  document.body.appendChild(tip);
+  setTimeout(function() { var t = document.getElementById('ftip-' + id); if (t) t.remove(); }, 8000);
+}
+
+// ─── PANEL TOGGLE (Sheet style) ───
+function togglePanel(name) {
+  var p = document.getElementById('panel-' + name);
+  if (!p) return;
+  if (activePanel === name) { closePanel(); return; }
+  closePanel();
+  p.classList.add('open');
+  document.getElementById('sheet-overlay').classList.add('open');
+  activePanel = name;
+  var btnMap = { soul: 'btn-soul-panel', settings: 'btn-settings-panel' };
+  if (btnMap[name]) document.getElementById(btnMap[name]).classList.add('active');
+  if (name === 'soul') {
+    refreshSoulPanel();
+    showFeatureTip('soul', 'Soul Files', 'Upload .md or .txt soul files here. They\'re saved locally and can be loaded to the proxy anytime.', p, 'right');
+  }
+  if (name === 'hub') refreshHubPanel();
+  if (name === 'research') renderDiscoveryList();
+  if (name === 'settings') {
+    showFeatureTip('settings', 'Inference Parameters', 'Adjust temperature for creativity, top-p for diversity, and max tokens for response length.', p, 'right');
+  }
+}
+function closePanel() {
+  document.querySelectorAll('.right-panel').forEach(function(p) { p.classList.remove('open'); });
+  document.querySelectorAll('.hdr-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('sheet-overlay').classList.remove('open');
+  activePanel = null;
+}
+
+// ─── FILE HANDLING ───
+function readFile(file, mode) {
+  return new Promise(function(resolve) {
+    var r = new FileReader();
+    r.onload = function() { resolve(r.result); };
+    r.onerror = function() { resolve(null); };
+    if (mode === 'text') r.readAsText(file); else r.readAsDataURL(file);
+  });
+}
+async function handleFiles(fileList) {
+  for (var i = 0; i < fileList.length; i++) {
+    var file = fileList[i];
+    var isImg = file.type.startsWith('image/');
+    var b64 = await readFile(file, 'dataurl');
+    var txt = isImg ? null : await readFile(file, 'text');
+    attachedFiles.push({ name: file.name, type: file.type || 'application/octet-stream', size: file.size, base64: b64, textContent: txt });
+    renderAttachments();
+  }
+  document.getElementById('file-input').value = '';
+  showFeatureTip('attach', 'Document RAG', 'Attached documents are automatically chunked, embedded, and searchable. The proxy injects relevant context into every conversation.', document.getElementById('att-preview'), 'bottom');
+}
+function renderAttachments() {
+  var c = document.getElementById('att-preview');
+  while (c.firstChild) c.removeChild(c.firstChild);
+  attachedFiles.forEach(function(f, i) {
+    var chip = el('div', 'att-chip');
+    chip.appendChild(document.createTextNode(f.name + ' (' + formatSize(f.size) + ') '));
+    var x = el('span', 'x', '\u00d7');
+    x.onclick = function() { attachedFiles.splice(i, 1); renderAttachments(); };
+    chip.appendChild(x);
+    c.appendChild(chip);
+  });
+}
+
+// ─── MESSAGES (Jan-style: user right, assistant left) ───
+function addMsg(role, text, attNames) {
+  var c = document.getElementById('msg-container');
+  var wrapper = el('div', 'message ' + role);
+
+  if (role === 'assistant') {
+    var hdr = el('div', 'msg-header');
+    hdr.appendChild(el('div', 'msg-avatar', 'Q'));
+    hdr.appendChild(el('span', 'msg-name', 'Qwen 2.5 7B'));
+    wrapper.appendChild(hdr);
+  }
+
+  if (attNames && attNames.length) {
+    var attRow = el('div', 'msg-attachments');
+    attRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px' + (role === 'user' ? ';justify-content:flex-end' : '');
+    attNames.forEach(function(n) { attRow.appendChild(el('span', 'att-badge', n)); });
+    wrapper.appendChild(attRow);
+  }
+
+  if (role === 'user') {
+    var bubble = el('div', 'msg-bubble', text || '');
+    wrapper.appendChild(bubble);
+  } else {
+    var body = el('div', 'msg-body', text || '');
+    wrapper.appendChild(body);
+  }
+
+  c.appendChild(wrapper);
+  scrollBottom();
+  return wrapper;
+}
+
+function addTyping() {
+  var c = document.getElementById('msg-container');
+  var w = el('div', 'message assistant');
+  var hdr = el('div', 'msg-header');
+  hdr.appendChild(el('div', 'msg-avatar', 'Q'));
+  hdr.appendChild(el('span', 'msg-name', 'Qwen 2.5 7B'));
+  w.appendChild(hdr);
+  var dots = el('div', 'typing-dots');
+  for (var i = 0; i < 3; i++) dots.appendChild(el('span'));
+  w.appendChild(dots);
+  c.appendChild(w);
+  scrollBottom();
+  return w;
+}
+
+// ─── SEND MESSAGE ───
+async function sendMessage() {
+  if (isGenerating) return;
+  var input = document.getElementById('user-input');
+  var text = input.value.trim();
+  if (!text && !attachedFiles.length) return;
+  isGenerating = true;
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('input-box').classList.add('streaming');
+
+  var curAtt = attachedFiles.slice();
+  var attNames = curAtt.map(function(f) { return f.name; });
+
+  var content;
+  if (curAtt.length > 0) {
+    var parts = [];
+    var fullText = text;
+    curAtt.forEach(function(f) {
+      if (!f.type.startsWith('image/') && f.textContent)
+        fullText += '\n\nFile: ' + f.name + '\n' + f.textContent;
+    });
+    if (fullText) parts.push({ type: 'text', text: fullText });
+    curAtt.forEach(function(f) {
+      if (f.type.startsWith('image/'))
+        parts.push({ type: 'image_url', image_url: { url: f.base64, detail: 'auto' } });
+    });
+    content = (parts.length === 1 && parts[0].type === 'text') ? parts[0].text : parts;
+  } else {
+    content = text;
+  }
+
+  for (var i = 0; i < curAtt.length; i++) {
+    var f = curAtt[i];
+    if (!f.type.startsWith('image/')) {
+      try {
+        var blob = await fetch(f.base64).then(function(r) { return r.blob(); });
+        var fd = new FormData();
+        fd.append('file', blob, f.name);
+        await fetch(API + '/documents', { method: 'POST', body: fd });
+      } catch (e) { console.warn('doc upload fail', e); }
+    }
+  }
+
+  addMsg('user', text, attNames);
+  input.value = ''; input.style.height = 'auto';
+  attachedFiles = []; renderAttachments();
+  chatMessages.push({ role: 'user', content: content });
+
+  var typing = addTyping();
+  var temp = parseFloat(document.getElementById('s-temp').value);
+  var topP = parseFloat(document.getElementById('s-topp').value);
+  var maxTok = parseInt(document.getElementById('s-maxtok').value);
+  var doStream = document.getElementById('s-stream').checked;
+
+  try {
+    var msgs = systemPrompt ? [{ role: 'system', content: systemPrompt }].concat(chatMessages) : chatMessages;
+    var resp = await fetch(API + '/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer local' },
+      body: JSON.stringify({ model: MODEL, messages: msgs, stream: doStream, temperature: temp, top_p: topP, max_tokens: maxTok, capabilities: capabilities })
+    });
+    typing.remove();
+    if (!resp.ok) {
+      var err = await resp.text();
+      addMsg('assistant', 'Error: ' + resp.status + ' \u2014 ' + err);
+      finishSend(); return;
+    }
+
+    if (doStream) {
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      var aText = '';
+      var msgEl = addMsg('assistant', '');
+      var bodyEl = msgEl.querySelector('.msg-body');
+      var buf = '';
+      while (true) {
+        var result = await reader.read();
+        if (result.done) break;
+        buf += decoder.decode(result.value, { stream: true });
+        var lines = buf.split('\n'); buf = lines.pop();
+        for (var li = 0; li < lines.length; li++) {
+          if (!lines[li].startsWith('data: ')) continue;
+          var d = lines[li].slice(6).trim();
+          if (d === '[DONE]') continue;
+          try {
+            var p = JSON.parse(d);
+            var delta = p.choices && p.choices[0] && p.choices[0].delta && p.choices[0].delta.content;
+            if (delta) { aText += delta; bodyEl.textContent = aText; scrollBottom(); }
+          } catch (e) {}
+        }
+      }
+      chatMessages.push({ role: 'assistant', content: aText });
+    } else {
+      var data = await resp.json();
+      var aText = data.choices[0].message.content;
+      addMsg('assistant', aText);
+      chatMessages.push({ role: 'assistant', content: aText });
+    }
+  } catch (e) {
+    typing.remove();
+    addMsg('assistant', 'Connection error: ' + e.message);
+  }
+  finishSend();
+}
+function finishSend() {
+  isGenerating = false;
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('input-box').classList.remove('streaming');
+  refreshStats();
+}
+
+// ─── SOUL PANEL ───
+async function loadSoulFile(file) {
+  if (!file) return;
+  var status = document.getElementById('soul-upload-status');
+  status.textContent = 'Uploading ' + file.name + '...';
+  try {
+    var content = await readFile(file, 'text');
+    saveSoulLocal(file.name, content);
+    var blob = new Blob([content], { type: 'text/markdown' });
+    var fd = new FormData();
+    fd.append('file', blob, file.name);
+    var resp = await fetch(API + '/documents', { method: 'POST', body: fd });
+    var data = await resp.json();
+    status.textContent = 'Uploaded: ' + file.name + ' (' + (data.chunks_added || '?') + ' chunks)';
+    if (data.consciousness) {
+      status.textContent += ' | Identity: ' + (data.consciousness.is_identity_payload ? 'YES' : 'no');
+      status.textContent += ' | Score: ' + (data.consciousness.identity_score || 0).toFixed(2);
+    }
+    refreshSoulPanel(); refreshStats();
+  } catch (e) { status.textContent = 'Error: ' + e.message; }
+  document.getElementById('soul-file-input').value = '';
+}
+
+// ─── LOCAL SOUL STORAGE ───
+function getSavedSouls() { try { return JSON.parse(localStorage.getItem('jan_saved_souls') || '[]'); } catch(e) { return []; } }
+function saveSoulLocal(name, content) {
+  var souls = getSavedSouls();
+  var idx = souls.findIndex(function(s) { return s.name === name; });
+  if (idx >= 0) souls[idx].content = content;
+  else souls.push({ name: name, content: content, savedAt: new Date().toISOString() });
+  localStorage.setItem('jan_saved_souls', JSON.stringify(souls));
+}
+function removeSoulLocal(name) {
+  var souls = getSavedSouls().filter(function(s) { return s.name !== name; });
+  localStorage.setItem('jan_saved_souls', JSON.stringify(souls));
+  renderLocalSouls();
+}
+function renderLocalSouls() {
+  var list = document.getElementById('local-soul-list');
+  while (list.firstChild) list.removeChild(list.firstChild);
+  var souls = getSavedSouls();
+  if (!souls.length) { var m = el('div', '', 'No saved souls'); m.style.cssText = 'font-size:13px;color:var(--fg-50)'; list.appendChild(m); return; }
+  souls.forEach(function(s) {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'card-name', s.name));
+    card.appendChild(el('div', 'card-desc', (s.content.length / 1024).toFixed(1) + ' KB \u2022 Saved ' + new Date(s.savedAt).toLocaleDateString()));
+    var row = el('div', ''); row.style.cssText = 'display:flex;gap:6px;margin-top:8px';
+    var loadBtn = el('button', 'btn-action', 'Load to Proxy');
+    loadBtn.onclick = (function(soul) { return function() { uploadSoulToProxy(soul.name, soul.content); }; })(s);
+    row.appendChild(loadBtn);
+    var delBtn = el('button', 'btn-action btn-danger', 'Remove');
+    delBtn.onclick = (function(n) { return function() { removeSoulLocal(n); }; })(s.name);
+    row.appendChild(delBtn);
+    card.appendChild(row);
+    list.appendChild(card);
+  });
+}
+async function uploadSoulToProxy(name, content) {
+  try {
+    var blob = new Blob([content], { type: 'text/markdown' });
+    var fd = new FormData(); fd.append('file', blob, name);
+    var resp = await fetch(API + '/documents', { method: 'POST', body: fd });
+    var data = await resp.json();
+    var status = document.getElementById('soul-upload-status');
+    status.textContent = 'Loaded: ' + name + ' (' + (data.chunks_added || '?') + ' chunks)';
+    if (data.consciousness) status.textContent += ' | Identity: ' + (data.consciousness.is_identity_payload ? 'YES' : 'no');
+    refreshSoulPanel(); refreshStats();
+  } catch (e) { document.getElementById('soul-upload-status').textContent = 'Error: ' + e.message; }
+}
+async function loadSoulFolder(fileList) {
+  for (var i = 0; i < fileList.length; i++) {
+    var content = await readFile(fileList[i], 'text');
+    if (content) saveSoulLocal(fileList[i].name, content);
+  }
+  renderLocalSouls();
+  document.getElementById('soul-dir-input').value = '';
+}
+async function refreshSoulPanel() {
+  try {
+    var resp = await fetch(API + '/souls/active');
+    var data = await resp.json();
+    var container = document.getElementById('active-soul-display');
+    while (container.firstChild) container.removeChild(container.firstChild);
+    if (data.active) {
+      var card = el('div', 'card');
+      card.appendChild(el('div', 'card-name', data.name || data.soul_id));
+      card.appendChild(el('div', 'card-desc', data.role || 'Unknown role'));
+      card.appendChild(el('div', 'card-badge active', 'ACTIVE'));
+      container.appendChild(card);
+      document.getElementById('dot-soul').className = 'dot soul';
+      document.getElementById('soul-label').textContent = data.name || data.soul_id;
+    } else {
+      var m = el('div', '', 'No soul active'); m.style.cssText = 'font-size:13px;color:var(--fg-50)'; container.appendChild(m);
+      document.getElementById('dot-soul').className = 'dot off';
+      document.getElementById('soul-label').textContent = 'None';
+    }
+  } catch (e) { document.getElementById('active-soul-display').textContent = 'Error loading'; }
+  try {
+    var resp = await fetch(API + '/souls');
+    var data = await resp.json();
+    var list = document.getElementById('soul-registry-list');
+    while (list.firstChild) list.removeChild(list.firstChild);
+    if (data.souls && data.souls.length) {
+      data.souls.forEach(function(s) {
+        var card = el('div', 'card');
+        card.appendChild(el('div', 'card-name', s.name || s.id));
+        card.appendChild(el('div', 'card-desc', s.role || ''));
+        card.appendChild(el('div', 'card-badge ' + (s.active ? 'active' : 'inactive'), s.active ? 'ACTIVE' : 'INACTIVE'));
+        if (!s.active) {
+          var btn = el('button', 'btn-soul', 'Activate');
+          btn.onclick = function() { activateSoul(s.id); };
+          card.appendChild(btn);
+        }
+        list.appendChild(card);
+      });
+    } else { var m = el('div', '', 'No souls registered'); m.style.cssText = 'font-size:13px;color:var(--fg-50)'; list.appendChild(m); }
+  } catch (e) {}
+  try {
+    var resp = await fetch(API + '/health');
+    var data = await resp.json();
+    var ps = document.getElementById('pipeline-status'); ps.textContent = '';
+    ps.appendChild(el('div', '', 'Status: ' + (data.status || 'unknown')));
+    ps.appendChild(el('div', '', 'LLM Connected: ' + (data.jan_connected ? 'Yes' : 'No')));
+    ps.appendChild(el('div', '', 'Docs Indexed: ' + (data.documents_indexed || 0)));
+    ps.appendChild(el('div', '', 'Auto-inject: ' + (data.auto_inject ? 'On' : 'Off')));
+    if (data.system_resources && data.system_resources.cpu_percent !== undefined) {
+      ps.appendChild(el('div', '', 'CPU: ' + data.system_resources.cpu_percent + '% | RAM: ' + data.system_resources.memory_percent + '%'));
+    }
+  } catch (e) {}
+  renderLocalSouls();
+}
+async function activateSoul(soulId) {
+  try { await fetch(API + '/souls/' + soulId + '/activate', { method: 'POST' }); refreshSoulPanel(); } catch (e) { console.error('activate failed', e); }
+}
+
+// ─── HUB PANEL ───
+async function refreshHubPanel() {
+  var modelsDiv = document.getElementById('hub-models');
+  try {
+    var resp = await fetch(API + '/v1/models');
+    var data = await resp.json();
+    while (modelsDiv.firstChild) modelsDiv.removeChild(modelsDiv.firstChild);
+    if (data.data && data.data.length) {
+      data.data.forEach(function(m) {
+        var card = el('div', 'card');
+        card.appendChild(el('div', 'card-name', m.id || m.name || 'Unknown'));
+        if (m.owned_by) card.appendChild(el('div', 'card-desc', 'Owner: ' + m.owned_by));
+        modelsDiv.appendChild(card);
+      });
+    } else { var m = el('div', '', 'No models available'); m.style.cssText = 'font-size:13px;color:var(--fg-50)'; modelsDiv.appendChild(m); }
+  } catch (e) { modelsDiv.textContent = 'Error loading models'; }
+  var docsDiv = document.getElementById('hub-docs');
+  try {
+    var resp = await fetch(API + '/health');
+    var data = await resp.json();
+    while (docsDiv.firstChild) docsDiv.removeChild(docsDiv.firstChild);
+    var count = data.documents_indexed || 0;
+    var d = el('div', '', count + ' document' + (count !== 1 ? 's' : '') + ' indexed');
+    d.style.cssText = 'font-size:13px;color:var(--fg-70)';
+    docsDiv.appendChild(d);
+    if (data.auto_inject !== undefined) {
+      var ai = el('div', '', 'Auto-inject: ' + (data.auto_inject ? 'Enabled' : 'Disabled'));
+      ai.style.cssText = 'font-size:12px;color:var(--fg-50);margin-top:4px';
+      docsDiv.appendChild(ai);
+    }
+  } catch (e) { docsDiv.textContent = 'Error loading'; }
+}
+
+// ─── CAPABILITY TOGGLES ───
+function toggleCap(name) {
+  capabilities[name] = !capabilities[name];
+  var capEl = document.getElementById('cap-' + name);
+  if (capabilities[name]) capEl.classList.add('active'); else capEl.classList.remove('active');
+  var checkMap = { rag: 'cap-rag-toggle', soul: 'cap-soul-toggle', consciousness: 'cap-consciousness-toggle' };
+  var cb = document.getElementById(checkMap[name]);
+  if (cb) cb.checked = capabilities[name];
+  showFeatureTip('cap-toggle', 'Capability Toggled', name.charAt(0).toUpperCase() + name.slice(1) + ' is now ' + (capabilities[name] ? 'enabled' : 'disabled') + '. This controls whether the proxy uses this pipeline for your messages.', capEl, 'bottom');
+}
+function syncCapFromCheckbox(name) {
+  var checkMap = { rag: 'cap-rag-toggle', soul: 'cap-soul-toggle', consciousness: 'cap-consciousness-toggle' };
+  capabilities[name] = document.getElementById(checkMap[name]).checked;
+  var capEl = document.getElementById('cap-' + name);
+  if (capabilities[name]) capEl.classList.add('active'); else capEl.classList.remove('active');
+}
+
+// ─── ASSISTANTS ───
+function applySystemPrompt() {
+  systemPrompt = document.getElementById('system-prompt').value.trim();
+  var btn = document.querySelector('#panel-assistants .btn-action');
+  if (systemPrompt) {
+    btn.textContent = 'System Prompt Applied';
+    btn.style.borderColor = 'var(--success)'; btn.style.color = 'var(--success)';
+  } else {
+    btn.textContent = 'Apply System Prompt';
+    btn.style.borderColor = ''; btn.style.color = '';
+  }
+  setTimeout(function() { btn.textContent = 'Apply System Prompt'; btn.style.borderColor = ''; btn.style.color = ''; }, 2000);
+}
+
+// ─── VOICE INPUT ───
+var voiceStream = null;
+var voiceContext = null;
+var voiceProcessor = null;
+var voiceBuffers = [];
+var isRecording = false;
+
+function toggleVoiceInput() {
+  if (isRecording) { stopVoiceRecording(); }
+  else { startVoiceRecording(); }
+}
+
+async function startVoiceRecording() {
+  var btn = document.getElementById('btn-mic');
+  try {
+    voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    voiceContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    var source = voiceContext.createMediaStreamSource(voiceStream);
+    voiceProcessor = voiceContext.createScriptProcessor(4096, 1, 1);
+    voiceBuffers = [];
+    voiceProcessor.onaudioprocess = function(e) {
+      var data = e.inputBuffer.getChannelData(0);
+      voiceBuffers.push(new Float32Array(data));
+    };
+    source.connect(voiceProcessor);
+    voiceProcessor.connect(voiceContext.destination);
+    isRecording = true;
+    btn.classList.add('recording');
+    btn.title = 'Stop recording';
+  } catch (e) {
+    console.error('Mic access failed:', e);
+    alert('Microphone access denied or unavailable.');
+  }
+}
+
+async function stopVoiceRecording() {
+  var btn = document.getElementById('btn-mic');
+  isRecording = false;
+  btn.classList.remove('recording');
+  btn.classList.add('transcribing');
+  btn.title = 'Transcribing...';
+
+  // Stop media
+  if (voiceProcessor) { voiceProcessor.disconnect(); voiceProcessor = null; }
+  if (voiceContext) { voiceContext.close(); voiceContext = null; }
+  if (voiceStream) { voiceStream.getTracks().forEach(function(t) { t.stop(); }); voiceStream = null; }
+
+  // Encode WAV
+  var wav = encodeWAV(voiceBuffers, 16000);
+  voiceBuffers = [];
+
+  // Send to transcription endpoint
+  try {
+    var fd = new FormData();
+    fd.append('file', new Blob([wav], { type: 'audio/wav' }), 'recording.wav');
+    var resp = await fetch(API + '/v1/audio/transcriptions', { method: 'POST', body: fd });
+    var data = await resp.json();
+    if (data.text) {
+      var input = document.getElementById('user-input');
+      var pos = input.selectionStart || input.value.length;
+      var before = input.value.substring(0, pos);
+      var after = input.value.substring(pos);
+      var spacer = (before && !before.endsWith(' ') && !before.endsWith('\n')) ? ' ' : '';
+      input.value = before + spacer + data.text + after;
+      autoResize(input);
+      input.focus();
+    }
+  } catch (e) {
+    console.error('Transcription failed:', e);
+  }
+
+  btn.classList.remove('transcribing');
+  btn.title = 'Voice input';
+}
+
+function encodeWAV(buffers, sampleRate) {
+  var totalLen = 0;
+  for (var i = 0; i < buffers.length; i++) totalLen += buffers[i].length;
+  var pcm = new Float32Array(totalLen);
+  var off = 0;
+  for (var i = 0; i < buffers.length; i++) { pcm.set(buffers[i], off); off += buffers[i].length; }
+  var buf = new ArrayBuffer(44 + pcm.length * 2);
+  var view = new DataView(buf);
+  // RIFF header
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + pcm.length * 2, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, pcm.length * 2, true);
+  for (var i = 0; i < pcm.length; i++) {
+    var s = Math.max(-1, Math.min(1, pcm[i]));
+    view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return buf;
+}
+function writeString(view, offset, str) { for (var i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); }
+
+// ─── RIGHT-CLICK CONTEXT MENU ───
+var ctxMenu = null;
+
+function createSvgIcon(paths) {
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.5');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  paths.forEach(function(d) {
+    var p = document.createElementNS('http://www.w3.org/2000/svg', d.tag || 'path');
+    Object.keys(d).forEach(function(k) { if (k !== 'tag') p.setAttribute(k, d[k]); });
+    svg.appendChild(p);
+  });
+  return svg;
+}
+
+document.addEventListener('contextmenu', function(e) {
+  var sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return;
+  var anchor = sel.anchorNode;
+  if (!anchor) return;
+  var msgBody = anchor.nodeType === 3 ? anchor.parentElement : anchor;
+  if (!msgBody || !msgBody.closest('.msg-body')) return;
+
+  e.preventDefault();
+  dismissCtxMenu();
+
+  var selectedText = sel.toString().trim();
+  if (!selectedText) return;
+
+  ctxMenu = el('div', 'ctx-menu');
+
+  // Drill Down
+  var drillItem = el('div', 'ctx-menu-item');
+  drillItem.appendChild(createSvgIcon([
+    { d: 'M11 8v6M8 11h6' },
+    { tag: 'circle', cx: '11', cy: '11', r: '8' },
+    { d: 'm21 21-4.3-4.3' }
+  ]));
+  drillItem.appendChild(document.createTextNode('Drill Down'));
+  drillItem.onclick = function() {
+    var input = document.getElementById('user-input');
+    input.value = 'Provide further detail in drill-down description of the following: ' + selectedText;
+    autoResize(input);
+    input.focus();
+    dismissCtxMenu();
+  };
+  ctxMenu.appendChild(drillItem);
+
+  // Divider
+  ctxMenu.appendChild(el('div', 'ctx-menu-divider'));
+
+  // Save to Discovery
+  var saveItem = el('div', 'ctx-menu-item');
+  saveItem.appendChild(createSvgIcon([
+    { d: 'M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20' }
+  ]));
+  saveItem.appendChild(document.createTextNode('Save to Discovery'));
+  saveItem.onclick = function() {
+    saveDiscoveryItem(selectedText);
+    dismissCtxMenu();
+  };
+  ctxMenu.appendChild(saveItem);
+
+  // Position with viewport edge detection
+  document.body.appendChild(ctxMenu);
+  var menuRect = ctxMenu.getBoundingClientRect();
+  var x = e.clientX, y = e.clientY;
+  if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 8;
+  if (y + menuRect.height > window.innerHeight) y = window.innerHeight - menuRect.height - 8;
+  ctxMenu.style.left = x + 'px';
+  ctxMenu.style.top = y + 'px';
+});
+
+function dismissCtxMenu() {
+  if (ctxMenu) { ctxMenu.remove(); ctxMenu = null; }
+}
+document.addEventListener('click', dismissCtxMenu);
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') dismissCtxMenu(); });
+
+// ─── RESEARCH / DISCOVERY ───
+function getDiscoveryItems() {
+  try { return JSON.parse(localStorage.getItem('jan_discovery_items') || '[]'); } catch(e) { return []; }
+}
+
+function saveDiscoveryItem(text, sourceDoc) {
+  var items = getDiscoveryItems();
+  var item = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    text: text,
+    savedAt: new Date().toISOString(),
+    chatSession: chatMessages.length,
+    assistant: MODEL,
+    capabilities: Object.assign({}, capabilities),
+    sourceDoc: sourceDoc || null
+  };
+  items.unshift(item);
+  localStorage.setItem('jan_discovery_items', JSON.stringify(items));
+  renderDiscoveryList();
+
+  // Feature tip on first save
+  showFeatureTip('discovery-save', 'Saved to Research', 'Open the Research panel from the sidebar to review, insert, or manage your saved discoveries.', document.getElementById('btn-research-side'), 'left');
+}
+
+function renderDiscoveryList() {
+  var container = document.getElementById('discovery-list');
+  if (!container) return;
+  while (container.firstChild) container.removeChild(container.firstChild);
+  var items = getDiscoveryItems();
+  if (!items.length) {
+    var empty = el('div', '', 'No items saved yet. Right-click on assistant text to save discoveries.');
+    empty.style.cssText = 'font-size:13px;color:var(--fg-50)';
+    container.appendChild(empty);
+    return;
+  }
+  items.forEach(function(item) {
+    var card = el('div', 'disc-card');
+
+    var textDiv = el('div', 'disc-text', item.text);
+    card.appendChild(textDiv);
+
+    var meta = el('div', 'disc-meta');
+    var date = new Date(item.savedAt);
+    meta.appendChild(el('span', '', date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})));
+    meta.appendChild(el('span', '', item.assistant || 'unknown'));
+    if (item.capabilities) {
+      var caps = [];
+      if (item.capabilities.rag) caps.push('RAG');
+      if (item.capabilities.soul) caps.push('Soul');
+      if (item.capabilities.consciousness) caps.push('Consciousness');
+      if (caps.length) meta.appendChild(el('span', '', caps.join(', ')));
+    }
+    if (item.sourceDoc) {
+      var link = el('a', 'disc-source-link', item.sourceDoc.filename || item.sourceDoc);
+      link.href = API + '/documents';
+      link.target = '_blank';
+      meta.appendChild(link);
+    }
+    card.appendChild(meta);
+
+    var actions = el('div', 'disc-actions');
+    var insertBtn = el('button', '', 'Insert into Chat');
+    insertBtn.onclick = (function(txt) { return function() {
+      var input = document.getElementById('user-input');
+      input.value += (input.value ? '\n' : '') + txt;
+      autoResize(input);
+      input.focus();
+      closePanel();
+    }; })(item.text);
+    actions.appendChild(insertBtn);
+
+    var delBtn = el('button', '', 'Delete');
+    delBtn.style.color = 'var(--destructive)';
+    delBtn.onclick = (function(id) { return function() {
+      var items = getDiscoveryItems().filter(function(it) { return it.id !== id; });
+      localStorage.setItem('jan_discovery_items', JSON.stringify(items));
+      renderDiscoveryList();
+    }; })(item.id);
+    actions.appendChild(delBtn);
+
+    card.appendChild(actions);
+    container.appendChild(card);
+  });
+}
+
+function clearAllDiscovery() {
+  if (!confirm('Clear all discovery items? This cannot be undone.')) return;
+  localStorage.setItem('jan_discovery_items', '[]');
+  renderDiscoveryList();
+}
+
+// ─── DEBUG REPORT ───
+async function generateDebugReport() {
+  var output = document.getElementById('debug-report-output');
+  output.style.display = 'block';
+  output.textContent = 'Generating report...';
+  try {
+    var resp = await fetch(API + '/debug/report');
+    var data = await resp.json();
+    output.textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    output.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function reportIssueGitHub() {
+  try {
+    var resp = await fetch(API + '/debug/report/github', { method: 'POST' });
+    var data = await resp.json();
+    if (data.issue_url) {
+      window.open(data.issue_url, '_blank');
+    }
+  } catch (e) {
+    alert('Failed to generate report: ' + e.message);
+  }
+}
+
+// ─── STATS & HEALTH ───
+async function refreshStats() {
+  try {
+    var resp = await fetch(API + '/health');
+    var data = await resp.json();
+    document.getElementById('doc-count').textContent = data.documents_indexed || 0;
+  } catch (e) {}
+}
+async function checkHealth() {
+  try { await fetch(API + '/health'); document.getElementById('dot-proxy').className = 'dot on'; } catch(e) { document.getElementById('dot-proxy').className = 'dot off'; }
+  try { await fetch('http://localhost:11435/v1/models'); document.getElementById('dot-llm').className = 'dot on'; } catch(e) { document.getElementById('dot-llm').className = 'dot off'; }
+  try {
+    var resp = await fetch(API + '/souls/active');
+    var data = await resp.json();
+    if (data.active) {
+      document.getElementById('dot-soul').className = 'dot soul';
+      document.getElementById('soul-label').textContent = data.name || data.soul_id;
+    }
+  } catch (e) {}
+  refreshStats();
+}
+
+// ─── NEW CHAT ───
+function newChat() {
+  chatMessages = [];
+  attachedFiles = [];
+  renderAttachments();
+  var c = document.getElementById('msg-container');
+  while (c.firstChild) c.removeChild(c.firstChild);
+  addMsg('assistant', 'Hello. I\'m Qwen 2.5 7B running through the Jan Document Plugin.\n\nYou can:\n\u2022 Chat normally \u2014 I\'ll respond with full context\n\u2022 Attach files \u2014 they\'re automatically chunked and indexed for RAG\n\u2022 Load a soul file from the \u03a8 panel \u2014 identity payloads are detected and injected\n\nThe consciousness pipeline is active. Toggle capabilities from the bar below.');
+}
+
+// ─── INIT ───
+newChat();
+checkHealth();
+setInterval(checkHealth, 30000);
+document.getElementById('user-input').focus();
+
+// Auto-show tutorial on first visit
+if (!localStorage.getItem('jan_onboarding_complete')) {
+  setTimeout(startTutorial, 800);
+}
+</script>
+</body>
+</html>

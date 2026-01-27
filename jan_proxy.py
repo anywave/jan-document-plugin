@@ -33,11 +33,20 @@ from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 
 import httpx
+import platform
+import subprocess
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from pydantic import BaseModel, Field
 import uvicorn
+
+# Speech recognition (optional — Windows offline transcription)
+try:
+    import speech_recognition as sr
+    SPEECH_RECOGNITION_AVAILABLE = True
+except ImportError:
+    SPEECH_RECOGNITION_AVAILABLE = False
 
 from document_processor import DocumentProcessor, DocumentExtractor
 
@@ -106,6 +115,31 @@ Use this context to inform your response when relevant. If the context doesn't c
 config = ProxyConfig()
 
 
+def detect_jan_version() -> Optional[str]:
+    """Detect installed Jan version by reading its package.json."""
+    try:
+        jan_dir = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "jan"
+        if not jan_dir.exists():
+            return None
+
+        # Try unpacked asar first, then fallback
+        candidates = [
+            jan_dir / "resources" / "app.asar.unpacked" / "package.json",
+            jan_dir / "resources" / "app" / "package.json",
+        ]
+        for pkg_path in candidates:
+            if pkg_path.exists():
+                data = json.loads(pkg_path.read_text(encoding="utf-8"))
+                return data.get("version")
+    except Exception:
+        pass
+    return None
+
+
+# Cached Jan version (populated once at startup)
+detected_jan_version: Optional[str] = None
+
+
 # ============================================================================
 # FastAPI Application
 # ============================================================================
@@ -113,7 +147,7 @@ config = ProxyConfig()
 app = FastAPI(
     title="Jan Document Plugin",
     description="OpenAI-compatible proxy with offline document processing",
-    version="1.0.0"
+    version="2.0.0-beta"
 )
 
 app.add_middleware(
@@ -138,7 +172,16 @@ consciousness_contexts: Dict[str, Dict[str, Any]] = {}
 @app.on_event("startup")
 async def startup():
     """Initialize document processor and consciousness pipeline on startup."""
-    global processor, consciousness_pipeline
+    global processor, consciousness_pipeline, detected_jan_version
+
+    # Detect Jan version
+    detected_jan_version = detect_jan_version()
+    if detected_jan_version:
+        logger.info(f"Jan v{detected_jan_version} detected")
+        if not detected_jan_version.startswith("0.6.8"):
+            logger.warning(f"Jan v{detected_jan_version} may not be fully compatible (designed for v0.6.8)")
+    else:
+        logger.info("Jan not detected — running standalone with bundled LLM server")
 
     logger.info("Initializing document processor...")
 
@@ -175,6 +218,13 @@ class ChatMessage(BaseModel):
     name: Optional[str] = None
 
 
+class CapabilitiesConfig(BaseModel):
+    """Per-request capability toggles sent from the UI."""
+    rag: bool = True                # Retrieve and inject document context
+    soul: bool = True               # Inject consciousness orientation / soul identity
+    consciousness: bool = True      # Run consciousness pipeline on inline attachments
+
+
 class ChatCompletionRequest(BaseModel):
     model: str
     messages: List[ChatMessage]
@@ -185,11 +235,12 @@ class ChatCompletionRequest(BaseModel):
     frequency_penalty: Optional[float] = None
     presence_penalty: Optional[float] = None
     stop: Optional[List[str]] = None
-    
+
     # Plugin-specific options
     inject_context: Optional[bool] = None  # Override auto_inject per request
     context_query: Optional[str] = None     # Custom query for context retrieval
     doc_filter: Optional[str] = None        # Filter to specific document hash
+    capabilities: Optional[CapabilitiesConfig] = None  # UI capability toggles
 
 
 class DocumentUploadResponse(BaseModel):
@@ -613,7 +664,10 @@ ATTACHMENT_MIME_MAP = {
 }
 
 
-def extract_inline_attachments(messages: List[ChatMessage]) -> List[ChatMessage]:
+def extract_inline_attachments(
+    messages: List[ChatMessage],
+    run_consciousness: bool = True
+) -> List[ChatMessage]:
     """
     Extract base64-encoded file attachments from multimodal message content.
 
@@ -626,7 +680,7 @@ def extract_inline_attachments(messages: List[ChatMessage]) -> List[ChatMessage]
     This function:
     1. Detects base64 data URLs in content arrays
     2. Decodes and indexes them through the document processor
-    3. Runs consciousness pipeline analysis
+    3. Runs consciousness pipeline analysis (if run_consciousness is True)
     4. Normalizes messages to plain text for the local LLM
     """
     normalized = []
@@ -696,8 +750,8 @@ def extract_inline_attachments(messages: List[ChatMessage]) -> List[ChatMessage]
                         logger.warning(f"Failed to index attachment {filename}: {e}")
                         text_parts.append(f"[Attached file: {filename} — indexing failed]")
 
-                # Consciousness pipeline analysis
-                if consciousness_pipeline is not None:
+                # Consciousness pipeline analysis (gated by run_consciousness flag)
+                if consciousness_pipeline is not None and run_consciousness:
                     try:
                         consciousness_result = process_uploaded_document(
                             file_bytes, filename, consciousness_pipeline
@@ -714,6 +768,8 @@ def extract_inline_attachments(messages: List[ChatMessage]) -> List[ChatMessage]
                             logger.info(f"Consciousness seed detected in attachment {filename}")
                     except Exception as e:
                         logger.warning(f"Consciousness analysis failed for {filename}: {e}")
+                elif consciousness_pipeline is not None and not run_consciousness:
+                    logger.info(f"Consciousness pipeline skipped for {filename} (disabled by capability toggle)")
 
         # Rebuild as plain text message
         combined_text = "\n".join(text_parts) if text_parts else ""
@@ -824,25 +880,41 @@ async def chat_completions(request: ChatCompletionRequest):
 
     Automatically retrieves and injects relevant document context.
     If consciousness payloads are present, also injects orientation context.
+
+    Respects per-request capability toggles:
+      capabilities.rag           - gate document context retrieval
+      capabilities.soul          - gate consciousness orientation injection
+      capabilities.consciousness - gate consciousness pipeline on attachments
     """
     if processor is None:
         raise HTTPException(status_code=503, detail="Processor not initialized")
 
+    # Resolve capabilities (default: all enabled)
+    caps = request.capabilities or CapabilitiesConfig()
+    logger.info(f"Capabilities: rag={caps.rag}, soul={caps.soul}, consciousness={caps.consciousness}")
+
     messages = request.messages
 
     # Extract and index any inline file attachments (Jan UI attachment flow)
-    messages = extract_inline_attachments(messages)
+    # Consciousness pipeline on attachments is gated by caps.consciousness
+    messages = extract_inline_attachments(messages, run_consciousness=caps.consciousness)
 
-    # Determine if we should inject context
-    should_inject = request.inject_context if request.inject_context is not None else config.auto_inject
+    # Determine if we should inject RAG context (gated by caps.rag)
+    should_inject_rag = caps.rag and (
+        request.inject_context if request.inject_context is not None else config.auto_inject
+    )
 
-    # Get consciousness orientation if any identity payloads are stored
-    consciousness_orientation = get_consciousness_orientation()
-    if consciousness_orientation:
-        logger.info("Consciousness orientation available - will inject")
+    # Get consciousness orientation (gated by caps.soul)
+    consciousness_orientation = None
+    if caps.soul:
+        consciousness_orientation = get_consciousness_orientation()
+        if consciousness_orientation:
+            logger.info("Consciousness orientation available - will inject (soul enabled)")
+    else:
+        logger.info("Soul capability disabled - skipping consciousness orientation")
 
     context = None
-    if should_inject and processor.get_stats()["documents_indexed"] > 0:
+    if should_inject_rag and processor.get_stats()["documents_indexed"] > 0:
         # Get query for context retrieval
         query = request.context_query or extract_user_query(messages)
 
@@ -857,7 +929,9 @@ async def chat_completions(request: ChatCompletionRequest):
             )
 
             if context:
-                logger.info(f"Injecting {len(context)} chars of context")
+                logger.info(f"Injecting {len(context)} chars of RAG context")
+    elif not caps.rag:
+        logger.info("RAG capability disabled - skipping document context retrieval")
 
     # Inject context (document context and/or consciousness orientation)
     if context or consciousness_orientation:
@@ -947,6 +1021,269 @@ async def stream_jan_response(url: str, data: dict) -> StreamingResponse:
 
 
 # ============================================================================
+# Audio Transcription Endpoint
+# ============================================================================
+
+@app.post("/v1/audio/transcriptions")
+async def audio_transcriptions(file: UploadFile = File(...)):
+    """
+    OpenAI-compatible audio transcription endpoint.
+
+    Accepts WAV audio, transcribes using Windows offline speech recognition.
+    Returns {"text": "..."} matching the OpenAI Whisper API response format.
+    """
+    if platform.system() != "Windows":
+        raise HTTPException(
+            status_code=501,
+            detail="Audio transcription requires Windows (uses Windows Speech Recognition)"
+        )
+
+    if not SPEECH_RECOGNITION_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="SpeechRecognition package not installed. Run: pip install SpeechRecognition PyAudio"
+        )
+
+    # Save uploaded audio to temp file
+    suffix = Path(file.filename).suffix.lower() if file.filename else ".wav"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    try:
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(tmp_path) as source:
+            audio_data = recognizer.record(source)
+
+        text = recognizer.recognize_windows(audio_data)
+        logger.info(f"Transcription result: {text[:100]}...")
+        return {"text": text}
+
+    except sr.UnknownValueError:
+        return {"text": ""}
+    except sr.RequestError as e:
+        logger.error(f"Speech recognition error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Speech recognition failed: {str(e)}"
+        )
+    finally:
+        os.unlink(tmp_path)
+
+
+# ============================================================================
+# Chat UI Endpoint
+# ============================================================================
+
+@app.get("/ui")
+async def serve_chat_ui():
+    """Serve the chat UI HTML file."""
+    # Handle PyInstaller bundle path
+    if getattr(sys, 'frozen', False):
+        base_dir = Path(sys._MEIPASS)
+    else:
+        base_dir = Path(__file__).parent
+
+    html_path = base_dir / "chat_ui.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="chat_ui.html not found")
+
+    return FileResponse(str(html_path), media_type="text/html")
+
+
+# ============================================================================
+# Debug Report Endpoints
+# ============================================================================
+
+@app.get("/debug/report")
+async def debug_report():
+    """
+    Collect comprehensive debug information about the system.
+
+    Returns JSON with: OS, Python, GPU, packages, ports, disk, memory,
+    doc store stats, config, and capability flags.
+    """
+    import psutil
+
+    report = {
+        "timestamp": datetime.now().isoformat(),
+        "plugin_version": "2.0.0-beta",
+        "os": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "version": platform.version(),
+            "machine": platform.machine(),
+        },
+        "python": {
+            "version": platform.python_version(),
+            "executable": sys.executable,
+        },
+    }
+
+    # GPU info (Windows wmic)
+    gpu_info = "unavailable"
+    if platform.system() == "Windows":
+        try:
+            result = subprocess.run(
+                ["wmic", "path", "win32_VideoController", "get", "name,driverversion,adapterram"],
+                capture_output=True, text=True, timeout=10
+            )
+            gpu_info = result.stdout.strip()
+        except Exception as e:
+            gpu_info = f"error: {e}"
+    report["gpu"] = gpu_info
+
+    # Installed package versions
+    packages = {}
+    for pkg_name in [
+        "fastapi", "uvicorn", "httpx", "chromadb", "sentence-transformers",
+        "pymupdf", "python-docx", "openpyxl", "Pillow", "pytesseract",
+        "psutil", "pydantic", "SpeechRecognition", "PyAudio"
+    ]:
+        try:
+            from importlib.metadata import version as pkg_version
+            packages[pkg_name] = pkg_version(pkg_name)
+        except Exception:
+            packages[pkg_name] = "not installed"
+    report["packages"] = packages
+
+    # Port status
+    proxy_port = config.proxy_port
+    jan_port = config.jan_port
+    port_status = {"proxy_port": proxy_port, "jan_port": jan_port}
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(f"http://localhost:{jan_port}/v1/models")
+            port_status["jan_reachable"] = resp.status_code == 200
+    except Exception:
+        port_status["jan_reachable"] = False
+    report["ports"] = port_status
+
+    # Disk space
+    try:
+        disk = psutil.disk_usage(os.path.abspath("."))
+        report["disk"] = {
+            "total_gb": round(disk.total / (1024**3), 1),
+            "free_gb": round(disk.free / (1024**3), 1),
+            "percent_used": disk.percent,
+        }
+    except Exception as e:
+        report["disk"] = {"error": str(e)}
+
+    # Memory
+    try:
+        mem = psutil.virtual_memory()
+        report["memory"] = {
+            "total_gb": round(mem.total / (1024**3), 1),
+            "available_gb": round(mem.available / (1024**3), 1),
+            "percent_used": mem.percent,
+        }
+    except Exception as e:
+        report["memory"] = {"error": str(e)}
+
+    # Document store stats
+    if processor:
+        report["doc_store"] = processor.get_stats()
+    else:
+        report["doc_store"] = {"status": "not initialized"}
+
+    # Config (sanitized — no secrets)
+    report["config"] = {
+        "jan_host": config.jan_host,
+        "jan_port": config.jan_port,
+        "proxy_port": config.proxy_port,
+        "persist_directory": config.persist_directory,
+        "embedding_model": config.embedding_model,
+        "auto_inject": config.auto_inject,
+        "max_context_tokens": config.max_context_tokens,
+        "max_chunks": config.max_chunks,
+        "relevance_threshold": config.relevance_threshold,
+    }
+
+    # Capability flags
+    report["capabilities"] = {
+        "consciousness_pipeline": CONSCIOUSNESS_PIPELINE_AVAILABLE,
+        "soul_registry": SOUL_REGISTRY_AVAILABLE,
+        "speech_recognition": SPEECH_RECOGNITION_AVAILABLE,
+    }
+
+    return report
+
+
+@app.post("/debug/report/github")
+async def debug_report_github():
+    """
+    Generate a debug report and format it as a GitHub issue URL.
+
+    Calls the debug report endpoint internally, formats as markdown,
+    and returns a pre-filled GitHub issue creation URL.
+    """
+    # Get the debug report
+    report = await debug_report()
+
+    # Format as markdown
+    body_lines = [
+        "## System Debug Report",
+        f"**Generated:** {report['timestamp']}",
+        f"**Plugin Version:** {report['plugin_version']}",
+        "",
+        "### OS",
+        f"- System: {report['os']['system']} {report['os']['release']}",
+        f"- Version: {report['os']['version']}",
+        f"- Machine: {report['os']['machine']}",
+        "",
+        "### Python",
+        f"- Version: {report['python']['version']}",
+        "",
+        "### GPU",
+        f"```\n{report['gpu']}\n```",
+        "",
+        "### Packages",
+    ]
+    for pkg, ver in report.get("packages", {}).items():
+        body_lines.append(f"- {pkg}: {ver}")
+
+    body_lines += [
+        "",
+        "### Ports",
+        f"- Proxy: {report['ports']['proxy_port']}",
+        f"- Jan: {report['ports']['jan_port']} (reachable: {report['ports'].get('jan_reachable', 'unknown')})",
+        "",
+        "### Resources",
+        f"- Disk: {report.get('disk', {})}",
+        f"- Memory: {report.get('memory', {})}",
+        "",
+        "### Document Store",
+        f"```json\n{json.dumps(report.get('doc_store', {}), indent=2)}\n```",
+        "",
+        "### Capabilities",
+        f"- Consciousness: {report['capabilities']['consciousness_pipeline']}",
+        f"- Soul Registry: {report['capabilities']['soul_registry']}",
+        f"- Speech Recognition: {report['capabilities']['speech_recognition']}",
+        "",
+        "### Describe the issue",
+        "_Please describe what happened:_",
+        "",
+    ]
+
+    body = "\n".join(body_lines)
+
+    # Build GitHub issue URL
+    from urllib.parse import quote
+    title = quote(f"[Bug Report] v{report['plugin_version']} - {report['os']['system']} {report['os']['release']}")
+    encoded_body = quote(body)
+    labels = quote("bug,auto-report")
+
+    issue_url = (
+        f"https://github.com/anywave/jan-document-plugin/issues/new"
+        f"?title={title}&body={encoded_body}&labels={labels}"
+    )
+
+    return {"issue_url": issue_url, "report": report}
+
+
+# ============================================================================
 # Additional OpenAI-Compatible Endpoints (Passthrough)
 # ============================================================================
 
@@ -996,6 +1333,7 @@ async def health_check():
         "status": "healthy" if jan_healthy else "degraded",
         "jan_connected": jan_healthy,
         "jan_url": config.jan_base_url,
+        "jan_version": detected_jan_version,
         "documents_indexed": processor.get_stats()["documents_indexed"] if processor else 0,
         "auto_inject": config.auto_inject,
         "system_resources": resource_info
@@ -1007,17 +1345,23 @@ async def root():
     """Root endpoint with API info."""
     return {
         "name": "Jan Document Plugin",
-        "version": "1.0.0",
+        "version": "2.0.0-beta",
         "description": "OpenAI-compatible proxy with offline document processing",
         "endpoints": {
             "chat": "POST /v1/chat/completions",
             "models": "GET /v1/models",
+            "audio": "POST /v1/audio/transcriptions",
+            "ui": "GET /ui",
             "documents": {
                 "upload": "POST /documents",
                 "list": "GET /documents",
                 "delete": "DELETE /documents/{doc_hash}",
                 "query": "POST /documents/query",
                 "stats": "GET /documents/stats"
+            },
+            "debug": {
+                "report": "GET /debug/report",
+                "github": "POST /debug/report/github"
             },
             "health": "GET /health"
         },
@@ -1089,14 +1433,18 @@ def main():
         max_context_tokens=args.max_context_tokens
     )
     
+    jan_ver_display = detected_jan_version or "not detected"
     print(f"""
 +==============================================================+
-|            Jan Document Plugin v1.0.0                        |
+|            Jan Document Plugin v2.0.0-beta                   |
 +==============================================================+
 |  Proxy listening on:  http://localhost:{config.proxy_port:<5}                |
+|  Chat UI:             http://localhost:{config.proxy_port}/ui{"":<13} |
 |  Forwarding to Jan:   {config.jan_base_url:<30} |
+|  Jan version:         {jan_ver_display:<30} |
 |  Document storage:    {config.persist_directory:<30} |
 |  Auto-inject context: {str(config.auto_inject):<30} |
+|  Speech recognition:  {str(SPEECH_RECOGNITION_AVAILABLE):<30} |
 +==============================================================+
     """)
     

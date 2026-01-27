@@ -8,11 +8,14 @@ Handles configuration loading, Tesseract detection, browser launch, and server s
 
 import os
 import sys
+import glob
 import ctypes
 import subprocess
 import webbrowser
 import threading
 import time
+import signal
+import atexit
 from pathlib import Path
 
 
@@ -107,21 +110,86 @@ def print_banner():
     """Print startup banner."""
     print()
     print("=" * 64)
-    print("         Jan Document Plugin v1.2.0")
+    print("         Jan Document Plugin v2.0.0-beta")
     print("     Offline Document Processing for Local LLMs")
     print("=" * 64)
     print()
 
 
+# Global reference to llama-server subprocess for cleanup
+_llama_process = None
+
+
+def find_llama_server(app_path):
+    """Locate bundled llama-server executable and model files."""
+    llama_exe = app_path / "llm" / "llama-server.exe"
+    if not llama_exe.exists():
+        return None, None
+
+    # Find GGUF model files
+    model_files = sorted(glob.glob(str(app_path / "models" / "*.gguf")))
+    if not model_files:
+        return str(llama_exe), None
+
+    # Use the first model found (single file) or primary shard
+    return str(llama_exe), model_files[0]
+
+
+def start_llama_server(llama_exe, model_path, port=1337):
+    """Start llama-server as a subprocess with Vulkan GPU offloading."""
+    global _llama_process
+
+    cmd = [
+        llama_exe,
+        "-m", model_path,
+        "--port", str(port),
+        "--host", "0.0.0.0",
+        "-ngl", "99",       # Offload all layers to GPU (Vulkan)
+        "-c", "4096",        # Context length
+    ]
+
+    print(f"  Starting llama-server on port {port}...")
+    print(f"  Model: {Path(model_path).name}")
+    print(f"  GPU offload: all layers (Vulkan)")
+
+    _llama_process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+    )
+
+    return _llama_process
+
+
+def stop_llama_server():
+    """Terminate llama-server subprocess if running."""
+    global _llama_process
+    if _llama_process and _llama_process.poll() is None:
+        print("\n  Stopping llama-server...")
+        _llama_process.terminate()
+        try:
+            _llama_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            _llama_process.kill()
+        _llama_process = None
+
+
 def main():
     """Main entry point."""
-    set_console_title("Jan Document Plugin")
+    set_console_title("Jan Document Plugin v2.0.0-beta")
     print_banner()
+
+    # Register cleanup handlers
+    atexit.register(stop_llama_server)
+    signal.signal(signal.SIGINT, lambda s, f: sys.exit(0))
+    signal.signal(signal.SIGTERM, lambda s, f: sys.exit(0))
 
     # Load configuration
     config = load_config()
     app_path = get_app_path()
     port = config['PROXY_PORT']
+    jan_port = int(config['JAN_PORT'])
 
     # Find Tesseract
     tesseract_path = config.get('TESSERACT_PATH', '')
@@ -135,9 +203,32 @@ def main():
     else:
         print("  OCR:         Disabled (Tesseract not found)")
 
-    print(f"  Web UI:      http://localhost:{port}")
-    print(f"  Jan API:     http://localhost:{config['JAN_PORT']}")
+    print(f"  Chat UI:     http://localhost:{port}/ui")
+    print(f"  LLM API:     http://localhost:{jan_port}")
     print(f"  Storage:     {config['STORAGE_DIR']}")
+
+    # --- Start bundled llama-server if available ---
+    llama_exe, model_path = find_llama_server(app_path)
+    llama_started = False
+
+    if llama_exe and model_path:
+        print()
+        try:
+            start_llama_server(llama_exe, model_path, port=jan_port)
+            llama_started = True
+            # Give llama-server a moment to bind its port
+            time.sleep(2)
+        except Exception as e:
+            print(f"  WARNING: Failed to start llama-server: {e}")
+            print(f"  Continuing without bundled LLM — connect Jan or another server to port {jan_port}")
+    elif llama_exe and not model_path:
+        print()
+        print("  WARNING: llama-server found but no .gguf model in models/ directory")
+        print(f"  Place a GGUF model in: {app_path / 'models'}")
+    else:
+        print()
+        print(f"  No bundled llama-server — expecting LLM server on port {jan_port}")
+
     print()
 
     # Ensure storage directory exists
@@ -152,11 +243,11 @@ def main():
 
     # Import and configure the proxy
     try:
-        from jan_proxy import app, config as proxy_config
+        from jan_proxy import app as proxy_app, config as proxy_config
         import uvicorn
 
         # Update proxy config
-        proxy_config.jan_port = int(config['JAN_PORT'])
+        proxy_config.jan_port = jan_port
         proxy_config.proxy_port = int(port)
         proxy_config.persist_directory = str(storage_dir)
         proxy_config.tesseract_path = tesseract_path
@@ -166,22 +257,24 @@ def main():
 
         print("=" * 64)
         print()
-        print(f"  Server running at: http://localhost:{port}")
+        print(f"  Chat UI:   http://localhost:{port}/ui")
+        if llama_started:
+            print(f"  LLM:       Bundled llama-server (Vulkan GPU)")
+        else:
+            print(f"  LLM:       External server on port {jan_port}")
         print()
-        print("  Upload documents via the web interface, then chat in Jan!")
-        print()
-        print("  Press Ctrl+C to stop the server")
+        print("  Press Ctrl+C to stop")
         print()
         print("=" * 64)
         print()
 
-        # Auto-open browser if configured
+        # Auto-open browser to Chat UI
         if config.get('AUTO_OPEN_BROWSER', 'true').lower() == 'true':
-            open_browser_delayed(f"http://localhost:{port}", delay=2)
+            open_browser_delayed(f"http://localhost:{port}/ui", delay=3)
 
-        # Start the server
+        # Start the proxy server
         uvicorn.run(
-            app,
+            proxy_app,
             host="0.0.0.0",
             port=int(port),
             log_level="info"
@@ -202,6 +295,8 @@ def main():
         traceback.print_exc()
         input("Press Enter to exit...")
         sys.exit(1)
+    finally:
+        stop_llama_server()
 
 
 if __name__ == "__main__":

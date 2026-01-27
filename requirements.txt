@@ -26,6 +26,10 @@ pydantic>=2.0.0
 # Resource monitoring
 psutil>=5.9.0                  # System resource monitoring
 
+# Voice input (Windows offline speech recognition)
+SpeechRecognition>=3.10.0      # Audio transcription framework
+PyAudio>=0.2.14                # Microphone capture
+
 # Build tools (optional - for creating standalone .exe)
 pyinstaller>=6.0.0
 

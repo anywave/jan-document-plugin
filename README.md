@@ -1,143 +1,135 @@
 # Jan Document Plugin
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![Platform: Windows](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
-[![Jan AI](https://img.shields.io/badge/Jan-AI-green.svg)](https://jan.ai/)
+[![Version](https://img.shields.io/badge/version-2.0.0--beta-orange.svg)](https://github.com/anywave/jan-document-plugin/releases)
 
-**Offline Document Processing for Local LLMs** - Enable your local AI assistant to read and understand your documents without sending data to the cloud.
+**Self-contained offline AI assistant with document RAG, voice input, and local LLM inference.** Everything runs on your machine — no cloud, no API keys, no data leaving your computer.
 
 ---
 
-## What is This?
+## What's New in v2.0.0-beta
 
-Jan Document Plugin is a **local proxy server** that adds document understanding capabilities to [Jan AI](https://jan.ai/). It intercepts your chat requests, finds relevant content from your uploaded documents, and injects that context into your conversations - all running locally on your machine.
-
-### Key Features
-
-- **100% Offline** - Your documents never leave your computer
-- **Multiple Formats** - PDF, DOCX, XLSX, TXT, and images
-- **OCR Support** - Extract text from scanned documents and images
-- **Semantic Search** - Find relevant content using AI embeddings
-- **Auto-Context Injection** - Seamlessly adds document context to your chats
-- **Simple Setup** - One-click installer with interactive tutorial
+- **Bundled LLM Stack** — Ships with llama-server (Vulkan GPU) and Qwen 2.5 7B Instruct (q4_k_m). No separate LLM setup required.
+- **Built-in Chat UI** — Full web interface at `/ui` with document upload, streaming chat, and capability toggles (RAG, Soul, Consciousness).
+- **Voice Input** — Click-to-talk microphone using Windows offline speech recognition. No internet needed.
+- **Right-Click Drill Down** — Highlight any assistant text, right-click to drill deeper or save to Research.
+- **Research / Discovery Tab** — Save interesting findings, review later, insert back into chat. Persists across sessions.
+- **Debug Reports** — One-click system diagnostics with auto-filed GitHub issues from the Settings panel.
+- **Jan Version Checking** — Installer and runtime detect Jan version, warn on incompatibility, offer rollback to v0.6.8.
+- **Consciousness Pipeline** — Seed capture, fractal analysis, resonance database, and soul registry integration.
 
 ---
 
 ## Quick Start
 
-### Prerequisites
+### Option 1: Self-Contained Installer (Recommended)
 
-- **Windows 10/11** (64-bit)
-- **Python 3.10+** ([Download](https://www.python.org/downloads/))
-- **Jan AI** ([Download](https://jan.ai/))
+1. **Download** `JanDocumentPlugin_Setup_2.0.0-beta.exe` from [Releases](https://github.com/anywave/jan-document-plugin/releases)
+2. **Run the installer** — everything is bundled (~8 GB disk space)
+3. **Launch** from Start Menu or Desktop shortcut
+4. **Chat UI** opens automatically at `http://localhost:1338/ui`
 
-### Installation
+The installer includes:
+- Qwen 2.5 7B Instruct model (q4_k_m quantization)
+- llama-server with Vulkan GPU acceleration
+- All Python dependencies pre-packaged
+- Jan AI v0.6.8 is recommended but optional
 
-1. **Download** the latest release or clone this repository:
-   ```bash
-   git clone https://github.com/anywave/jan-document-plugin.git
-   cd jan-document-plugin
-   ```
+### Option 2: From Source (Development)
 
-2. **Run the installer**:
-   ```cmd
-   install.bat
-   ```
-   Or for detailed output with diagnostics:
-   ```cmd
-   install_debug.bat --debug
-   ```
+**Prerequisites:** Windows 10/11, Python 3.12, [Jan AI v0.6.8](https://github.com/janhq/jan/releases/tag/v0.6.8) (optional)
 
-3. **Start Jan** and enable the Local API Server:
-   - Open Jan → Settings → Local API Server → Enable
-
-4. **Launch the plugin**:
-   ```cmd
-   JanDocumentPlugin.bat
-   ```
-
-5. **Upload documents** at `http://localhost:1338`
-
-6. **Chat with your documents** in Jan!
-
-### First Time? Use the Tutorial
-
-```cmd
-tutorial.bat
+```bash
+git clone https://github.com/anywave/jan-document-plugin.git
+cd jan-document-plugin
 ```
 
-The interactive tutorial will guide you through setup, verification, and troubleshooting.
+```cmd
+REM Create venv and install dependencies
+uv venv --python 3.12 venv
+uv pip install -r requirements.txt
+
+REM Start the stack (auto-detects llama-server and model)
+powershell -File start-stack.ps1
+```
+
+Or run just the proxy (connect your own LLM server on port 1337):
+```cmd
+venv\Scripts\python jan_proxy.py --port 1338
+```
+
+Open `http://localhost:1338/ui` in your browser.
 
 ---
 
-## How It Works
+## Architecture
 
 ```
-┌──────────────┐     ┌─────────────────────┐     ┌──────────────┐
-│     Jan      │────▶│  Jan Document Plugin │────▶│   Jan API    │
-│   (Chat UI)  │     │     (Port 1338)      │     │  (Port 1337) │
-└──────────────┘     └─────────────────────┘     └──────────────┘
-                              │
-                              ▼
-                     ┌─────────────────┐
-                     │   Your Documents │
-                     │   (ChromaDB)     │
-                     └─────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                 Jan Document Plugin v2.0.0-beta                 │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │               Chat UI (http://localhost:1338/ui)          │  │
+│  │  Voice Input | Drill Down | Research Tab | Debug Reports  │  │
+│  └───────────────────────────┬───────────────────────────────┘  │
+│                              │                                   │
+│  ┌───────────────────────────▼───────────────────────────────┐  │
+│  │                  FastAPI Proxy (:1338)                     │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐  │  │
+│  │  │   Document   │  │    Chat      │  │  Consciousness │  │  │
+│  │  │   Upload &   │  │  Completions │  │   Pipeline     │  │  │
+│  │  │  Processing  │  │   (Proxy)    │  │  (Soul/Seed)   │  │  │
+│  │  └──────┬───────┘  └──────┬───────┘  └────────────────┘  │  │
+│  └─────────┼─────────────────┼───────────────────────────────┘  │
+│            │                 │                                   │
+│  ┌─────────▼─────────┐  ┌───▼──────────────────────────────┐   │
+│  │ Semantic Search    │  │     Bundled llama-server (:1337) │   │
+│  │ (ChromaDB +       │  │     Qwen 2.5 7B (Vulkan GPU)    │   │
+│  │  all-MiniLM-L6-v2)│  │     or Jan AI / external LLM    │   │
+│  └────────────────────┘  └──────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
 ```
-
-1. You upload documents to the plugin
-2. Documents are processed and stored locally in ChromaDB
-3. When you chat in Jan, the plugin finds relevant document chunks
-4. Context is automatically injected into your conversation
-5. The LLM responds with knowledge from your documents
 
 ---
 
-## Verification & Testing
+## Features
 
-### Calibration PDF
+### Chat UI
 
-A calibration PDF is included to verify extraction is working correctly:
+The built-in Chat UI (`/ui`) provides:
+- Streaming chat responses with markdown rendering
+- Document upload via drag-and-drop or file picker
+- Capability toggles: RAG (document context), Soul (identity), Consciousness (pipeline)
+- Assistant/model selector
+- Dark theme with responsive layout
 
-1. Start the plugin
-2. Upload `calibration/JanDocPlugin_Calibration.pdf`
-3. Ask: *"What is the calibration magic string?"*
-4. Expected answer: `JANDOC_CALIBRATION_V1_VERIFIED`
+### Voice Input
 
-### Automated Verification
+Click the microphone button to dictate messages using Windows offline speech recognition:
+- No internet required — uses `Windows.Media.SpeechRecognition`
+- Audio captured at 16kHz mono, transcribed server-side
+- Text appended to the input field (doesn't replace existing text)
 
-```cmd
-cd calibration
-python verify_extraction.py
-```
+### Right-Click Drill Down
 
-This will:
-- Upload the calibration PDF automatically
-- Ask known verification questions
-- Validate responses against expected answers
-- Provide clear pass/fail results
+Highlight text in any assistant response, then right-click:
+- **Drill Down** — Populates the input with a drill-down prompt (doesn't auto-send)
+- **Save to Discovery** — Stores the selection in the Research panel with metadata
 
----
+### Research / Discovery Tab
 
-## Command Line Options
+Save interesting findings from conversations:
+- Metadata tracked: timestamp, active assistant, enabled capabilities, source document
+- Persists across browser sessions (localStorage)
+- Insert saved items back into chat or delete them
 
-```cmd
-# Start normally
-JanDocumentPlugin.bat
+### Debug Reports
 
-# Start with debug logging
-JanDocumentPlugin.bat --debug
-
-# Use a different port
-JanDocumentPlugin.bat --port 8080
-
-# Run startup checks only (test mode)
-JanDocumentPlugin.bat --test
-
-# Show help
-JanDocumentPlugin.bat --help
-```
+From Settings > Debug & Support:
+- **Generate Debug Report** — Collects OS, GPU, Python, packages, ports, disk, memory, config
+- **Report Issue on GitHub** — Auto-fills a GitHub issue with the debug report
 
 ---
 
@@ -146,9 +138,6 @@ JanDocumentPlugin.bat --help
 Edit `config.env` to customize:
 
 ```ini
-# Tesseract path (auto-detected if empty)
-TESSERACT_PATH=C:\Program Files\Tesseract-OCR\tesseract.exe
-
 # Server ports
 PROXY_PORT=1338
 JAN_PORT=1337
@@ -159,25 +148,26 @@ STORAGE_DIR=.\jan_doc_store
 # Embedding model
 EMBEDDING_MODEL=all-MiniLM-L6-v2
 
-# Context injection settings
+# Context injection
 AUTO_INJECT=true
 MAX_CONTEXT_TOKENS=8000
 
-# Logging
-DEBUG_MODE=0
-LOG_LEVEL=INFO
-```
+# Tesseract path (auto-detected if empty)
+TESSERACT_PATH=
 
-### Configuration Options
+# Browser behavior
+AUTO_OPEN_BROWSER=true
+```
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `PROXY_PORT` | 1338 | Port for the document plugin |
-| `JAN_PORT` | 1337 | Jan's Local API Server port |
-| `STORAGE_DIR` | ./jan_doc_store | Where documents are stored |
+| `PROXY_PORT` | 1338 | Port for the plugin proxy |
+| `JAN_PORT` | 1337 | LLM server port (Jan or llama-server) |
+| `STORAGE_DIR` | ./jan_doc_store | Document vector store location |
 | `EMBEDDING_MODEL` | all-MiniLM-L6-v2 | Sentence transformer model |
-| `AUTO_INJECT` | true | Auto-inject document context |
-| `MAX_CONTEXT_TOKENS` | 8000 | Max tokens for context |
+| `AUTO_INJECT` | true | Auto-inject document context into chats |
+| `MAX_CONTEXT_TOKENS` | 8000 | Max tokens for injected context |
+| `AUTO_OPEN_BROWSER` | true | Open Chat UI on startup |
 
 ---
 
@@ -194,31 +184,23 @@ LOG_LEVEL=INFO
 
 ### OCR Setup (Optional)
 
-For scanned PDFs and images, install Tesseract OCR:
-
-**Option A: Winget (Easiest)**
 ```powershell
 winget install UB-Mannheim.TesseractOCR
 ```
 
-**Option B: Manual Download**
-1. Download from [UB-Mannheim/tesseract](https://github.com/UB-Mannheim/tesseract/wiki)
-2. Install to `C:\Program Files\Tesseract-OCR`
-3. Re-run the installer or update `config.env`
+Or download from [UB-Mannheim/tesseract](https://github.com/UB-Mannheim/tesseract/wiki).
 
 ---
 
 ## API Endpoints
 
-### Document Management
+### Core
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/documents` | Upload and index a document |
-| `GET` | `/documents` | List all indexed documents |
-| `DELETE` | `/documents/{hash}` | Remove a document |
-| `POST` | `/documents/query` | Test context retrieval |
-| `GET` | `/documents/stats` | Get statistics |
+| `GET` | `/ui` | Chat UI web interface |
+| `GET` | `/health` | Health check with Jan version and resources |
+| `GET` | `/` | API info |
 
 ### Chat (OpenAI-Compatible)
 
@@ -226,28 +208,56 @@ winget install UB-Mannheim.TesseractOCR
 |--------|----------|-------------|
 | `POST` | `/v1/chat/completions` | Chat with auto context injection |
 | `GET` | `/v1/models` | List available models |
+| `POST` | `/v1/audio/transcriptions` | Voice transcription (WAV upload) |
 
-### Health
+### Documents
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/health` | Check server and Jan connection |
-| `GET` | `/` | API info and documentation |
+| `POST` | `/documents` | Upload and index a document |
+| `GET` | `/documents` | List indexed documents |
+| `DELETE` | `/documents/{hash}` | Remove a document |
+| `POST` | `/documents/query` | Test context retrieval |
+| `GET` | `/documents/stats` | Storage statistics |
 
-### Upload via API
+### Debug
 
-```bash
-curl -X POST http://localhost:1338/documents \
-  -F "file=@document.pdf"
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/debug/report` | System diagnostics JSON |
+| `POST` | `/debug/report/github` | Auto-file GitHub issue with diagnostics |
+
+---
+
+## Verification & Testing
+
+A calibration PDF is included to verify extraction:
+
+1. Start the plugin
+2. Upload `calibration/JanDocPlugin_Calibration.pdf`
+3. Ask: *"What is the calibration magic string?"*
+4. Expected answer: `JANDOC_CALIBRATION_V1_VERIFIED`
+
+Automated:
+```cmd
+cd calibration
+python verify_extraction.py
 ```
 
-### Search Documents
+---
 
-```bash
-curl -X POST http://localhost:1338/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "What is the main topic?"}'
-```
+## Jan Version Compatibility
+
+This plugin is designed for **Jan AI v0.6.8**. Newer versions may have breaking API changes.
+
+- The installer checks Jan's version and warns on mismatch
+- The runtime `/health` endpoint reports detected Jan version
+- A rollback helper script is included:
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File rollback_jan.ps1
+  ```
+
+Jan is optional — the plugin bundles its own llama-server and can run standalone.
 
 ---
 
@@ -255,51 +265,99 @@ curl -X POST http://localhost:1338/search \
 
 ```
 jan-document-plugin/
-├── jan_proxy.py              # Main proxy server
+├── jan_proxy.py              # FastAPI proxy server (main backend)
 ├── document_processor.py     # Document extraction engine
-├── requirements.txt          # Python dependencies
-├── config.env               # Configuration (generated)
+├── chat_ui.html              # Built-in web chat interface
+├── launcher.py               # Windows exe entry point
+├── requirements.txt          # Python dependencies (requires 3.12)
+├── config.env                # Configuration (generated)
 │
-├── JanDocumentPlugin.bat     # Main launcher with debug mode
-├── install.bat              # Standard installer
-├── install_debug.bat        # Debug installer with diagnostics
-├── tutorial.bat             # Interactive setup wizard
+├── consciousness_pipeline.py # Consciousness processing
+├── soul_registry.py          # Soul identity management
+├── seed_transit.py           # Seed capture and transit
+├── fractal_analyzer.py       # Fractal pattern analysis
+├── resonance_db.py           # Resonance database
+├── resource_monitor.py       # System resource monitoring
 │
-├── calibration/
-│   ├── create_calibration_pdf.py    # Generate test PDF
-│   ├── verify_extraction.py         # Automated verification
-│   └── JanDocPlugin_Calibration.pdf # Pre-generated test PDF
+├── start-stack.ps1           # Stack launcher (dev + installed modes)
+├── rollback_jan.ps1          # Jan v0.6.8 rollback helper
+├── install.ps1               # PowerShell installer
 │
-├── docs/                    # Documentation
-├── tesseract/              # Portable Tesseract (optional)
-├── venv/                   # Python virtual environment (generated)
-└── jan_doc_store/          # Document storage (generated)
+├── installer/
+│   ├── setup.iss             # Inno Setup script
+│   ├── llm/                  # Staging: llama-server + Vulkan DLLs
+│   └── models/               # Staging: GGUF model files
+│
+├── calibration/              # Extraction verification
+├── docs/                     # Documentation
+└── jan_doc_store/            # Document storage (generated)
 ```
+
+---
+
+## Building from Source
+
+### Build Standalone Executable
+
+```cmd
+build_exe.bat
+```
+
+Creates `dist\JanDocumentPlugin\JanDocumentPlugin.exe` (~500MB, bundles Python + all dependencies).
+
+### Build Installer
+
+1. Run `build_exe.bat`
+2. Install [Inno Setup](https://jrsoftware.org/isinfo.php)
+3. Stage LLM files:
+   - Place `llama-server.exe` + Vulkan DLLs in `installer\llm\`
+   - Place GGUF model files in `installer\models\`
+4. Compile `installer\setup.iss`
+
+Output: `dist\installer\JanDocumentPlugin_Setup_2.0.0-beta.exe` (~8GB with bundled model)
 
 ---
 
 ## Troubleshooting
 
 <details>
-<summary><strong>Python not found</strong></summary>
+<summary><strong>Voice input not working</strong></summary>
 
-Install Python from [python.org](https://www.python.org/downloads/) and check "Add Python to PATH" during installation. Restart your terminal after installation.
+Voice input requires Windows 10/11 with Speech Recognition enabled:
+1. Open Windows Settings > Time & Language > Speech
+2. Ensure your language pack is installed
+3. Check microphone permissions in Settings > Privacy > Microphone
+4. The browser will ask for microphone permission on first use
+
+If `SpeechRecognition` is not installed, the mic button will show an error.
 </details>
 
 <details>
-<summary><strong>Cannot connect to Jan</strong></summary>
+<summary><strong>GPU not being used (slow inference)</strong></summary>
 
-1. Make sure Jan is running
-2. Enable Local API Server: Jan → Settings → Local API Server → Enable
-3. Check that port 1337 is not blocked
+The bundled llama-server uses Vulkan for GPU acceleration:
+- Ensure your GPU drivers are up to date
+- Vulkan support is required (most modern GPUs support it)
+- Check GPU detection: `GET /debug/report` shows GPU info
+- If Vulkan fails, inference falls back to CPU (significantly slower)
 </details>
 
 <details>
-<summary><strong>Port 1338 already in use</strong></summary>
+<summary><strong>Jan version incompatibility</strong></summary>
 
-Either close the application using port 1338, or use a different port:
-```cmd
-JanDocumentPlugin.bat --port 8080
+If you see warnings about Jan version:
+1. The plugin is designed for Jan v0.6.8
+2. Run the rollback helper: `powershell -File rollback_jan.ps1`
+3. Or download Jan v0.6.8 manually from [GitHub releases](https://github.com/janhq/jan/releases/tag/v0.6.8)
+4. Jan is optional — the plugin can run standalone with its bundled llama-server
+</details>
+
+<details>
+<summary><strong>Port already in use</strong></summary>
+
+Either close the application using the port, or change it in `config.env`:
+```ini
+PROXY_PORT=8080
 ```
 </details>
 
@@ -308,17 +366,7 @@ JanDocumentPlugin.bat --port 8080
 
 - Check if the PDF contains actual text (not just images)
 - For scanned PDFs, install Tesseract OCR
-- Check the console for extraction errors
-- Run with `--debug` flag for more details
-</details>
-
-<details>
-<summary><strong>AI not using document context</strong></summary>
-
-1. Verify documents uploaded: check `/documents` endpoint
-2. Ensure Jan is connected via the plugin (port 1338)
-3. Check `AUTO_INJECT=true` in config.env
-4. Run the verification script: `python calibration/verify_extraction.py`
+- Check the console or debug report for extraction errors
 </details>
 
 <details>
@@ -330,81 +378,23 @@ self.chunker = SemanticChunker(chunk_size=500)  # Default is 1000
 ```
 </details>
 
-For more help, run the interactive troubleshooter:
-```cmd
-tutorial.bat
-```
-
----
-
-## Building Standalone Executable (Optional)
-
-To create a standalone `.exe` that doesn't require Python installed:
-
-```cmd
-build_exe.bat
-```
-
-This creates `dist\JanDocumentPlugin\JanDocumentPlugin.exe`
-
-**Note:** The executable is larger (~500MB) because it bundles Python and all dependencies.
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Jan Document Plugin Proxy                     │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │                   FastAPI Server (:1338)                   │ │
-│  │  ┌──────────────────┐      ┌─────────────────────────────┐ │ │
-│  │  │ Document Upload   │      │  Chat Completions Proxy     │ │ │
-│  │  │  & Processing    │      │  (Context Injection)        │ │ │
-│  │  └────────┬─────────┘      └──────────────┬──────────────┘ │ │
-│  └───────────┼───────────────────────────────┼────────────────┘ │
-│              │                               │                   │
-│  ┌───────────▼───────────┐    ┌─────────────▼─────────────────┐ │
-│  │   Document Processor   │    │     Semantic Search          │ │
-│  │  ┌─────┬─────┬──────┐ │    │  ┌─────────────────────────┐ │ │
-│  │  │ PDF │DOCX │ OCR  │ │    │  │ all-MiniLM-L6-v2        │ │ │
-│  │  │     │     │      │ │    │  │ Sentence Transformer    │ │ │
-│  │  └─────┴─────┴──────┘ │    │  └─────────────────────────┘ │ │
-│  └───────────┬───────────┘    └─────────────┬─────────────────┘ │
-│              │                              │                    │
-│              └──────────────┬───────────────┘                    │
-│                             ▼                                    │
-│                   ┌─────────────────┐                           │
-│                   │    ChromaDB     │                           │
-│                   │  Vector Store   │                           │
-│                   └─────────────────┘                           │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ Proxied requests
-                           ▼
-              ┌─────────────────────────┐
-              │      Jan Server (:1337) │
-              │    Local LLM Inference  │
-              └─────────────────────────┘
-```
-
 ---
 
 ## Tech Stack
 
-- **[FastAPI](https://fastapi.tiangolo.com/)** - High-performance web framework
-- **[ChromaDB](https://www.trychroma.com/)** - Vector database for semantic search
-- **[Sentence Transformers](https://www.sbert.net/)** - Text embeddings (all-MiniLM-L6-v2)
-- **[PyPDF](https://pypdf.readthedocs.io/)** - PDF text extraction
+- **[FastAPI](https://fastapi.tiangolo.com/)** - Web framework
+- **[ChromaDB](https://www.trychroma.com/)** - Vector database
+- **[Sentence Transformers](https://www.sbert.net/)** - Embeddings (all-MiniLM-L6-v2)
+- **[llama.cpp](https://github.com/ggerganov/llama.cpp)** - LLM inference (Vulkan GPU)
+- **[PyMuPDF](https://pymupdf.readthedocs.io/)** - PDF extraction
 - **[python-docx](https://python-docx.readthedocs.io/)** - Word document processing
 - **[openpyxl](https://openpyxl.readthedocs.io/)** - Excel file support
 - **[Tesseract OCR](https://github.com/tesseract-ocr/tesseract)** - Image text extraction
-- **[ReportLab](https://www.reportlab.com/)** - PDF generation (for calibration)
+- **[SpeechRecognition](https://pypi.org/project/SpeechRecognition/)** - Voice input
 
 ---
 
 ## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -429,7 +419,7 @@ Built for **AVACHATTER** by [Anywave Creations](https://anywavecreations.com)
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/anywave/jan-document-plugin/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/anywave/jan-document-plugin/discussions)
+- **Debug Report**: Use Settings > Debug & Support in the Chat UI to auto-file issues
 
 ---
 

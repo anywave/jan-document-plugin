@@ -4,6 +4,7 @@
 
 param(
     [switch]$SkipLlama,
+    [switch]$Installed,       # Use bundled paths (.\llm\, .\models\)
     [int]$PluginPort = 1338,
     [int]$LlamaPort = 11435,
     [ValidateSet("jan-nano", "qwen2.5-7b")]
@@ -70,8 +71,35 @@ if ($hostname -match "DELL") {
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "   Jan Document Plugin Stack Launcher" -ForegroundColor Cyan
+Write-Host "   v2.0.0-beta" -ForegroundColor DarkCyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
+
+# --- Installed mode: use bundled llama-server and model ---
+if ($Installed) {
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $LlamaServer = Join-Path $scriptDir "llm\llama-server.exe"
+    $ModelPath = (Get-ChildItem -Path (Join-Path $scriptDir "models") -Filter "*.gguf" | Sort-Object Name | Select-Object -First 1).FullName
+    $EngineType = "Vulkan (GPU)"
+    $ModelAlias = "bundled-model"
+    $ModelParams = "bundled"
+    $CtxSize = 4096
+    $LlamaPort = 1337  # Default port for installed mode
+
+    if (-not (Test-Path $LlamaServer)) {
+        Write-Host "[!!] Bundled llama-server not found at: $LlamaServer" -ForegroundColor Red
+        Write-Host "     Falling back to dev mode..." -ForegroundColor Yellow
+        $Installed = $false
+    } elseif (-not $ModelPath) {
+        Write-Host "[!!] No .gguf model found in: $(Join-Path $scriptDir 'models')" -ForegroundColor Red
+        Write-Host "     Falling back to dev mode..." -ForegroundColor Yellow
+        $Installed = $false
+    } else {
+        Write-Host "[OK] Installed mode — using bundled components" -ForegroundColor Green
+        Write-Host "     Engine: $LlamaServer" -ForegroundColor DarkGray
+        Write-Host "     Model:  $(Split-Path $ModelPath -Leaf)" -ForegroundColor DarkGray
+    }
+}
 
 if (-not $SkipLlama) {
     # Check if llama-server is already running on the port
@@ -120,18 +148,35 @@ if ($portInUse) {
 Write-Host ""
 Write-Host "[..] Starting Jan Document Plugin..." -ForegroundColor Yellow
 
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$venvPython = Join-Path $scriptDir "venv\Scripts\python.exe"
-$proxyScript = Join-Path $scriptDir "jan_proxy.py"
-
-if (-not (Test-Path $venvPython)) {
-    Write-Host "[!!] Virtual environment not found at $venvPython" -ForegroundColor Red
-    Write-Host "     Run: uv venv --python 3.12 venv && uv pip install -r requirements.txt" -ForegroundColor Gray
-    exit 1
+if (-not $scriptDir) {
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 }
 
-# Start the plugin
-Start-Process -FilePath $venvPython -ArgumentList "$proxyScript --port $PluginPort --jan-port $LlamaPort" -NoNewWindow
+if ($Installed) {
+    # Installed mode — use the bundled executable
+    $pluginExe = Join-Path $scriptDir "JanDocumentPlugin.exe"
+    if (Test-Path $pluginExe) {
+        Start-Process -FilePath $pluginExe -NoNewWindow
+    } else {
+        Write-Host "[!!] Bundled executable not found at $pluginExe" -ForegroundColor Red
+        Write-Host "     Falling back to Python venv..." -ForegroundColor Yellow
+        $Installed = $false
+    }
+}
+
+if (-not $Installed) {
+    $venvPython = Join-Path $scriptDir "venv\Scripts\python.exe"
+    $proxyScript = Join-Path $scriptDir "jan_proxy.py"
+
+    if (-not (Test-Path $venvPython)) {
+        Write-Host "[!!] Virtual environment not found at $venvPython" -ForegroundColor Red
+        Write-Host "     Run: uv venv --python 3.12 venv && uv pip install -r requirements.txt" -ForegroundColor Gray
+        exit 1
+    }
+
+    # Start the plugin
+    Start-Process -FilePath $venvPython -ArgumentList "$proxyScript --port $PluginPort --jan-port $LlamaPort" -NoNewWindow
+}
 
 Start-Sleep -Seconds 5
 
@@ -150,17 +195,20 @@ Write-Host "   Stack Ready!" -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Architecture:" -ForegroundColor Gray
-Write-Host "  Jan UI --> Plugin ($PluginPort) --> llama-server ($LlamaPort)" -ForegroundColor Gray
+Write-Host "  Chat UI --> Plugin ($PluginPort) --> llama-server ($LlamaPort)" -ForegroundColor Gray
 Write-Host "  Engine: $EngineType" -ForegroundColor Gray
 Write-Host "  Model: $ModelAlias ($ModelParams parameters)" -ForegroundColor Gray
 Write-Host ""
-Write-Host "To configure Jan:" -ForegroundColor Yellow
+Write-Host "Chat UI:" -ForegroundColor Yellow
+Write-Host "  http://localhost:$PluginPort/ui" -ForegroundColor White
+Write-Host ""
+Write-Host "To configure Jan (optional):" -ForegroundColor Yellow
 Write-Host "  1. Open Jan" -ForegroundColor White
 Write-Host "  2. Go to Settings > Model Providers > OpenAI" -ForegroundColor White
 Write-Host "  3. Set API Base URL: http://localhost:$PluginPort/v1" -ForegroundColor White
 Write-Host "  4. Set API Key: local (any string works)" -ForegroundColor White
-Write-Host "  5. Select model 'jan-nano-128k' in your chat" -ForegroundColor White
 Write-Host ""
 Write-Host "To upload documents:" -ForegroundColor Yellow
+Write-Host "  Use the Chat UI upload button, or:" -ForegroundColor White
 Write-Host "  curl -X POST http://localhost:$PluginPort/documents -F 'file=@yourfile.pdf'" -ForegroundColor White
 Write-Host ""
