@@ -1,5 +1,5 @@
 # Jan Document Plugin Stack Startup Script
-# Starts: llama-server (jan-nano model) + Jan Document Plugin (RAG middleware)
+# Starts: llama-server + Jan Document Plugin (RAG middleware)
 # Jan UI connects to Plugin on port 1338
 
 param(
@@ -7,7 +7,7 @@ param(
     [int]$PluginPort = 1338,
     [int]$LlamaPort = 11435,
     [ValidateSet("jan-nano", "qwen2.5-7b")]
-    [string]$Model = "jan-nano"
+    [string]$Model = "qwen2.5-7b"
 )
 
 # Configuration — auto-detect machine and engine variant
