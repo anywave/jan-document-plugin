@@ -113,6 +113,50 @@ echo Place GGUF model files here > dist\JanDocumentPlugin\models\README.txt
 REM Create installer output directory
 mkdir dist\installer 2>nul
 
+REM ---- Verify dist output ----
+echo.
+echo Verifying build output...
+
+set "VERIFY_OK=1"
+
+if not exist "dist\JanDocumentPlugin\JanDocumentPlugin.exe" (
+    echo   [FAIL] JanDocumentPlugin.exe missing
+    set "VERIFY_OK=0"
+) else (
+    echo   [OK] JanDocumentPlugin.exe
+)
+
+if not exist "dist\JanDocumentPlugin\chat_ui.html" (
+    echo   [FAIL] chat_ui.html missing
+    set "VERIFY_OK=0"
+) else (
+    echo   [OK] chat_ui.html
+)
+
+if not exist "dist\JanDocumentPlugin\config.env" (
+    echo   [WARN] config.env missing (will use defaults)
+) else (
+    echo   [OK] config.env
+)
+
+if not exist "dist\JanDocumentPlugin\rollback_jan.ps1" (
+    echo   [WARN] rollback_jan.ps1 missing
+) else (
+    echo   [OK] rollback_jan.ps1
+)
+
+if not exist "dist\JanDocumentPlugin\calibration\JanDocPlugin_Calibration.pdf" (
+    echo   [WARN] Calibration PDF missing
+) else (
+    echo   [OK] Calibration PDF
+)
+
+if "%VERIFY_OK%"=="0" (
+    echo.
+    echo WARNING: Some required files are missing from the dist output.
+    echo The build may be incomplete.
+)
+
 echo.
 echo ========================================================================
 echo    Build Complete!
@@ -126,10 +170,9 @@ echo   Option 1 - Direct Distribution:
 echo     Copy the entire dist\JanDocumentPlugin folder
 echo.
 echo   Option 2 - Create Installer (Recommended):
-echo     1. Install Inno Setup: https://jrsoftware.org/isinfo.php
-echo     2. Stage llm/ and models/ in installer\ directory
-echo     3. Open installer\setup.iss in Inno Setup
-echo     4. Compile to create JanDocumentPlugin_Setup_2.0.0-beta.exe
+echo     1. Stage LLM files in installer\llm\ and installer\models\
+echo     2. Run: build_installer.bat
+echo        (validates everything and compiles the Inno Setup installer)
 echo.
 echo ========================================================================
 echo.

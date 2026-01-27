@@ -76,6 +76,14 @@ tesseract/tessdata/
 !tesseract/README.txt
 !tesseract/.gitkeep
 
+# Installer staging — large binaries (llama-server, Vulkan DLLs, GGUF models)
+installer/llm/*.exe
+installer/llm/*.dll
+installer/models/*.gguf
+# Keep READMEs
+!installer/llm/README.txt
+!installer/models/README.txt
+
 # Sentence transformers and model cache
 .cache/
 sentence_transformers_cache/
