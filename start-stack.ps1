@@ -28,9 +28,9 @@ $ModelPaths = @{
         "CtxSize" = 8192
     }
     "qwen2.5-7b" = @{
-        "DELL"    = "$env:USERPROFILE\Documents\Jan Stuff\Models\Qwen2.5-7B-Instruct-GGUF\qwen2.5-7b-instruct-q4_k_m.gguf"
-        "RADIX"   = "$env:USERPROFILE\Documents\Jan Stuff\Models\Qwen2.5-7B-Instruct-GGUF\qwen2.5-7b-instruct-q4_k_m.gguf"
-        "DEFAULT" = "$env:USERPROFILE\Documents\Jan Stuff\Models\Qwen2.5-7B-Instruct-GGUF\qwen2.5-7b-instruct-q4_k_m.gguf"
+        "DELL"    = "$env:USERPROFILE\Documents\Jan Stuff\Models\Qwen2.5-7B-Instruct-GGUF\qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf"
+        "RADIX"   = "$env:USERPROFILE\Documents\Jan Stuff\Models\Qwen2.5-7B-Instruct-GGUF\qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf"
+        "DEFAULT" = "$env:USERPROFILE\Documents\Jan Stuff\Models\Qwen2.5-7B-Instruct-GGUF\qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf"
         "Alias"   = "qwen2.5-7b-instruct"
         "Params"  = "7B"
         "CtxSize" = 8192
