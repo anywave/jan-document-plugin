@@ -42,7 +42,11 @@ def load_config():
     config = {
         'TESSERACT_PATH': '',
         'PROXY_PORT': '1338',
-        'JAN_PORT': '1337',
+        'JAN_PORT': '11434',  # Ollama for document processing
+        'JAN_AI_PORT': '1337',  # Jan AI for chat
+        'DOCUMENT_PROCESSING_MODEL': 'qwen2.5:7b-instruct',
+        'CHAT_MODEL': 'jan-nano:128k',
+        'USE_JAN_AI_FOR_CHAT': 'true',
         'STORAGE_DIR': './jan_doc_store',
         'EMBEDDING_MODEL': 'all-MiniLM-L6-v2',
         'AUTO_INJECT': 'true',
@@ -204,7 +208,15 @@ def main():
         print("  OCR:         Disabled (Tesseract not found)")
 
     print(f"  Chat UI:     http://localhost:{port}/ui")
-    print(f"  LLM API:     http://localhost:{jan_port}")
+
+    # Show two-tier system info if enabled
+    if config['USE_JAN_AI_FOR_CHAT'].lower() == 'true':
+        print(f"  Architecture: Two-Tier LLM System")
+        print(f"    Chat:      {config['CHAT_MODEL']} (Jan AI port {config['JAN_AI_PORT']})")
+        print(f"    Documents: {config['DOCUMENT_PROCESSING_MODEL']} (Ollama port {jan_port})")
+    else:
+        print(f"  LLM API:     http://localhost:{jan_port}")
+
     print(f"  Storage:     {config['STORAGE_DIR']}")
 
     # --- Start bundled llama-server if available ---
@@ -248,6 +260,10 @@ def main():
 
         # Update proxy config
         proxy_config.jan_port = jan_port
+        proxy_config.jan_ai_port = int(config['JAN_AI_PORT'])
+        proxy_config.use_jan_ai_for_chat = config['USE_JAN_AI_FOR_CHAT'].lower() == 'true'
+        proxy_config.document_processing_model = config['DOCUMENT_PROCESSING_MODEL']
+        proxy_config.chat_model = config['CHAT_MODEL']
         proxy_config.proxy_port = int(port)
         proxy_config.persist_directory = str(storage_dir)
         proxy_config.tesseract_path = tesseract_path
@@ -257,11 +273,15 @@ def main():
 
         print("=" * 64)
         print()
-        print(f"  Chat UI:   http://localhost:{port}/ui")
+        print(f"  Chat UI:        http://localhost:{port}/ui")
         if llama_started:
-            print(f"  LLM:       Bundled llama-server (Vulkan GPU)")
+            print(f"  LLM:            Bundled llama-server (Vulkan GPU)")
         else:
-            print(f"  LLM:       External server on port {jan_port}")
+            if config['USE_JAN_AI_FOR_CHAT'].lower() == 'true':
+                print(f"  Chat (Tier 2):  Jan AI on port {config['JAN_AI_PORT']} ({config['CHAT_MODEL']})")
+                print(f"  Docs (Tier 1):  Ollama on port {jan_port} ({config['DOCUMENT_PROCESSING_MODEL']})")
+            else:
+                print(f"  LLM:            Ollama on port {jan_port}")
         print()
         print("  Press Ctrl+C to stop")
         print()

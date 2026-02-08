@@ -78,19 +78,25 @@ logger = logging.getLogger("jan-proxy")
 
 class ProxyConfig(BaseModel):
     """Proxy server configuration."""
-    
-    # Jan server connection
+
+    # Server connection - Two-tier system
     jan_host: str = "localhost"
-    jan_port: int = 1337
-    
+    jan_port: int = 11434  # Ollama for document processing
+    jan_ai_port: int = 1337  # Jan AI for chat interface
+    use_jan_ai_for_chat: bool = True  # Use Jan AI API for chat vs Ollama
+
+    # Model configuration - Two-tier system
+    document_processing_model: str = "qwen2.5:7b-instruct"  # Larger model for documents
+    chat_model: str = "jan-nano:128k"  # Jan Nano for chat with The Architect
+
     # Proxy server
     proxy_port: int = 1338
-    
+
     # Document processing
     persist_directory: str = "./jan_doc_store"
     tesseract_path: Optional[str] = None
     embedding_model: str = "all-MiniLM-L6-v2"
-    
+
     # Context injection settings
     auto_inject: bool = True           # Automatically inject context
     max_context_tokens: int = 400      # Max tokens for injected context (very small for slow models)
@@ -109,6 +115,10 @@ Use this context to inform your response when relevant. If the context doesn't c
     @property
     def jan_base_url(self) -> str:
         return f"http://{self.jan_host}:{self.jan_port}"
+
+    @property
+    def jan_ai_base_url(self) -> str:
+        return f"http://{self.jan_host}:{self.jan_ai_port}"
 
 
 # Global config - can be overridden at startup
@@ -953,9 +963,14 @@ async def chat_completions(request: ChatCompletionRequest):
         jan_request["top_p"] = request.top_p
     if request.stop:
         jan_request["stop"] = request.stop
-    
-    # Forward to Jan
-    jan_url = f"{config.jan_base_url}/v1/chat/completions"
+
+    # Forward to Jan AI (chat interface) or Ollama (document processing) based on configuration
+    if config.use_jan_ai_for_chat:
+        jan_url = f"{config.jan_ai_base_url}/v1/chat/completions"
+        logger.info(f"Routing chat to Jan AI: {jan_url}")
+    else:
+        jan_url = f"{config.jan_base_url}/v1/chat/completions"
+        logger.info(f"Routing chat to Ollama: {jan_url}")
     
     try:
         if request.stream:
@@ -964,9 +979,11 @@ async def chat_completions(request: ChatCompletionRequest):
             return await forward_jan_request(jan_url, jan_request)
     
     except httpx.ConnectError:
+        target_url = config.jan_ai_base_url if config.use_jan_ai_for_chat else config.jan_base_url
+        target_name = "Jan AI" if config.use_jan_ai_for_chat else "Ollama"
         raise HTTPException(
             status_code=502,
-            detail=f"Cannot connect to Jan server at {config.jan_base_url}. Is Jan running?"
+            detail=f"Cannot connect to {target_name} server at {target_url}. Is {target_name} running?"
         )
 
 
@@ -1339,6 +1356,50 @@ async def health_check():
         "auto_inject": config.auto_inject,
         "system_resources": resource_info
     }
+
+
+@app.get("/api/assistants")
+async def list_assistants():
+    """
+    Fetch available assistants from Jan AI.
+
+    Returns assistants configured in Jan AI with their emoji, name, description,
+    instructions, and predefined parameters. Only available when use_jan_ai_for_chat is enabled.
+    """
+    if not config.use_jan_ai_for_chat:
+        return {
+            "assistants": [],
+            "message": "Jan AI integration disabled. Enable USE_JAN_AI_FOR_CHAT in config."
+        }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{config.jan_ai_base_url}/v1/assistants")
+
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"Retrieved {len(data.get('data', []))} assistants from Jan AI")
+                return data
+            else:
+                logger.warning(f"Failed to fetch assistants: {response.status_code}")
+                return {
+                    "assistants": [],
+                    "error": f"Jan AI returned status {response.status_code}"
+                }
+
+    except httpx.ConnectError:
+        logger.error(f"Cannot connect to Jan AI at {config.jan_ai_base_url}")
+        return {
+            "assistants": [],
+            "error": f"Cannot connect to Jan AI at {config.jan_ai_base_url}. Is Jan AI running?"
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching assistants: {e}")
+        return {
+            "assistants": [],
+            "error": str(e)
+        }
 
 
 @app.get("/")
