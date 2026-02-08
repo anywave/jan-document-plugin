@@ -1,0 +1,59 @@
+Jan Document Plugin - Bootstrap Installer
+==========================================
+
+This installer will set up everything you need to run the Jan Document Plugin:
+
+INSTALLATION STEPS:
+-------------------
+
+1. Python 3.12 Installation
+   • Checks if Python 3.12 is installed
+   • Downloads and installs if missing (~30MB)
+   • Configures PATH automatically
+
+2. Tesseract OCR (Optional)
+   • Installs via winget package manager
+   • Required for PDF/image text extraction
+   • Can be skipped if not needed
+
+3. Python Dependencies
+   • Creates isolated virtual environment
+   • Installs FastAPI, ChromaDB, and other packages
+   • Verifies installation success
+
+4. Application Setup
+   • Extracts Jan Document Plugin files
+   • Configures default settings
+   • Creates start menu shortcuts
+   • Sets up document storage directories
+
+SYSTEM REQUIREMENTS:
+--------------------
+• Windows 10/11 (64-bit)
+• ~500MB disk space (or ~8GB with bundled LLM)
+• Internet connection (for dependency downloads)
+• Administrator privileges (for Python install)
+
+INSTALLATION TIME:
+------------------
+• With internet: 5-10 minutes
+• Bundled version: 10-15 minutes (large model file)
+
+POST-INSTALLATION:
+------------------
+After installation completes:
+1. Launch from Start Menu or Desktop icon
+2. Wait for services to start (~30 seconds)
+3. Browser opens automatically to http://localhost:1338/ui
+4. Upload documents and start chatting!
+
+OFFLINE MODE:
+-------------
+After initial setup, the application runs completely offline:
+• No data sent to cloud
+• No API keys required
+• Local LLM inference
+• Private document processing
+
+For support or issues:
+https://github.com/anywave/jan-document-plugin/issues
