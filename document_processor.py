@@ -31,6 +31,10 @@ except ImportError:
 
 # Chunking & Embeddings
 from sentence_transformers import SentenceTransformer
+
+# Python 3.14 compatibility patch for ChromaDB
+import chromadb_compat  # noqa: F401 - side-effect import for patching
+
 import chromadb
 from chromadb.config import Settings
 
