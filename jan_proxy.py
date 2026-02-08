@@ -994,8 +994,9 @@ async def forward_jan_request(url: str, data: dict) -> JSONResponse:
 
 async def stream_jan_response(url: str, data: dict) -> StreamingResponse:
     """Stream response from Jan server."""
-    
+
     async def generate():
+        logger.info(f"Streaming request to {url} with data: {json.dumps(data, indent=2)}")
         async with httpx.AsyncClient(timeout=120.0) as client:
             async with client.stream("POST", url, json=data) as response:
                 if response.status_code != 200:
