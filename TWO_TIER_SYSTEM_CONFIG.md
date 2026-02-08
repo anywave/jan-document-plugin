@@ -145,62 +145,59 @@ The Jan AI application should have "The Architect" assistant configured with:
 
 ### ✅ Completed:
 - [x] Added two-tier configuration to config.env
-- [x] Updated ProxyConfig class in jan_proxy.py
-- [x] Updated launcher.py defaults
+- [x] Updated ProxyConfig class in jan_proxy.py (added jan_ai_port, use_jan_ai_for_chat, model configs)
+- [x] Updated launcher.py to load and display two-tier configuration
 - [x] Created Jan Nano 128k model in Ollama
-- [x] Downloading qwen2.5:7b-instruct (88% complete)
+- [x] Downloading qwen2.5:7b-instruct (25% complete, 24 minutes remaining)
 - [x] Fixed chat UI to dynamically detect models
-- [x] Pushed all fixes to GitHub
+- [x] Implemented chat endpoint routing logic (Jan AI vs Ollama)
+- [x] Added /api/assistants endpoint in jan_proxy.py
+- [x] Implemented Jan AI assistant selector in web UI
+- [x] Assistant integration: instructions + predefined parameters
+- [x] Pushed all changes to GitHub (3 commits)
 
 ### ⏳ Pending (after download completes):
 - [ ] Test document upload with qwen2.5:7b-instruct
-- [ ] Configure document processor to use DOCUMENT_PROCESSING_MODEL
-- [ ] Test Jan AI assistant integration
-- [ ] Implement Jan AI assistant selector in web UI
+- [ ] Configure document processor to use DOCUMENT_PROCESSING_MODEL (if needed)
+- [ ] Test Jan AI assistant integration with live Jan AI instance
 - [ ] Test full RAG flow with both models
 - [ ] Remove qwen2.5:0.5b if not needed
 
-### 🔧 TODO: Code Implementation
+### 🔧 Implementation Complete
 
-#### 1. Update document_processor.py
-Need to modify document processing to use the configured larger model:
+#### 1. ✅ Chat Endpoint Routing (DONE)
+Implemented in jan_proxy.py lines 963-972:
 ```python
-# In document_processor.py, use config.document_processing_model
-# for any LLM-based document understanding tasks
-```
-
-#### 2. Update chat endpoint
-Need to route chat requests based on USE_JAN_AI_FOR_CHAT:
-```python
-# In jan_proxy.py chat_completions endpoint:
+# Forward to Jan AI (chat interface) or Ollama (document processing) based on configuration
 if config.use_jan_ai_for_chat:
-    # Forward to Jan AI API (port jan_ai_port)
-    jan_url = f"http://{config.jan_host}:{config.jan_ai_port}/v1/chat/completions"
+    jan_url = f"{config.jan_ai_base_url}/v1/chat/completions"
+    logger.info(f"Routing chat to Jan AI: {jan_url}")
 else:
-    # Forward to Ollama directly (port jan_port)
-    jan_url = f"http://{config.jan_host}:{config.jan_port}/v1/chat/completions"
+    jan_url = f"{config.jan_base_url}/v1/chat/completions"
+    logger.info(f"Routing chat to Ollama: {jan_url}")
 ```
 
-#### 3. Jan AI Assistant Selector (Web UI)
-Need to add endpoint to fetch Jan AI assistants:
+#### 2. ✅ Jan AI Assistant Selector (DONE)
+Implemented /api/assistants endpoint in jan_proxy.py:
+- Fetches assistants from Jan AI
+- Returns emoji, name, instructions, and predefined parameters
+- Graceful error handling for disabled or unreachable Jan AI
+
+Implemented in chat_ui.html:
+- Assistant selector UI with emoji + name display
+- Fetches assistants on page load
+- Automatically selects "The Architect" if available
+- Applies assistant instructions to system prompt
+- Applies assistant predefined parameters (stream, temperature, frequency_penalty, presence_penalty, top_k, top_p)
+- Disabled state when Jan AI unavailable
+
+#### 3. ⏳ Document Processor Model Selection (TODO)
+Currently document_processor.py doesn't use LLM for processing (only embeddings).
+If LLM-based document understanding is added in future:
 ```python
-@app.get("/api/assistants")
-async def list_assistants():
-    """Fetch assistants from Jan AI."""
-    if config.use_jan_ai_for_chat:
-        try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(f"http://{config.jan_host}:{config.jan_ai_port}/v1/assistants")
-                return resp.json()
-        except:
-            return {"assistants": []}
-    return {"assistants": []}
+# Use config.document_processing_model for any LLM-based tasks
+# Currently not needed as processing uses only embeddings
 ```
-
-Then update chat_ui.html to:
-- Fetch and display assistants
-- Show emoji + name in selector
-- Apply assistant instructions and parameters to requests
 
 ## Testing Checklist
 
