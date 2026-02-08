@@ -431,7 +431,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 <script>
 var API = 'http://localhost:1338';
-var MODEL = 'qwen2.5-7b-instruct';
+var MODEL = null;  // Will be set dynamically from available models
+var availableModels = [];
 var chatMessages = [];
 var systemPrompt = '';
 var attachedFiles = [];
@@ -1332,11 +1333,44 @@ function newChat() {
   renderAttachments();
   var c = document.getElementById('msg-container');
   while (c.firstChild) c.removeChild(c.firstChild);
-  addMsg('assistant', 'Hello. I\'m Qwen 2.5 7B running through the Jan Document Plugin.\n\nYou can:\n\u2022 Chat normally \u2014 I\'ll respond with full context\n\u2022 Attach files \u2014 they\'re automatically chunked and indexed for RAG\n\u2022 Load a soul file from the \u03a8 panel \u2014 identity payloads are detected and injected\n\nThe consciousness pipeline is active. Toggle capabilities from the bar below.');
+  var modelName = MODEL || 'the LLM';
+  addMsg('assistant', 'Hello. I\'m ' + modelName + ' running through the Jan Document Plugin.\n\nYou can:\n\u2022 Chat normally \u2014 I\'ll respond with full context\n\u2022 Attach files \u2014 they\'re automatically chunked and indexed for RAG\n\u2022 Load a soul file from the \u03a8 panel \u2014 identity payloads are detected and injected\n\nThe consciousness pipeline is active. Toggle capabilities from the bar below.');
+}
+
+// ─── MODEL INITIALIZATION ───
+async function initializeModel() {
+  try {
+    var resp = await fetch(API + '/v1/models');
+    var data = await resp.json();
+    if (data.data && data.data.length > 0) {
+      availableModels = data.data;
+      MODEL = data.data[0].id;  // Use first available model
+      console.log('Using model:', MODEL);
+
+      // Update model display
+      var modelSelect = document.getElementById('model-select');
+      if (modelSelect) {
+        var modelLabel = modelSelect.querySelector('span');
+        if (modelLabel) {
+          // Friendly display name
+          var displayName = MODEL.replace(':', ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); });
+          modelLabel.textContent = displayName;
+        }
+      }
+    } else {
+      console.warn('No models available in Ollama');
+      MODEL = 'qwen2.5:0.5b';  // Fallback
+    }
+  } catch (err) {
+    console.error('Failed to fetch models:', err);
+    MODEL = 'qwen2.5:0.5b';  // Fallback
+  }
 }
 
 // ─── INIT ───
-newChat();
+initializeModel().then(function() {
+  newChat();
+});
 checkHealth();
 setInterval(checkHealth, 30000);
 document.getElementById('user-input').focus();
