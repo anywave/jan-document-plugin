@@ -64,7 +64,8 @@
       "resolve": true
     },
     "updater": {
-      "active": false
+      "active": false,
+      "pubkey": ""
     },
     "deep-link": { "schemes": ["mobius"] }
   },

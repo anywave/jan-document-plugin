@@ -197,7 +197,7 @@ pub fn default_data_folder_path<R: Runtime>(app_handle: tauri::AppHandle<R>) -> 
     let mut path = app_handle.path().data_dir().unwrap();
 
     let app_name = std::env::var("APP_NAME")
-        .unwrap_or_else(|_| app_handle.config().product_name.clone().unwrap());
+        .unwrap_or_else(|_| String::from("jan"));
     path.push(app_name);
     path.push("data");
 

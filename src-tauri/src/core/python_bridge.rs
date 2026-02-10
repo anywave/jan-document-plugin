@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
@@ -113,7 +113,7 @@ async fn execute_python_command(
         let mut error_output = String::new();
         err_reader
             .read_to_string(&mut error_output)
-            .map_err(|e| e.to_string())?;
+            .map_err(|e: std::io::Error| e.to_string())?;
 
         return Err(format!(
             "Python process failed with exit code {:?}: {}",
@@ -245,7 +245,7 @@ pub async fn query_documents(
     log::info!("Querying documents: {}", query);
 
     // Build command args
-    let mut args = vec![
+    let args = vec![
         "--json".to_string(),  // Enable JSON output
         "query".to_string(),
         query.clone(),
