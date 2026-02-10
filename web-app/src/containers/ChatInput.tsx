@@ -22,6 +22,7 @@ import {
   IconCodeCircle2,
   IconPlayerStopFilled,
   IconX,
+  IconFileSearch,
 } from '@tabler/icons-react'
 import { useTranslation } from '@/i18n/react-i18next-compat'
 import { useGeneralSetting } from '@/hooks/useGeneralSetting'
@@ -34,6 +35,8 @@ import DropdownModelProvider from '@/containers/DropdownModelProvider'
 import { ModelLoader } from '@/containers/loaders/ModelLoader'
 import DropdownToolsAvailable from '@/containers/DropdownToolsAvailable'
 import { getConnectedServers } from '@/services/mcp'
+import { DocumentSearchModal } from '@/extensions/document-rag/src/components/DocumentSearchModal'
+import { ContextIndicator } from '@/extensions/document-rag/src/components/ContextIndicator'
 
 type ChatInputProps = {
   className?: string
@@ -70,6 +73,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
     }>
   >([])
   const [connectedServers, setConnectedServers] = useState<string[]>([])
+  const [showDocumentSearch, setShowDocumentSearch] = useState(false)
 
   // Check for connected MCP servers
   useEffect(() => {
@@ -308,6 +312,12 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
               isFocused && 'ring-1 ring-main-view-fg/10'
             )}
           >
+            {/* Document Context Indicator */}
+            {currentThreadId && (
+              <div className="px-4 pt-3">
+                <ContextIndicator threadId={currentThreadId} />
+              </div>
+            )}
             {uploadedFiles.length > 0 && (
               <div className="flex gap-3 items-center p-2 pb-0">
                 {uploadedFiles.map((file, index) => {
@@ -551,6 +561,25 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                     </Tooltip>
                   </TooltipProvider>
                 )}
+                {/* Document Search - Always available */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        onClick={() => setShowDocumentSearch(true)}
+                        className="h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1 cursor-pointer"
+                      >
+                        <IconFileSearch
+                          size={18}
+                          className="text-main-view-fg/50"
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Search Documents</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
 
@@ -598,6 +627,15 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
             />
           </div>
         </div>
+      )}
+
+      {/* Document Search Modal */}
+      {currentThreadId && (
+        <DocumentSearchModal
+          isOpen={showDocumentSearch}
+          onClose={() => setShowDocumentSearch(false)}
+          threadId={currentThreadId}
+        />
       )}
     </div>
   )

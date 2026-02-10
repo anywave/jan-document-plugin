@@ -12,11 +12,14 @@ import { toast } from 'sonner'
 interface SearchInterfaceProps {
   collectionName?: string
   className?: string
+  /** Optional callback when results are found */
+  onResultsFound?: (results: QueryResult) => void
 }
 
 export function SearchInterface({
   collectionName = 'documents',
-  className = ''
+  className = '',
+  onResultsFound
 }: SearchInterfaceProps) {
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<QueryResult | null>(null)
@@ -43,6 +46,10 @@ export function SearchInterface({
         toast.error(`Search failed: ${result.error}`)
       } else if (result.results.length === 0) {
         toast.info('No results found')
+      } else if (onResultsFound) {
+        // Callback mode: call handler and don't display results
+        onResultsFound(result)
+        return
       }
 
       setSearchResults(result)

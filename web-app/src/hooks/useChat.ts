@@ -32,6 +32,7 @@ import { updateSettings } from '@/services/providers'
 import { useContextSizeApproval } from './useModelContextApproval'
 import { useModelLoad } from './useModelLoad'
 import { useGeneralSetting } from './useGeneralSetting'
+import { useDocumentContext } from '@/extensions/document-rag/src/hooks/useDocumentContext'
 
 export const useChat = () => {
   const { prompt, setPrompt } = usePrompt()
@@ -65,6 +66,7 @@ export const useChat = () => {
   const { getMessages, addMessage } = useMessages()
   const { setModelLoadError } = useModelLoad()
   const router = useRouter()
+  const { formatContext } = useDocumentContext()
 
   const provider = useMemo(() => {
     return getProviderByName(selectedProvider)
@@ -243,9 +245,17 @@ export const useChat = () => {
           updateLoadingModel(false)
         }
 
+        // Get document context and combine with assistant instructions
+        const documentContext = formatContext(activeThread.id)
+        const systemInstruction = documentContext
+          ? currentAssistant?.instructions
+            ? `${currentAssistant.instructions}\n\n${documentContext}`
+            : documentContext
+          : currentAssistant?.instructions
+
         const builder = new CompletionMessagesBuilder(
           messages,
-          currentAssistant?.instructions
+          systemInstruction
         )
         if (troubleshooting) builder.addUserMessage(message)
 

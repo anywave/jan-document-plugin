@@ -56,3 +56,4 @@ target
 
 ## test
 test-data
+extensions/document-rag/python/__pycache__/
