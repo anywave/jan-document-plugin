@@ -514,7 +514,7 @@ function General() {
                 description={t('settings:general.documentationDesc')}
                 actions={
                   <a
-                    href="https://github.com/anywave/avachatter/docs"
+                    href="https://github.com/anywave/mobius/docs"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -530,7 +530,7 @@ function General() {
                 description={t('settings:general.releaseNotesDesc')}
                 actions={
                   <a
-                    href="https://github.com/anywave/avachatter/releases"
+                    href="https://github.com/anywave/mobius/releases"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -550,7 +550,7 @@ function General() {
                 description={t('settings:general.githubDesc')}
                 actions={
                   <a
-                    href="https://github.com/anywave/avachatter"
+                    href="https://github.com/anywave/mobius"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -581,7 +581,7 @@ function General() {
                 description="Report bugs or request features on GitHub"
                 actions={
                   <a
-                    href="https://github.com/anywave/avachatter/issues"
+                    href="https://github.com/anywave/mobius/issues"
                     target="_blank"
                   >
                     <div className="flex items-center gap-1">

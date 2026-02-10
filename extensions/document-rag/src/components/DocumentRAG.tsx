@@ -78,7 +78,7 @@ export function DocumentRAG({
               <ol className="list-decimal list-inside space-y-1 ml-2">
                 <li>Install Python 3.12 or later from python.org</li>
                 <li>Add Python to your system PATH</li>
-                <li>Restart AVACHATTER</li>
+                <li>Restart MOBIUS</li>
               </ol>
             </div>
           </div>

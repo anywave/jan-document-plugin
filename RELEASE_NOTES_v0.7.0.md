@@ -1,4 +1,4 @@
-# AVACHATTER v0.7.0 Release Notes
+# MOBIUS v0.7.0 Release Notes
 
 **Release Date**: February 10, 2026
 **Codename**: "Sovereign Intelligence"
@@ -83,9 +83,9 @@
 **Build Features:**
 - 🏗️ **Cross-Platform**: Single codebase, platform-specific builds
 - 📦 **App Bundling**: All dependencies included
-- 🎨 **Proper Branding**: AVACHATTER name, identifier, icons
+- 🎨 **Proper Branding**: MOBIUS name, identifier, icons
 - 🔄 **Auto-Updater**: Disabled by default (privacy-first)
-- 🔗 **Deep-Link**: `avachatter://` protocol support
+- 🔗 **Deep-Link**: `mobius://` protocol support
 - 📝 **Documentation**: Comprehensive build instructions
 
 **Build Scripts:**
@@ -213,7 +213,7 @@
 
 ### Core Application
 
-- AVACHATTER desktop application (Tauri-based)
+- MOBIUS desktop application (Tauri-based)
 - Embedded AI runtime (llama.cpp)
 - Python 3.11 runtime (for document processing)
 - ChromaDB vector database
@@ -233,18 +233,18 @@
 
 ### Windows
 
-1. Download `AVACHATTER_0.7.0_x64_en-US.msi` or `AVACHATTER_0.7.0_x64-setup.exe`
+1. Download `MOBIUS_0.7.0_x64_en-US.msi` or `MOBIUS_0.7.0_x64-setup.exe`
 2. Run the installer
 3. Follow installation wizard
-4. Launch AVACHATTER from Start Menu
+4. Launch MOBIUS from Start Menu
 
 **Requirements**: Windows 10 (1809+) or Windows 11, WebView2 Runtime
 
 ### macOS
 
-1. Download `AVACHATTER_0.7.0_universal.dmg`
+1. Download `MOBIUS_0.7.0_universal.dmg`
 2. Open DMG file
-3. Drag AVACHATTER.app to Applications folder
+3. Drag MOBIUS.app to Applications folder
 4. Launch from Applications
 
 **Requirements**: macOS 10.13+ (High Sierra), Intel or Apple Silicon
@@ -253,14 +253,14 @@
 
 **Debian/Ubuntu:**
 ```bash
-sudo dpkg -i avachatter_0.7.0_amd64.deb
-avachatter
+sudo dpkg -i mobius_0.7.0_amd64.deb
+mobius
 ```
 
 **Universal (AppImage):**
 ```bash
-chmod +x avachatter_0.7.0_amd64.AppImage
-./avachatter_0.7.0_amd64.AppImage
+chmod +x mobius_0.7.0_amd64.AppImage
+./mobius_0.7.0_amd64.AppImage
 ```
 
 **Requirements**: WebKit2GTK, GTK 3.0
@@ -271,7 +271,7 @@ chmod +x avachatter_0.7.0_amd64.AppImage
 
 ### Basic Chat
 
-1. Launch AVACHATTER
+1. Launch MOBIUS
 2. Select an AI model (if not already configured)
 3. Type a message or click microphone to speak
 4. AI responds with streaming text
@@ -350,7 +350,7 @@ chmod +x avachatter_0.7.0_amd64.AppImage
 
 **Developed By**: ANYWAVE Team
 **License**: AGPLv3 (see LICENSE file)
-**Homepage**: https://github.com/anywave/avachatter
+**Homepage**: https://github.com/anywave/mobius
 
 ---
 
@@ -358,14 +358,14 @@ chmod +x avachatter_0.7.0_amd64.AppImage
 
 ### Getting Help
 
-- **Issues**: https://github.com/anywave/avachatter/issues
-- **Discussions**: https://github.com/anywave/avachatter/discussions
+- **Issues**: https://github.com/anywave/mobius/issues
+- **Discussions**: https://github.com/anywave/mobius/discussions
 - **Documentation**: See docs/ directory
 
 ### Reporting Bugs
 
 Please include:
-- AVACHATTER version (v0.7.0)
+- MOBIUS version (v0.7.0)
 - Operating system and version
 - Steps to reproduce
 - Expected vs actual behavior
@@ -377,12 +377,12 @@ Please include:
 
 ### From Jan AI v0.6.8
 
-AVACHATTER is a fork of Jan AI with significant enhancements. Your existing Jan AI data and models will not be automatically migrated. This is a fresh installation.
+MOBIUS is a fork of Jan AI with significant enhancements. Your existing Jan AI data and models will not be automatically migrated. This is a fresh installation.
 
 **Migration Steps:**
 1. Export your Jan AI conversation history (if needed)
 2. Note your model configurations
-3. Install AVACHATTER v0.7.0
+3. Install MOBIUS v0.7.0
 4. Re-download models as needed
 5. Upload documents to new Document RAG system
 
@@ -410,7 +410,7 @@ AVACHATTER is a fork of Jan AI with significant enhancements. Your existing Jan 
 
 ## 🎯 Version Summary
 
-**AVACHATTER v0.7.0 "Sovereign Intelligence"**
+**MOBIUS v0.7.0 "Sovereign Intelligence"**
 
 - ✅ 100% Offline Document RAG
 - ✅ Hands-Free Voice I/O
@@ -431,7 +431,7 @@ AVACHATTER is a fork of Jan AI with significant enhancements. Your existing Jan 
 **License**: AGPLv3
 **Status**: Production Ready ✅
 
-**Thank you for using AVACHATTER!** 🚀
+**Thank you for using MOBIUS!** 🚀
 
 ---
 
@@ -451,10 +451,10 @@ AVACHATTER is a fork of Jan AI with significant enhancements. Your existing Jan 
 - Comprehensive build documentation
 
 **Changed:**
-- Rebranded from Jan AI to AVACHATTER
-- Updated app identifier to com.avachatter.app
+- Rebranded from Jan AI to MOBIUS
+- Updated app identifier to com.mobius.app
 - Disabled auto-updater (privacy-first)
-- Modified deep-link scheme to avachatter://
+- Modified deep-link scheme to mobius://
 
 **Fixed:**
 - Generated missing platform-specific icon files

@@ -35,7 +35,7 @@ function Privacy() {
                 description={
                   <div className="text-main-view-fg/90">
                     <p className="mb-4">
-                      AVACHATTER is committed to your privacy. This application operates 100% offline with no data collection, tracking, or telemetry of any kind.
+                      MOBIUS is committed to your privacy. This application operates 100% offline with no data collection, tracking, or telemetry of any kind.
                     </p>
                     <p className="mb-2 font-medium">Your Privacy Guarantees:</p>
                     <ul className="list-disc pl-4 space-y-1">

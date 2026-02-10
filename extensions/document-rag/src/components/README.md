@@ -1,6 +1,6 @@
 # Document RAG UI Components
 
-React components for AVACHATTER's document RAG functionality.
+React components for MOBIUS's document RAG functionality.
 
 ## Components
 
@@ -228,7 +228,7 @@ export function CustomLayout() {
 
 ## Styling
 
-All components use Tailwind CSS and follow AVACHATTER's design system:
+All components use Tailwind CSS and follow MOBIUS's design system:
 
 - **Colors**: Uses semantic color tokens (primary, accent, destructive, etc.)
 - **Dark Mode**: Fully supports dark mode via theme classes
@@ -330,4 +330,4 @@ test('renders upload component', () => {
 
 ## License
 
-Part of AVACHATTER - 100% offline document AI assistant.
+Part of MOBIUS - 100% offline document AI assistant.

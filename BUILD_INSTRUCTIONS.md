@@ -1,4 +1,4 @@
-# AVACHATTER Build Instructions
+# MOBIUS Build Instructions
 
 ## Prerequisites
 
@@ -87,16 +87,16 @@ npm run build:tauri:linux
 ## Build Outputs
 
 ### Windows
-- **MSI**: `src-tauri/target/release/bundle/msi/AVACHATTER_0.7.0_x64_en-US.msi`
-- **NSIS**: `src-tauri/target/release/bundle/nsis/AVACHATTER_0.7.0_x64-setup.exe`
+- **MSI**: `src-tauri/target/release/bundle/msi/MOBIUS_0.7.0_x64_en-US.msi`
+- **NSIS**: `src-tauri/target/release/bundle/nsis/MOBIUS_0.7.0_x64-setup.exe`
 
 ### macOS
-- **DMG**: `src-tauri/target/release/bundle/dmg/AVACHATTER_0.7.0_universal.dmg`
-- **APP**: `src-tauri/target/release/bundle/macos/AVACHATTER.app`
+- **DMG**: `src-tauri/target/release/bundle/dmg/MOBIUS_0.7.0_universal.dmg`
+- **APP**: `src-tauri/target/release/bundle/macos/MOBIUS.app`
 
 ### Linux
-- **DEB**: `src-tauri/target/release/bundle/deb/avachatter_0.7.0_amd64.deb`
-- **AppImage**: `src-tauri/target/release/bundle/appimage/avachatter_0.7.0_amd64.AppImage`
+- **DEB**: `src-tauri/target/release/bundle/deb/mobius_0.7.0_amd64.deb`
+- **AppImage**: `src-tauri/target/release/bundle/appimage/mobius_0.7.0_amd64.AppImage`
 
 ---
 
@@ -104,9 +104,9 @@ npm run build:tauri:linux
 
 ### tauri.conf.json
 Main configuration file for Tauri builds:
-- **productName**: AVACHATTER
+- **productName**: MOBIUS
 - **version**: 0.7.0
-- **identifier**: com.avachatter.app
+- **identifier**: com.mobius.app
 - **bundle targets**: msi, nsis, dmg, app, deb, appimage
 
 ### Icons
@@ -280,9 +280,9 @@ Or use version bump script (coming soon).
 
 For build issues:
 - Check Tauri docs: https://tauri.app
-- AVACHATTER issues: https://github.com/anywave/avachatter/issues
+- MOBIUS issues: https://github.com/anywave/mobius/issues
 
 ---
 
 **Last Updated**: February 10, 2026
-**AVACHATTER Version**: 0.7.0
+**MOBIUS Version**: 0.7.0

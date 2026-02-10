@@ -30,7 +30,7 @@ class Embedder:
         if self.model is None:
             print(f"Loading model: {self.model_name}...")
             self.model = SentenceTransformer(self.model_name, device=self.device)
-            print("✓ Model loaded")
+            print("[OK] Model loaded")
 
     def embed_text(self, text: str) -> List[float]:
         """

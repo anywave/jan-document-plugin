@@ -1,4 +1,4 @@
-# AVACHATTER - 100% Offline AI Assistant
+# MOBIUS - 100% Offline AI Assistant
 
 <p align="center">
   <strong>Privacy-First • Document Intelligence • Voice I/O • Zero Cloud</strong>
@@ -12,9 +12,9 @@
 
 ---
 
-## 🚀 What is AVACHATTER?
+## 🚀 What is MOBIUS?
 
-AVACHATTER is a **100% offline AI assistant** with advanced document intelligence and voice capabilities. Fork of Jan AI v0.6.8 with major enhancements for privacy, document RAG, and voice interaction.
+MOBIUS is a **100% offline AI assistant** with advanced document intelligence and voice capabilities. Fork of Jan AI v0.6.8 with major enhancements for privacy, document RAG, and voice interaction.
 
 ### Key Features
 
@@ -31,15 +31,15 @@ AVACHATTER is a **100% offline AI assistant** with advanced document intelligenc
 
 ### Quick Install
 
-Download the installer for your platform from [GitHub Releases](https://github.com/anywave/avachatter/releases/latest):
+Download the installer for your platform from [GitHub Releases](https://github.com/anywave/mobius/releases/latest):
 
 | Platform | Installer | Size |
 |----------|-----------|------|
-| **Windows 10/11** | AVACHATTER_0.7.0_x64.msi | ~80MB |
-| **Windows (Alt)** | AVACHATTER_0.7.0_setup.exe | ~80MB |
-| **macOS 10.13+** | AVACHATTER_0.7.0_universal.dmg | ~85MB |
-| **Linux (Debian/Ubuntu)** | avachatter_0.7.0_amd64.deb | ~75MB |
-| **Linux (Universal)** | avachatter_0.7.0_amd64.AppImage | ~80MB |
+| **Windows 10/11** | MOBIUS_0.7.0_x64.msi | ~80MB |
+| **Windows (Alt)** | MOBIUS_0.7.0_setup.exe | ~80MB |
+| **macOS 10.13+** | MOBIUS_0.7.0_universal.dmg | ~85MB |
+| **Linux (Debian/Ubuntu)** | mobius_0.7.0_amd64.deb | ~75MB |
+| **Linux (Universal)** | mobius_0.7.0_amd64.AppImage | ~80MB |
 
 ### System Requirements
 
@@ -109,7 +109,7 @@ Download the installer for your platform from [GitHub Releases](https://github.c
 
 ### 3. Production Build System
 
-**Professional installers** for Windows, macOS, and Linux with proper branding and deep-link support (`avachatter://`).
+**Professional installers** for Windows, macOS, and Linux with proper branding and deep-link support (`mobius://`).
 
 ---
 
@@ -118,7 +118,7 @@ Download the installer for your platform from [GitHub Releases](https://github.c
 ### 1. Basic Chat
 
 ```
-1. Launch AVACHATTER
+1. Launch MOBIUS
 2. Select an AI model (or download one)
 3. Type a message
 4. Get AI response
@@ -165,8 +165,8 @@ See [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md) for comprehensive build guide
 
 ```bash
 # Clone repository
-git clone https://github.com/anywave/avachatter
-cd avachatter
+git clone https://github.com/anywave/mobius
+cd mobius
 
 # Install dependencies
 npm install
@@ -208,7 +208,7 @@ build-installer.bat   # Windows
 
 ### What We Collect
 
-**Nothing.** AVACHATTER collects zero data.
+**Nothing.** MOBIUS collects zero data.
 
 ### How It Works
 
@@ -222,15 +222,15 @@ build-installer.bat   # Windows
 ### Data Storage
 
 All data stored locally in:
-- **Windows**: `C:\Users\<username>\AppData\Roaming\AVACHATTER`
-- **macOS**: `~/Library/Application Support/com.avachatter.app`
-- **Linux**: `~/.config/AVACHATTER`
+- **Windows**: `C:\Users\<username>\AppData\Roaming\MOBIUS`
+- **macOS**: `~/Library/Application Support/com.mobius.app`
+- **Linux**: `~/.config/MOBIUS`
 
 ---
 
 ## 🤝 Contributing
 
-AVACHATTER is open source (AGPLv3). Contributions welcome!
+MOBIUS is open source (AGPLv3). Contributions welcome!
 
 ### Development Workflow
 
@@ -282,7 +282,7 @@ AVACHATTER is open source (AGPLv3). Contributions welcome!
 3. **Vector Search**: Performance degrades with >5000 chunks
 4. **Model Size**: Large models (>7B) need 8GB+ RAM
 
-See [GitHub Issues](https://github.com/anywave/avachatter/issues) for full list.
+See [GitHub Issues](https://github.com/anywave/mobius/issues) for full list.
 
 ---
 
@@ -308,14 +308,14 @@ See [GitHub Issues](https://github.com/anywave/avachatter/issues) for full list.
 
 ### Getting Help
 
-- **Issues**: [GitHub Issues](https://github.com/anywave/avachatter/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/anywave/avachatter/discussions)
+- **Issues**: [GitHub Issues](https://github.com/anywave/mobius/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/anywave/mobius/discussions)
 - **Email**: support@anywave.com (coming soon)
 
 ### Reporting Bugs
 
 Include:
-- AVACHATTER version (v0.7.0)
+- MOBIUS version (v0.7.0)
 - Operating system and version
 - Steps to reproduce
 - Expected vs actual behavior
@@ -353,7 +353,7 @@ Include:
 
 ## 🌟 Star History
 
-If you find AVACHATTER useful, please star the repository!
+If you find MOBIUS useful, please star the repository!
 
 ---
 
@@ -369,15 +369,15 @@ If you find AVACHATTER useful, please star the repository!
 ---
 
 <p align="center">
-  <strong>AVACHATTER - Your Sovereign Intelligence</strong><br>
+  <strong>MOBIUS - Your Sovereign Intelligence</strong><br>
   100% Offline • Privacy-First • Open Source
 </p>
 
 <p align="center">
-  <a href="https://github.com/anywave/avachatter">GitHub</a> •
+  <a href="https://github.com/anywave/mobius">GitHub</a> •
   <a href="RELEASE_NOTES_v0.7.0.md">Release Notes</a> •
   <a href="BUILD_INSTRUCTIONS.md">Build Guide</a> •
-  <a href="https://github.com/anywave/avachatter/issues">Issues</a>
+  <a href="https://github.com/anywave/mobius/issues">Issues</a>
 </p>
 
 ---

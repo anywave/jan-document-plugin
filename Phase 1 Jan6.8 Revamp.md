@@ -1,7 +1,7 @@
-# Phase 1: Jan AI 6.8 → AVACHATTER Revamp
-**Project**: AVACHATTER - Offline AI with Document Intelligence
+# Phase 1: Jan AI 6.8 → MOBIUS Revamp
+**Project**: MOBIUS - Offline AI with Document Intelligence
 **Base Version**: Jan AI v0.6.8
-**Branch**: `avachatter-v0.6.8-fork`
+**Branch**: `mobius-v0.6.8-fork`
 **Date**: February 9, 2026
 **Duration**: ~1.5 hours
 **Status**: ✅ COMPLETED
@@ -25,20 +25,20 @@
 ## Project Overview
 
 ### Goal
-Transform Jan AI v0.6.8 into AVACHATTER, a privacy-focused, 100% offline AI application with enhanced document processing capabilities.
+Transform Jan AI v0.6.8 into MOBIUS, a privacy-focused, 100% offline AI application with enhanced document processing capabilities.
 
 ### Key Requirements
 - ✅ Maintain exact UI from v0.6.8 (no visual changes)
 - ✅ Keep Assistants functionality 100% unchanged
 - ✅ Remove Hub, telemetry, and unnecessary features
-- ✅ Update all branding to AVACHATTER
+- ✅ Update all branding to MOBIUS
 - ✅ Change all URLs to Anywave GitHub organization
 - ✅ 100% offline operation (no external connections)
 
 ### Success Criteria
 - [x] Clean codebase with unwanted features removed
 - [x] Zero telemetry/analytics infrastructure
-- [x] All branding updated to AVACHATTER
+- [x] All branding updated to MOBIUS
 - [x] No compilation errors
 - [x] Ready for Phase 2 (Python integration)
 
@@ -47,7 +47,7 @@ Transform Jan AI v0.6.8 into AVACHATTER, a privacy-focused, 100% offline AI appl
 ## Phase 1 Objectives
 
 ### 1. Remove Hub Functionality ✅
-**Reason**: Hub was for downloading models from external sources; AVACHATTER ships with jan-nano:128k only.
+**Reason**: Hub was for downloading models from external sources; MOBIUS ships with jan-nano:128k only.
 
 **Actions**:
 - Deleted entire `web-app/src/routes/hub/` folder
@@ -58,18 +58,18 @@ Transform Jan AI v0.6.8 into AVACHATTER, a privacy-focused, 100% offline AI appl
 **Impact**: 1,578 lines deleted
 
 ### 2. Update Branding ✅
-**Reason**: Rebrand from Jan AI to AVACHATTER with Anywave organization.
+**Reason**: Rebrand from Jan AI to MOBIUS with Anywave organization.
 
 **Actions**:
-- Updated root `package.json`: `jan-app` → `avachatter-app`
-- Updated `web-app/package.json`: `@janhq/web-app` → `@anywave/avachatter`
+- Updated root `package.json`: `jan-app` → `mobius-app`
+- Updated `web-app/package.json`: `@janhq/web-app` → `@anywave/mobius`
 - Set version to `0.6.8`
-- Changed HTML title to "AVACHATTER"
+- Changed HTML title to "MOBIUS"
 
 **Impact**: 5 lines changed
 
 ### 3. Remove Telemetry & Analytics ✅
-**Reason**: AVACHATTER must be 100% offline with zero data collection.
+**Reason**: MOBIUS must be 100% offline with zero data collection.
 
 **Actions**:
 - Deleted PostHog analytics integration
@@ -87,16 +87,16 @@ Transform Jan AI v0.6.8 into AVACHATTER, a privacy-focused, 100% offline AI appl
 **Reason**: All references must point to Anywave GitHub, not Jan AI.
 
 **Actions**:
-- Tauri updater: `menloresearch/jan` → `anywave/avachatter`
-- Documentation: `jan.ai/docs` → `github.com/anywave/avachatter/docs`
-- Release notes: `menloresearch/jan/releases` → `anywave/avachatter/releases`
-- GitHub repo: `menloresearch/jan` → `anywave/avachatter`
-- Support: `menloresearch/jan/issues` → `anywave/avachatter/issues`
+- Tauri updater: `menloresearch/jan` → `anywave/mobius`
+- Documentation: `jan.ai/docs` → `github.com/anywave/mobius/docs`
+- Release notes: `menloresearch/jan/releases` → `anywave/mobius/releases`
+- GitHub repo: `menloresearch/jan` → `anywave/mobius`
+- Support: `menloresearch/jan/issues` → `anywave/mobius/issues`
 
 **Impact**: 8 URL references updated
 
 ### 5. Simplify Settings ✅
-**Reason**: Remove unnecessary settings to streamline UX for AVACHATTER's focused use case.
+**Reason**: Remove unnecessary settings to streamline UX for MOBIUS's focused use case.
 
 **Actions**:
 - Removed HuggingFace Token input (not needed)
@@ -117,7 +117,7 @@ Transform Jan AI v0.6.8 into AVACHATTER, a privacy-focused, 100% offline AI appl
 4. **Zero Tolerance**: No dangling imports, no dead code, no broken references
 
 ### Tools & Methods
-- **Git Branching**: Created `avachatter-v0.6.8-fork` from v0.6.8 tag
+- **Git Branching**: Created `mobius-v0.6.8-fork` from v0.6.8 tag
 - **Code Analysis**: Used Grep, Glob, and Read tools to find all references
 - **Verification**: Checked imports, types, and file structure
 - **Testing**: Validated no broken dependencies or syntax errors
@@ -136,8 +136,8 @@ cd jan-ai-fork
 # Checkout v0.6.8 tag specifically
 git checkout v0.6.8
 
-# Create new branch for AVACHATTER
-git checkout -b avachatter-v0.6.8-fork
+# Create new branch for MOBIUS
+git checkout -b mobius-v0.6.8-fork
 ```
 
 ### File Structure Changes
@@ -151,7 +151,7 @@ BEFORE (Jan AI v0.6.8):
 │  ├─ hooks/useAnalytic.ts           ← DELETED
 │  └─ services/analytic.ts           ← DELETED
 
-AFTER (AVACHATTER):
+AFTER (MOBIUS):
 ├─ web-app/src/
 │  ├─ routes/settings/
 │  │  ├─ privacy.tsx                 ← SIMPLIFIED
@@ -166,7 +166,7 @@ AFTER (AVACHATTER):
 
 ### Commit 1: Hub Removal & Initial Branding
 **Hash**: `1bcd1b8ad`
-**Message**: "Phase 1 Start: Remove Hub, update branding to AVACHATTER"
+**Message**: "Phase 1 Start: Remove Hub, update branding to MOBIUS"
 
 **Changes**:
 ```
@@ -227,7 +227,7 @@ Modified Files:
 
 ### Commit 4: Final Branding
 **Hash**: `2f905d15b`
-**Message**: "Phase 1: Update app title to AVACHATTER"
+**Message**: "Phase 1: Update app title to MOBIUS"
 
 **Changes**:
 ```
@@ -269,13 +269,13 @@ Deleted Files:
 ```json
 // package.json (root)
 {
-  "name": "avachatter-app",  // Changed from "jan-app"
+  "name": "mobius-app",  // Changed from "jan-app"
   "version": "0.0.0"
 }
 
 // web-app/package.json
 {
-  "name": "@anywave/avachatter",  // Changed from "@janhq/web-app"
+  "name": "@anywave/mobius",  // Changed from "@janhq/web-app"
   "version": "0.6.8"  // Changed from "0.6.6"
 }
 ```
@@ -287,7 +287,7 @@ Deleted Files:
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/anywave/avachatter/releases/latest/download/latest.json"
+        "https://github.com/anywave/mobius/releases/latest/download/latest.json"
         // Changed from: menloresearch/jan
       ]
     }
@@ -357,7 +357,7 @@ function Privacy() {
 }
 ```
 
-**AFTER** (AVACHATTER):
+**AFTER** (MOBIUS):
 ```tsx
 function Privacy() {
   const { t } = useTranslation()
@@ -366,7 +366,7 @@ function Privacy() {
     <Card header="Privacy Policy">
       <CardItem description={
         <div>
-          <p>AVACHATTER is committed to your privacy.
+          <p>MOBIUS is committed to your privacy.
              This application operates 100% offline with no data
              collection, tracking, or telemetry of any kind.</p>
           <p>Your Privacy Guarantees:</p>
@@ -429,7 +429,7 @@ function General() {
 }
 ```
 
-**AFTER** (AVACHATTER):
+**AFTER** (MOBIUS):
 ```tsx
 function General() {
   const { spellCheckChatInput, setSpellCheckChatInput } = useGeneralSetting()
@@ -440,7 +440,7 @@ function General() {
 
       <Card title="Community">
         <CardItem title="GitHub"
-          actions={<a href="https://github.com/anywave/avachatter">...</a>}
+          actions={<a href="https://github.com/anywave/mobius">...</a>}
         />
         <CardItem
           title="Community"
@@ -479,7 +479,7 @@ const AppLayout = () => {
 }
 ```
 
-**AFTER** (AVACHATTER):
+**AFTER** (MOBIUS):
 ```tsx
 // Removed all analytics imports
 
@@ -657,7 +657,7 @@ Total: 1,578 lines deleted
 - Model details display
 
 **Reason for Removal**:
-AVACHATTER ships with jan-nano:128k pre-installed. No need for external model downloads.
+MOBIUS ships with jan-nano:128k pre-installed. No need for external model downloads.
 
 ---
 
@@ -727,12 +727,12 @@ AVACHATTER ships with jan-nano:128k pre-installed. No need for external model do
 
 | Location | Before | After |
 |----------|--------|-------|
-| Tauri updater | `github.com/menloresearch/jan/releases/.../latest.json` | `github.com/anywave/avachatter/releases/.../latest.json` |
-| Release notes API | `api.github.com/repos/menloresearch/jan/releases` | `api.github.com/repos/anywave/avachatter/releases` |
-| Documentation | `jan.ai/docs` | `github.com/anywave/avachatter/docs` |
-| Release notes link | `github.com/menloresearch/jan/releases` | `github.com/anywave/avachatter/releases` |
-| GitHub repo | `github.com/menloresearch/jan` | `github.com/anywave/avachatter` |
-| Support/Issues | `github.com/menloresearch/jan/issues/new` | `github.com/anywave/avachatter/issues` |
+| Tauri updater | `github.com/menloresearch/jan/releases/.../latest.json` | `github.com/anywave/mobius/releases/.../latest.json` |
+| Release notes API | `api.github.com/repos/menloresearch/jan/releases` | `api.github.com/repos/anywave/mobius/releases` |
+| Documentation | `jan.ai/docs` | `github.com/anywave/mobius/docs` |
+| Release notes link | `github.com/menloresearch/jan/releases` | `github.com/anywave/mobius/releases` |
+| GitHub repo | `github.com/menloresearch/jan` | `github.com/anywave/mobius` |
+| Support/Issues | `github.com/menloresearch/jan/issues/new` | `github.com/anywave/mobius/issues` |
 | Privacy policy | `jan.ai/privacy` | `anywave.com/privacy` |
 | Community | `discord.com/invite/FTk2MvZwJH` | "Coming Soon" |
 
@@ -844,7 +844,7 @@ AVACHATTER ships with jan-nano:128k pre-installed. No need for external model do
    - **Mitigation**: Anywave will provide own release channel
 
 2. **Feature Divergence**: Missing new Jan AI features
-   - **Mitigation**: Intentional - AVACHATTER has different goals
+   - **Mitigation**: Intentional - MOBIUS has different goals
 
 3. **Support Risk**: Can't use Jan AI community support
    - **Mitigation**: Will build own support channels
@@ -891,13 +891,13 @@ AVACHATTER ships with jan-nano:128k pre-installed. No need for external model do
 - [PostHog Documentation](https://posthog.com/docs) (for reference)
 
 ### Project Files
-- `AVACHATTER_BUILD_SPEC.md` - Complete build specification
+- `MOBIUS_BUILD_SPEC.md` - Complete build specification
 - `SETTINGS_MODIFICATIONS.md` - Detailed settings requirements
 - `PHASE1_PROGRESS.md` - Progress tracking log
 - `PHASE1_VERIFICATION.md` - Verification report
 
 ### Git Repository
-- **Branch**: `avachatter-v0.6.8-fork`
+- **Branch**: `mobius-v0.6.8-fork`
 - **Base Commit**: `6ac3d6de2` (v0.6.8 tag)
 - **Latest Commit**: `617756868`
 - **Commits**: 5 (Phase 1)
@@ -914,7 +914,7 @@ AVACHATTER ships with jan-nano:128k pre-installed. No need for external model do
 git clone https://github.com/janhq/jan.git jan-ai-fork
 cd jan-ai-fork
 git checkout v0.6.8
-git checkout -b avachatter-v0.6.8-fork
+git checkout -b mobius-v0.6.8-fork
 
 # Check status
 git status
@@ -989,12 +989,12 @@ jan-ai-fork/
 
 ## Conclusion
 
-Phase 1 has successfully transformed Jan AI v0.6.8 into the AVACHATTER foundation. All unwanted features have been cleanly removed, branding has been updated, and the codebase is ready for Phase 2 development.
+Phase 1 has successfully transformed Jan AI v0.6.8 into the MOBIUS foundation. All unwanted features have been cleanly removed, branding has been updated, and the codebase is ready for Phase 2 development.
 
 **Key Achievements**:
 - ✅ 2,517 lines of unnecessary code removed
 - ✅ Zero telemetry infrastructure remaining
-- ✅ All branding updated to AVACHATTER
+- ✅ All branding updated to MOBIUS
 - ✅ All URLs point to Anywave organization
 - ✅ No compilation or import errors
 - ✅ Clean git history with atomic commits
