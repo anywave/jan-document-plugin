@@ -37,6 +37,8 @@ import DropdownToolsAvailable from '@/containers/DropdownToolsAvailable'
 import { getConnectedServers } from '@/services/mcp'
 import { DocumentSearchModal } from '@/extensions/document-rag/src/components/DocumentSearchModal'
 import { ContextIndicator } from '@/extensions/document-rag/src/components/ContextIndicator'
+import { VoiceRecorder } from '@/components/VoiceRecorder'
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 
 type ChatInputProps = {
   className?: string
@@ -74,6 +76,40 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
   >([])
   const [connectedServers, setConnectedServers] = useState<string[]>([])
   const [showDocumentSearch, setShowDocumentSearch] = useState(false)
+
+  // Speech recognition
+  const {
+    transcript,
+    isListening,
+    isSupported: isSpeechSupported,
+    toggleListening,
+    resetTranscript,
+    error: speechError,
+  } = useSpeechRecognition()
+
+  // Sync transcript to prompt
+  useEffect(() => {
+    if (transcript) {
+      setPrompt((prev) => {
+        const combined = prev ? `${prev} ${transcript}` : transcript
+        return combined
+      })
+      resetTranscript()
+    }
+  }, [transcript, resetTranscript])
+
+  // Keyboard shortcut for voice (Ctrl+M)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'm') {
+        e.preventDefault()
+        toggleListening()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [toggleListening])
 
   // Check for connected MCP servers
   useEffect(() => {
@@ -580,6 +616,13 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+                {/* Voice Input - Always available */}
+                <VoiceRecorder
+                  isRecording={isListening}
+                  isSupported={isSpeechSupported}
+                  onToggle={toggleListening}
+                  error={speechError}
+                />
               </div>
             </div>
 

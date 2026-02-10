@@ -39,6 +39,8 @@ import TokenSpeedIndicator from '@/containers/TokenSpeedIndicator'
 import CodeEditor from '@uiw/react-textarea-code-editor'
 import '@uiw/react-textarea-code-editor/dist.css'
 import { useTranslation } from '@/i18n/react-i18next-compat'
+import { MessageTTS } from '@/components/MessageTTS'
+import { useTextToSpeech } from '@/hooks/useTextToSpeech'
 
 const CopyButton = ({ text }: { text: string }) => {
   const [copied, setCopied] = useState(false)
@@ -151,6 +153,26 @@ export const ThreadContent = memo(
     }
   ) => {
     const { t } = useTranslation()
+    const [currentSpeakingId, setCurrentSpeakingId] = useState<string | null>(null)
+    const {
+      speak,
+      stop,
+      pause,
+      resume,
+      isSpeaking,
+      isPaused,
+      isSupported: isTTSSupported,
+    } = useTextToSpeech()
+
+    const handleSpeak = useCallback((messageId: string, text: string) => {
+      setCurrentSpeakingId(messageId)
+      speak(text)
+    }, [speak])
+
+    const handleStop = useCallback(() => {
+      setCurrentSpeakingId(null)
+      stop()
+    }, [stop])
 
     // Use useMemo to stabilize the components prop
     const linkComponents = useMemo(
@@ -380,6 +402,16 @@ export const ThreadContent = memo(
                       }
                     />
                     <CopyButton text={item.content?.[0]?.text.value || ''} />
+                    <MessageTTS
+                      text={item.content?.[0]?.text.value || ''}
+                      isSpeaking={isSpeaking && currentSpeakingId === item.id}
+                      isPaused={isPaused}
+                      isSupported={isTTSSupported}
+                      onSpeak={(text) => handleSpeak(item.id, text)}
+                      onStop={handleStop}
+                      onPause={pause}
+                      onResume={resume}
+                    />
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
