@@ -411,12 +411,17 @@ async def upload_document(
         return response
 
     except Exception as e:
-        logger.error(f"Failed to process {file.filename}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback as tb
+        error_tb = tb.format_exc()
+        logger.error(f"Failed to process {file.filename}: {e}\n{error_tb}")
+        raise HTTPException(status_code=500, detail=f"{e}\n\nTraceback:\n{error_tb}")
 
     finally:
         # Cleanup temp file
-        os.unlink(tmp_path)
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
 
 
 @app.post("/documents/batch", response_model=BatchUploadResponse)
@@ -559,14 +564,12 @@ async def delete_document(doc_hash: str):
     """Remove a document from the index."""
     if processor is None:
         raise HTTPException(status_code=503, detail="Processor not initialized")
-    
-    # Find document by hash
-    for doc in processor.processed_docs.values():
-        if doc.doc_hash == doc_hash:
-            processor.remove_document(doc.file_path)
-            return {"success": True, "message": f"Removed document: {doc_hash}"}
-    
-    raise HTTPException(status_code=404, detail=f"Document not found: {doc_hash}")
+
+    if doc_hash not in processor.processed_docs:
+        raise HTTPException(status_code=404, detail=f"Document not found: {doc_hash}")
+
+    processor.remove_document_by_hash(doc_hash)
+    return {"success": True, "message": f"Removed document: {doc_hash}"}
 
 
 @app.get("/documents/stats")

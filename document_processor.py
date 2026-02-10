@@ -822,14 +822,18 @@ class DocumentProcessor:
         return "\n\n---\n\n".join(context_parts)
     
     def remove_document(self, file_path: Union[str, Path]):
-        """Remove a document from the index."""
+        """Remove a document from the index by file path."""
         path = Path(file_path).resolve()
         doc_hash = self._compute_hash(path)
-        
+        self.remove_document_by_hash(doc_hash)
+
+    def remove_document_by_hash(self, doc_hash: str):
+        """Remove a document from the index by its hash."""
         if doc_hash in self.processed_docs:
+            filename = self.processed_docs[doc_hash].filename
             self.vector_store.delete_document(doc_hash)
             del self.processed_docs[doc_hash]
-            logger.info(f"Removed: {path.name}")
+            logger.info(f"Removed: {filename} ({doc_hash})")
     
     def list_documents(self) -> List[Dict]:
         """List all indexed documents."""
