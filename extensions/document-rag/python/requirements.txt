@@ -1,0 +1,27 @@
+# AVACHATTER Document RAG Extension - Python Dependencies
+# Python Version: 3.12+
+# All packages must work 100% offline after installation
+
+# PDF Processing
+PyMuPDF==1.24.0        # PDF text extraction
+pikepdf==8.10.1        # PDF decryption/encryption handling
+
+# DOCX Processing
+python-docx==1.1.0     # Microsoft Word document processing
+
+# Image Processing & OCR
+Pillow==10.2.0         # Image manipulation
+pytesseract==0.3.10    # Tesseract OCR wrapper
+
+# Vector Storage
+chromadb==0.4.22       # Vector database
+hnswlib==0.8.0         # Fast approximate nearest neighbor search (ChromaDB dependency)
+
+# Embeddings
+sentence-transformers==2.3.1  # all-MiniLM-L6-v2 model
+torch==2.1.2+cpu              # PyTorch CPU-only version
+transformers==4.36.2          # HuggingFace transformers
+
+# Utilities
+numpy==1.26.3          # Numerical operations
+tqdm==4.66.1           # Progress bars
