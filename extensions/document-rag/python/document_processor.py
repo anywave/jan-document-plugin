@@ -321,8 +321,10 @@ class DocumentProcessor:
 def main():
     """CLI interface for document processor."""
     import argparse
+    import sys
 
     parser = argparse.ArgumentParser(description="AVACHATTER Document Processor")
+    parser.add_argument('--json', action='store_true', help='Output results as JSON')
     subparsers = parser.add_subparsers(dest='command', help='Command to execute')
 
     # Process command
@@ -345,6 +347,13 @@ def main():
 
     args = parser.parse_args()
 
+    # Suppress progress output when in JSON mode
+    if args.json:
+        # Redirect stdout temporarily to capture only final JSON
+        import io
+        original_stdout = sys.stdout
+        sys.stdout = io.StringIO()
+
     # Initialize processor
     processor = DocumentProcessor()
 
@@ -357,11 +366,15 @@ def main():
             password=args.password
         )
 
-        print("\n" + "=" * 80)
-        if result['success']:
-            print(f"✓ Success: Created {result['chunks_created']} chunks")
+        if args.json:
+            sys.stdout = original_stdout
+            print(json.dumps(result))
         else:
-            print(f"✗ Error: {result['error']}")
+            print("\n" + "=" * 80)
+            if result['success']:
+                print(f"✓ Success: Created {result['chunks_created']} chunks")
+            else:
+                print(f"✗ Error: {result['error']}")
 
     elif args.command == 'query':
         result = processor.query_documents(
@@ -370,24 +383,33 @@ def main():
             top_k=args.top_k
         )
 
-        print("\n" + "=" * 80)
-        if result['error']:
-            print(f"✗ Error: {result['error']}")
+        if args.json:
+            sys.stdout = original_stdout
+            print(json.dumps(result))
         else:
-            print(f"Query: {result['query']}")
-            print(f"Found {len(result['results'])} results:\n")
-            for i, res in enumerate(result['results'], 1):
-                print(f"{i}. {res['metadata'].get('file_name', 'Unknown')}")
-                print(f"   Distance: {res['distance']:.4f}")
-                print(f"   Text: {res['text'][:100]}...")
-                print()
+            print("\n" + "=" * 80)
+            if result['error']:
+                print(f"✗ Error: {result['error']}")
+            else:
+                print(f"Query: {result['query']}")
+                print(f"Found {len(result['results'])} results:\n")
+                for i, res in enumerate(result['results'], 1):
+                    print(f"{i}. {res['metadata'].get('file_name', 'Unknown')}")
+                    print(f"   Distance: {res['distance']:.4f}")
+                    print(f"   Text: {res['text'][:100]}...")
+                    print()
 
     elif args.command == 'stats':
         stats = processor.get_collection_stats(args.collection)
-        print("\n" + "=" * 80)
-        print(f"Collection: {stats['collection']}")
-        print(f"Documents: {stats['document_count']}")
-        print(f"\nAll collections: {', '.join(stats['all_collections'])}")
+
+        if args.json:
+            sys.stdout = original_stdout
+            print(json.dumps(stats))
+        else:
+            print("\n" + "=" * 80)
+            print(f"Collection: {stats['collection']}")
+            print(f"Documents: {stats['document_count']}")
+            print(f"\nAll collections: {', '.join(stats['all_collections'])}")
 
     else:
         parser.print_help()

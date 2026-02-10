@@ -60,6 +60,11 @@ pub fn run() {
             core::cmd::read_logs,
             core::cmd::change_app_data_folder,
             core::cmd::factory_reset,
+            // Python Bridge commands
+            core::python_bridge::check_python_status,
+            core::python_bridge::process_document,
+            core::python_bridge::query_documents,
+            core::python_bridge::get_collection_stats,
             // MCP commands
             core::mcp::get_tools,
             core::mcp::call_tool,

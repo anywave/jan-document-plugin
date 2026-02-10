@@ -2,6 +2,7 @@ pub mod cmd;
 pub mod fs;
 pub mod hardware;
 pub mod mcp;
+pub mod python_bridge;
 pub mod server;
 pub mod setup;
 pub mod state;
