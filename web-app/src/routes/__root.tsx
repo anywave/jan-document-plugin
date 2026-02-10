@@ -11,9 +11,6 @@ import { DataProvider } from '@/providers/DataProvider'
 import { route } from '@/constants/routes'
 import { ExtensionProvider } from '@/providers/ExtensionProvider'
 import { ToasterProvider } from '@/providers/ToasterProvider'
-import { useAnalytic } from '@/hooks/useAnalytic'
-import { PromptAnalytic } from '@/containers/analytics/PromptAnalytic'
-import { AnalyticProvider } from '@/providers/AnalyticProvider'
 import { useLeftPanel } from '@/hooks/useLeftPanel'
 import { cn } from '@/lib/utils'
 import ToolApproval from '@/containers/dialogs/ToolApproval'
@@ -36,7 +33,6 @@ export const Route = createRootRoute({
 })
 
 const AppLayout = () => {
-  const { productAnalyticPrompt } = useAnalytic()
   const {
     open: isLeftPanelOpen,
     setLeftPanel,
@@ -67,7 +63,6 @@ const AppLayout = () => {
 
   return (
     <Fragment>
-      <AnalyticProvider />
       <KeyboardShortcutsProvider />
       <main className="relative h-svh text-sm antialiased select-none bg-app">
         {/* Fake absolute panel top to enable window drag */}
@@ -124,7 +119,6 @@ const AppLayout = () => {
           </div>
         )}
       </main>
-      {productAnalyticPrompt && <PromptAnalytic />}
     </Fragment>
   )
 }

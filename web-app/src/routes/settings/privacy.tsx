@@ -2,11 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { route } from '@/constants/routes'
 import SettingsMenu from '@/containers/SettingsMenu'
 import HeaderPage from '@/containers/HeaderPage'
-import { Switch } from '@/components/ui/switch'
 import { Card, CardItem } from '@/containers/Card'
 import { useTranslation } from '@/i18n/react-i18next-compat'
-import { useAnalytic } from '@/hooks/useAnalytic'
-import posthog from 'posthog-js'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const Route = createFileRoute(route.settings.privacy as any)({
@@ -15,7 +12,6 @@ export const Route = createFileRoute(route.settings.privacy as any)({
 
 function Privacy() {
   const { t } = useTranslation()
-  const { setProductAnalytic, productAnalytic } = useAnalytic()
 
   return (
     <div className="flex flex-col h-full">
@@ -30,54 +26,46 @@ function Privacy() {
               header={
                 <div className="flex items-center justify-between mb-4">
                   <h1 className="text-main-view-fg font-medium text-base">
-                    {t('settings:privacy.analytics')}
+                    Privacy Policy
                   </h1>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={productAnalytic}
-                      onCheckedChange={(state) => {
-                        if (state) {
-                          posthog.opt_in_capturing()
-                        } else {
-                          posthog.opt_out_capturing()
-                        }
-                        setProductAnalytic(state)
-                      }}
-                    />
-                  </div>
                 </div>
               }
             >
               <CardItem
-                title={t('settings:privacy.helpUsImprove')}
-                description={<p>{t('settings:privacy.helpUsImproveDesc')}</p>}
-                align="start"
-              />
-              <CardItem
                 description={
                   <div className="text-main-view-fg/90">
-                    <p>{t('settings:privacy.privacyPolicy')}</p>
-                    <p className="my-1">
-                      {t('settings:privacy.analyticsDesc')}
+                    <p className="mb-4">
+                      AVACHATTER is committed to your privacy. This application operates 100% offline with no data collection, tracking, or telemetry of any kind.
                     </p>
-                    <p>{t('settings:privacy.privacyPromises')}</p>
-                    <ul className="list-disc pl-4 space-y-1 mt-4">
+                    <p className="mb-2 font-medium">Your Privacy Guarantees:</p>
+                    <ul className="list-disc pl-4 space-y-1">
                       <li className="font-medium">
-                        {t('settings:privacy.promise1')}
+                        No data is sent to external servers
                       </li>
                       <li className="font-medium">
-                        {t('settings:privacy.promise2')}
+                        No analytics or tracking
                       </li>
                       <li className="font-medium">
-                        {t('settings:privacy.promise3')}
+                        All processing happens locally on your device
                       </li>
                       <li className="font-medium">
-                        {t('settings:privacy.promise4')}
+                        Your conversations and documents never leave your computer
                       </li>
                       <li className="font-medium">
-                        {t('settings:privacy.promise5')}
+                        No crash reporting or diagnostics collection
                       </li>
                     </ul>
+                    <p className="mt-4">
+                      For more information, visit:{' '}
+                      <a
+                        href="https://anywave.com/privacy"
+                        className="text-accent hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        https://anywave.com/privacy
+                      </a>
+                    </p>
                   </div>
                 }
               />
