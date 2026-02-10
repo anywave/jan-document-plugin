@@ -137,7 +137,7 @@ export function DocumentRAG({
           <DocumentLibrary
             collectionName={collectionName}
             onDocumentSelect={(doc) => {
-              console.log('Document selected:', doc)
+              // Document selection handled by DocumentLibrary
             }}
           />
         )}
