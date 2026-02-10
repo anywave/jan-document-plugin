@@ -1,5 +1,5 @@
 {
-  "name": "jan-app",
+  "name": "avachatter-app",
   "private": true,
   "workspaces": {
     "packages": [
