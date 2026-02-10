@@ -57,3 +57,8 @@ target
 ## test
 test-data
 extensions/document-rag/python/__pycache__/
+extensions/document-rag/python/chroma_db/
+extensions/document-rag/python/test_chroma_db/
+extensions/document-rag/python/test_document.txt
+extensions/document-rag/venv312/
+web-app/src/extensions/
