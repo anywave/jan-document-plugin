@@ -443,7 +443,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 </div>
 
 <script>
-var API = 'http://localhost:1338';
+var API = window.location.origin || 'http://localhost:1338';
 var MODEL = null;  // Will be set dynamically from available models
 var availableModels = [];
 var availableAssistants = [];
@@ -633,12 +633,17 @@ function readFile(file, mode) {
   });
 }
 async function handleFiles(fileList) {
+  if (!fileList || fileList.length === 0) { console.log('[attach] No files selected'); return; }
+  console.log('[attach] Processing ' + fileList.length + ' file(s)');
   for (var i = 0; i < fileList.length; i++) {
     var file = fileList[i];
+    console.log('[attach] Reading: ' + file.name + ' (' + file.size + ' bytes, ' + file.type + ')');
     var isImg = file.type.startsWith('image/');
     var b64 = await readFile(file, 'dataurl');
     var txt = isImg ? null : await readFile(file, 'text');
+    if (!b64) { console.error('[attach] Failed to read file as data URL: ' + file.name); continue; }
     attachedFiles.push({ name: file.name, type: file.type || 'application/octet-stream', size: file.size, base64: b64, textContent: txt });
+    console.log('[attach] Attached: ' + file.name);
     renderAttachments();
   }
   document.getElementById('file-input').value = '';
@@ -739,11 +744,20 @@ async function sendMessage() {
     var f = curAtt[i];
     if (!f.type.startsWith('image/')) {
       try {
+        console.log('[upload] Indexing document: ' + f.name);
         var blob = await fetch(f.base64).then(function(r) { return r.blob(); });
         var fd = new FormData();
         fd.append('file', blob, f.name);
-        await fetch(API + '/documents', { method: 'POST', body: fd });
-      } catch (e) { console.warn('doc upload fail', e); }
+        var resp = await fetch(API + '/documents', { method: 'POST', body: fd });
+        if (!resp.ok) {
+          var errText = await resp.text();
+          console.error('[upload] Failed to index ' + f.name + ': ' + resp.status + ' ' + errText);
+        } else {
+          var result = await resp.json();
+          console.log('[upload] Indexed ' + f.name + ': ' + result.chunks + ' chunks');
+          refreshStats();
+        }
+      } catch (e) { console.error('[upload] doc upload fail for ' + f.name + ':', e); }
     }
   }
 
@@ -1362,7 +1376,7 @@ async function refreshStats() {
 }
 async function checkHealth() {
   try { await fetch(API + '/health'); document.getElementById('dot-proxy').className = 'dot on'; } catch(e) { document.getElementById('dot-proxy').className = 'dot off'; }
-  try { await fetch('http://localhost:11435/v1/models'); document.getElementById('dot-llm').className = 'dot on'; } catch(e) { document.getElementById('dot-llm').className = 'dot off'; }
+  try { await fetch('http://localhost:11434/v1/models'); document.getElementById('dot-llm').className = 'dot on'; } catch(e) { document.getElementById('dot-llm').className = 'dot off'; }
   try {
     var resp = await fetch(API + '/souls/active');
     var data = await resp.json();
