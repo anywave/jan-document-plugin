@@ -62,8 +62,6 @@ function General() {
     setSpellCheckChatInput,
     experimentalFeatures,
     setExperimentalFeatures,
-    huggingfaceToken,
-    setHuggingfaceToken,
   } = useGeneralSetting()
 
   const openFileTitle = (): string => {
@@ -507,23 +505,6 @@ function General() {
                   />
                 }
               />
-              <CardItem
-                title={t('settings:general.huggingfaceToken', {
-                  ns: 'settings',
-                })}
-                description={t('settings:general.huggingfaceTokenDesc', {
-                  ns: 'settings',
-                })}
-                actions={
-                  <Input
-                    id="hf-token"
-                    value={huggingfaceToken || ''}
-                    onChange={(e) => setHuggingfaceToken(e.target.value)}
-                    placeholder={'hf_xxx'}
-                    required
-                  />
-                }
-              />
             </Card>
 
             {/* Resources */}
@@ -533,7 +514,7 @@ function General() {
                 description={t('settings:general.documentationDesc')}
                 actions={
                   <a
-                    href="https://jan.ai/docs"
+                    href="https://github.com/anywave/avachatter/docs"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -549,7 +530,7 @@ function General() {
                 description={t('settings:general.releaseNotesDesc')}
                 actions={
                   <a
-                    href="https://github.com/menloresearch/jan/releases"
+                    href="https://github.com/anywave/avachatter/releases"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -569,7 +550,7 @@ function General() {
                 description={t('settings:general.githubDesc')}
                 actions={
                   <a
-                    href="https://github.com/menloresearch/jan"
+                    href="https://github.com/anywave/avachatter"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -583,21 +564,12 @@ function General() {
                 }
               />
               <CardItem
-                title={t('settings:general.discord')}
-                description={t('settings:general.discordDesc')}
+                title="Community"
+                description="Join our community - coming soon!"
                 actions={
-                  <a
-                    href="https://discord.com/invite/FTk2MvZwJH"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <div className="size-6 cursor-pointer flex items-center justify-center rounded hover:bg-main-view-fg/15 bg-main-view-fg/10 transition-all duration-200 ease-in-out">
-                      <IconBrandDiscord
-                        size={18}
-                        className="text-main-view-fg/50"
-                      />
-                    </div>
-                  </a>
+                  <div className="text-main-view-fg/50 text-sm">
+                    Coming Soon
+                  </div>
                 }
               />
             </Card>
@@ -605,31 +577,18 @@ function General() {
             {/* Support */}
             <Card title={t('settings:general.support')}>
               <CardItem
-                title={t('settings:general.reportAnIssue')}
-                description={t('settings:general.reportAnIssueDesc')}
+                title="Report an Issue"
+                description="Report bugs or request features on GitHub"
                 actions={
                   <a
-                    href="https://github.com/menloresearch/jan/issues/new"
+                    href="https://github.com/anywave/avachatter/issues"
                     target="_blank"
                   >
                     <div className="flex items-center gap-1">
-                      <span>{t('settings:general.reportIssue')}</span>
+                      <span>Report Issue</span>
                       <IconExternalLink size={14} />
                     </div>
                   </a>
-                }
-              />
-            </Card>
-
-            {/* Credits */}
-            <Card title={t('settings:general.credits')}>
-              <CardItem
-                align="start"
-                description={
-                  <div className="text-main-view-fg/70 -mt-2">
-                    <p>{t('settings:general.creditsDesc1')}</p>
-                    <p className="mt-2">{t('settings:general.creditsDesc2')}</p>
-                  </div>
                 }
               />
             </Card>
