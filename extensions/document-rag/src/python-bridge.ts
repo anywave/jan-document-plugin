@@ -65,6 +65,36 @@ export interface ProcessingProgress {
 }
 
 /**
+ * ChromaDB health check result
+ */
+export interface ChromaDbHealth {
+  healthy: boolean
+  document_count: number
+  error: string | null
+  recovered: boolean
+}
+
+/**
+ * Structured error event from Python bridge
+ */
+export interface PythonBridgeError {
+  error_type: 'timeout' | 'spawn_error' | 'execution_error'
+  message: string
+  attempt: number
+  max_attempts: number
+}
+
+/**
+ * Jan lock status
+ */
+export interface JanLockStatus {
+  jan_installed: boolean
+  jan_version: string | null
+  jan_install_path: string | null
+  mobius_locked: boolean
+}
+
+/**
  * Check if Python is available and scripts are installed
  */
 export async function checkPythonStatus(): Promise<PythonStatus> {
@@ -130,6 +160,32 @@ export async function getCollectionStats(
 }
 
 /**
+ * Check ChromaDB health status
+ *
+ * @param collectionName - Collection to check
+ * @param autoRecover - Whether to auto-recover corrupt database
+ * @returns Health check result
+ */
+export async function checkChromaDbHealth(
+  collectionName?: string,
+  autoRecover?: boolean
+): Promise<ChromaDbHealth> {
+  return invoke<ChromaDbHealth>('check_chromadb_health', {
+    collectionName,
+    autoRecover,
+  })
+}
+
+/**
+ * Check Jan lock status
+ *
+ * @returns Jan lock status from Windows registry
+ */
+export async function checkJanLockStatus(): Promise<JanLockStatus> {
+  return invoke<JanLockStatus>('check_jan_lock_status')
+}
+
+/**
  * Listen to document processing progress events
  *
  * @param callback - Callback function for progress updates
@@ -144,52 +200,15 @@ export async function onProcessingProgress(
 }
 
 /**
- * Example usage:
+ * Listen to Python bridge error events
  *
- * ```typescript
- * import { checkPythonStatus, processDocument, queryDocuments } from './python-bridge'
- *
- * // Check Python status
- * const status = await checkPythonStatus()
- * if (!status.available) {
- *   console.error('Python not available:', status.error)
- *   return
- * }
- *
- * // Listen to progress
- * const unlisten = await onProcessingProgress((progress) => {
- *   console.log('Progress:', progress.status, progress.file)
- * })
- *
- * // Process a document
- * const result = await processDocument('/path/to/document.pdf', {
- *   collectionName: 'my-docs',
- *   useOcr: true
- * })
- *
- * if (result.success) {
- *   console.log(`Processed ${result.chunks_created} chunks`)
- * } else {
- *   console.error('Processing failed:', result.error)
- * }
- *
- * // Query documents
- * const queryResult = await queryDocuments('machine learning', {
- *   topK: 5
- * })
- *
- * queryResult.results.forEach((match, i) => {
- *   console.log(`${i+1}. ${match.metadata.file_name} (distance: ${match.distance})`)
- *   console.log(`   ${match.text.substring(0, 100)}...`)
- * })
- *
- * // Get statistics
- * const stats = await getCollectionStats()
- * console.log(`Collection: ${stats.collection}`)
- * console.log(`Documents: ${stats.document_count}`)
- * console.log(`All collections: ${stats.all_collections.join(', ')}`)
- *
- * // Cleanup
- * unlisten()
- * ```
+ * @param callback - Callback function for error events
+ * @returns Unlisten function
  */
+export async function onPythonError(
+  callback: (error: PythonBridgeError) => void
+) {
+  return listen<PythonBridgeError>('python-error', (event) => {
+    callback(event.payload)
+  })
+}

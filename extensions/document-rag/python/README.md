@@ -1,4 +1,4 @@
-# AVACHATTER Document RAG Extension - Python Backend
+# MOBIUS Document RAG Extension - Python Backend
 
 **Version**: 1.0.0
 **Python**: 3.12+
@@ -6,7 +6,7 @@
 
 ## Overview
 
-This Python backend handles document processing, OCR, text embedding, and vector storage for AVACHATTER's document RAG system.
+This Python backend handles document processing, OCR, text embedding, and vector storage for MOBIUS's document RAG system.
 
 ## Components
 
@@ -292,7 +292,7 @@ else:
 - Process large PDFs in smaller chunks
 - Use CPU-only torch build (default)
 
-## Integration with AVACHATTER
+## Integration with MOBIUS
 
 These Python scripts will be called via Tauri IPC from the Electron/React frontend:
 
@@ -306,7 +306,7 @@ const result = await invoke('process_document', {
 
 ## License
 
-Part of AVACHATTER project - 100% offline document AI assistant.
+Part of MOBIUS project - 100% offline document AI assistant.
 
 ## Credits
 

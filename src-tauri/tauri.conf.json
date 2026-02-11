@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "AVACHATTER",
+  "productName": "MOBIUS",
   "version": "0.7.0",
-  "identifier": "com.avachatter.app",
+  "identifier": "com.anywave.mobius",
   "build": {
     "frontendDist": "../web-app/dist",
     "devUrl": "http://localhost:1420",
@@ -15,7 +15,7 @@
       {
         "zoomHotkeysEnabled": true,
         "label": "main",
-        "title": "AVACHATTER",
+        "title": "MOBIUS",
         "width": 1024,
         "minWidth": 375,
         "minHeight": 667,
@@ -41,13 +41,13 @@
     "security": {
       "csp": {
         "default-src": "'self' customprotocol: asset: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*",
-        "connect-src": "ipc: http://ipc.localhost http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* https: http:",
+        "connect-src": "ipc: http://ipc.localhost http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*",
         "font-src": [
-          "https://fonts.gstatic.com blob: data: tauri://localhost http://tauri.localhost"
+          "blob: data: tauri://localhost http://tauri.localhost"
         ],
-        "img-src": "'self' asset: http://asset.localhost blob: data: https:",
-        "style-src": "'unsafe-inline' 'self' https://fonts.googleapis.com",
-        "script-src": "'self' asset: $APPDATA/**.* http://asset.localhost https://eu-assets.i.posthog.com https://posthog.com"
+        "img-src": "'self' asset: http://asset.localhost blob: data:",
+        "style-src": "'unsafe-inline' 'self'",
+        "script-src": "'self' asset: $APPDATA/**.* http://asset.localhost"
       },
       "assetProtocol": {
         "enable": true,
@@ -64,9 +64,10 @@
       "resolve": true
     },
     "updater": {
-      "active": false
+      "active": false,
+      "pubkey": ""
     },
-    "deep-link": { "schemes": ["avachatter"] }
+    "deep-link": { "schemes": ["mobius"] }
   },
   "bundle": {
     "active": true,
@@ -93,12 +94,14 @@
       "minimumSystemVersion": "10.13",
       "exceptionDomain": ""
     },
-    "resources": [],
+    "resources": [
+      "resources/python312.zip"
+    ],
     "copyright": "",
     "category": "Utility",
     "shortDescription": "100% Offline AI Assistant with Document RAG and Voice I/O",
-    "longDescription": "AVACHATTER is a privacy-first, 100% offline AI assistant featuring document intelligence, voice input/output, and semantic search. No internet required, no data collection.",
-    "homepage": "https://github.com/anywave/avachatter",
+    "longDescription": "MOBIUS is a privacy-first, 100% offline AI assistant featuring document intelligence, voice input/output, and semantic search. No internet required, no data collection.",
+    "homepage": "https://github.com/anywave/mobius",
     "publisher": "ANYWAVE"
   }
 }

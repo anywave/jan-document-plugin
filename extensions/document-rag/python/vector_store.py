@@ -24,12 +24,8 @@ class VectorStore:
         self.persist_directory = persist_directory
         Path(persist_directory).mkdir(parents=True, exist_ok=True)
 
-        # Initialize ChromaDB client
-        self.client = chromadb.Client(Settings(
-            chroma_db_impl="duckdb+parquet",
-            persist_directory=persist_directory,
-            anonymized_telemetry=False  # IMPORTANT: Disable telemetry
-        ))
+        # Initialize ChromaDB client (new API)
+        self.client = chromadb.PersistentClient(path=persist_directory)
 
         self.default_collection_name = "documents"
 

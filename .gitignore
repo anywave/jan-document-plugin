@@ -21,6 +21,8 @@ src-tauri/icons
 !src-tauri/icons/icon.png
 src-tauri/gen/apple
 src-tauri/resources/bin
+src-tauri/resources/python312
+src-tauri/resources/python312.zip
 
 # Helper tools
 .opencode
@@ -57,3 +59,8 @@ target
 ## test
 test-data
 extensions/document-rag/python/__pycache__/
+extensions/document-rag/python/chroma_db/
+extensions/document-rag/python/test_chroma_db/
+extensions/document-rag/python/test_document.txt
+extensions/document-rag/venv312/
+web-app/src/extensions/

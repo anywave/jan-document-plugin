@@ -1,5 +1,5 @@
 {
-  "name": "avachatter-app",
+  "name": "mobius-app",
   "private": true,
   "workspaces": {
     "packages": [
@@ -8,7 +8,7 @@
     ]
   },
   "scripts": {
-    "lint": "yarn workspace @janhq/web-app lint",
+    "lint": "yarn workspace @anywave/mobius lint",
     "dev": "yarn dev:tauri",
     "build": "yarn build:web && yarn build:tauri",
     "test": "vitest run",
@@ -16,7 +16,7 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "test:prepare": "yarn build:icon && yarn copy:assets:tauri && yarn build --no-bundle ",
-    "dev:web": "yarn workspace @janhq/web-app dev",
+    "dev:web": "yarn workspace @anywave/mobius dev",
     "dev:tauri": "yarn build:icon && yarn copy:assets:tauri && cross-env IS_CLEAN=true tauri dev",
     "copy:assets:tauri": "cpx \"pre-install/*.tgz\" \"src-tauri/resources/pre-install/\"",
     "download:lib": "node ./scripts/download-lib.mjs",
@@ -27,7 +27,7 @@
     "build:tauri": "yarn build:icon && yarn copy:assets:tauri && run-script-os",
     "build:icon": "tauri icon ./src-tauri/icons/icon.png",
     "build:core": "cd core && yarn build && yarn pack",
-    "build:web": "yarn workspace @janhq/web-app build",
+    "build:web": "yarn workspace @anywave/mobius build",
     "build:extensions": "rimraf ./pre-install/*.tgz || true && yarn workspace @janhq/core build && cd extensions && yarn install && yarn workspaces foreach -Apt run build:publish",
     "prepare": "husky"
   },

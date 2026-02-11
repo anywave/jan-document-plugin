@@ -23,10 +23,7 @@ interface UploadingFile {
   error?: string
 }
 
-const SUPPORTED_EXTENSIONS = [
-  '.pdf', '.docx', '.doc', '.txt', '.md',
-  '.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.tif'
-]
+const SUPPORTED_EXTENSIONS = ['.txt', '.md']
 
 export function DocumentUpload({
   onUploadComplete,
@@ -201,7 +198,7 @@ export function DocumentUpload({
             Select Files
           </button>
           <p className="text-xs text-muted-fg mt-4">
-            Supported: PDF, DOCX, TXT, MD, Images
+            Supported: TXT, MD (Plain text and Markdown)
           </p>
         </div>
       </div>
