@@ -21,6 +21,8 @@ src-tauri/icons
 !src-tauri/icons/icon.png
 src-tauri/gen/apple
 src-tauri/resources/bin
+src-tauri/resources/python312
+src-tauri/resources/python312.zip
 
 # Helper tools
 .opencode

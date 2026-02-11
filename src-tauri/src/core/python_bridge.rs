@@ -1,10 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
-use std::sync::Arc;
+use std::process::{Command, Stdio};
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::sync::Mutex;
+use zip::ZipArchive;
 
 /// Response from Python document processor
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -48,17 +47,88 @@ pub struct PythonStatus {
     pub error: Option<String>,
 }
 
-/// Get path to Python script directory
-fn get_python_scripts_path(app_handle: AppHandle) -> PathBuf {
-    let extensions_path = app_handle
+/// Get path to the extracted Python 3.12 directory (in app data)
+fn get_python_dir(app_handle: &AppHandle) -> PathBuf {
+    app_handle
         .path()
         .app_data_dir()
         .expect("Failed to get app data dir")
-        .join("extensions")
-        .join("document-rag")
-        .join("python");
+        .join("python312")
+}
 
-    extensions_path
+/// Get path to the bundled Python zip archive (in resources)
+fn get_python_zip_path(app_handle: &AppHandle) -> PathBuf {
+    app_handle
+        .path()
+        .resource_dir()
+        .expect("Failed to get resource dir")
+        .join("python312.zip")
+}
+
+/// Get path to the bundled Python executable
+fn get_python_exe(app_handle: &AppHandle) -> PathBuf {
+    get_python_dir(app_handle).join("python.exe")
+}
+
+/// Get path to the bundled Python scripts directory
+fn get_python_scripts_path(app_handle: &AppHandle) -> PathBuf {
+    get_python_dir(app_handle).join("scripts")
+}
+
+/// Ensure Python is extracted from the bundled zip archive.
+/// Extracts only on first run or if python.exe is missing.
+fn ensure_python_extracted(app_handle: &AppHandle) -> Result<(), String> {
+    let python_dir = get_python_dir(app_handle);
+    let python_exe = python_dir.join("python.exe");
+
+    // Already extracted
+    if python_exe.exists() {
+        return Ok(());
+    }
+
+    let zip_path = get_python_zip_path(app_handle);
+    if !zip_path.exists() {
+        return Err(format!(
+            "Python archive not found at: {:?}. Reinstall MOBIUS.",
+            zip_path
+        ));
+    }
+
+    log::info!("Extracting bundled Python to {:?}...", python_dir);
+
+    // Create target directory
+    std::fs::create_dir_all(&python_dir)
+        .map_err(|e| format!("Failed to create Python directory: {}", e))?;
+
+    // Extract zip
+    let file = std::fs::File::open(&zip_path)
+        .map_err(|e| format!("Failed to open Python archive: {}", e))?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| format!("Failed to read Python archive: {}", e))?;
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i)
+            .map_err(|e| format!("Failed to read archive entry: {}", e))?;
+
+        let outpath = python_dir.join(entry.mangled_name());
+
+        if entry.is_dir() {
+            std::fs::create_dir_all(&outpath)
+                .map_err(|e| format!("Failed to create directory {:?}: {}", outpath, e))?;
+        } else {
+            if let Some(parent) = outpath.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("Failed to create parent dir: {}", e))?;
+            }
+            let mut outfile = std::fs::File::create(&outpath)
+                .map_err(|e| format!("Failed to create file {:?}: {}", outpath, e))?;
+            std::io::copy(&mut entry, &mut outfile)
+                .map_err(|e| format!("Failed to extract {:?}: {}", outpath, e))?;
+        }
+    }
+
+    log::info!("Python extraction complete ({} entries)", archive.len());
+    Ok(())
 }
 
 /// Execute Python command and return JSON result
@@ -67,7 +137,15 @@ async fn execute_python_command(
     script_name: &str,
     args: Vec<String>,
 ) -> Result<String, String> {
-    let script_path = get_python_scripts_path(app_handle.clone()).join(script_name);
+    // Ensure Python is extracted from the bundled zip on first use
+    ensure_python_extracted(&app_handle)?;
+
+    let python_exe = get_python_exe(&app_handle);
+    let script_path = get_python_scripts_path(&app_handle).join(script_name);
+
+    if !python_exe.exists() {
+        return Err(format!("Bundled Python not found: {:?}", python_exe));
+    }
 
     if !script_path.exists() {
         return Err(format!("Python script not found: {:?}", script_path));
@@ -75,9 +153,9 @@ async fn execute_python_command(
 
     log::info!("Executing Python script: {:?} with args: {:?}", script_path, args);
 
-    // Spawn Python process
-    let mut child = Command::new("python")
-        .arg(script_path)
+    // Spawn bundled Python process
+    let mut child = Command::new(&python_exe)
+        .arg(&script_path)
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -125,40 +203,56 @@ async fn execute_python_command(
     Ok(output)
 }
 
-/// Check if Python is available and scripts are installed
+/// Check if bundled Python is available and scripts are installed
 #[tauri::command]
 pub async fn check_python_status(app_handle: AppHandle) -> Result<PythonStatus, String> {
     log::info!("Checking Python status...");
 
-    // Check if Python is in PATH
-    let python_check = Command::new("python")
-        .arg("--version")
-        .output();
-
-    let (available, version) = match python_check {
-        Ok(output) if output.status.success() => {
-            let version_str = String::from_utf8_lossy(&output.stdout);
-            (true, Some(version_str.trim().to_string()))
-        }
-        _ => (false, None),
-    };
-
-    if !available {
+    // Ensure Python is extracted from the bundled zip on first use
+    if let Err(e) = ensure_python_extracted(&app_handle) {
         return Ok(PythonStatus {
             available: false,
             version: None,
             script_path: None,
-            error: Some("Python not found in PATH. Please install Python 3.12+".to_string()),
+            error: Some(format!("Failed to extract Python: {}", e)),
         });
     }
 
+    let python_exe = get_python_exe(&app_handle);
+
+    // Check if bundled Python exists
+    if !python_exe.exists() {
+        return Ok(PythonStatus {
+            available: false,
+            version: None,
+            script_path: None,
+            error: Some(format!(
+                "Bundled Python not found at: {:?}",
+                python_exe
+            )),
+        });
+    }
+
+    // Check bundled Python version
+    let python_check = Command::new(&python_exe)
+        .arg("--version")
+        .output();
+
+    let version = match python_check {
+        Ok(output) if output.status.success() => {
+            let version_str = String::from_utf8_lossy(&output.stdout);
+            Some(version_str.trim().to_string())
+        }
+        _ => None,
+    };
+
     // Check if scripts exist
-    let script_path = get_python_scripts_path(app_handle);
+    let script_path = get_python_scripts_path(&app_handle);
     let main_script = script_path.join("document_processor.py");
 
     if !main_script.exists() {
         return Ok(PythonStatus {
-            available,
+            available: true,
             version,
             script_path: Some(script_path.to_string_lossy().to_string()),
             error: Some(format!(
@@ -169,7 +263,7 @@ pub async fn check_python_status(app_handle: AppHandle) -> Result<PythonStatus, 
     }
 
     Ok(PythonStatus {
-        available,
+        available: true,
         version,
         script_path: Some(script_path.to_string_lossy().to_string()),
         error: None,
