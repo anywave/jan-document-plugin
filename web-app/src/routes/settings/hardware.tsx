@@ -313,15 +313,15 @@ function Hardware() {
                           title={device.name}
                           actions={
                             <div className="flex items-center gap-4">
-                              {/* <div className="flex flex-col items-end gap-1">
-                            <span className="text-main-view-fg/80 text-sm">
-                              ID: {device.id}
-                            </span>
-                            <span className="text-main-view-fg/80 text-sm">
-                              Memory: {formatMegaBytes(device.mem)} /{' '}
-                              {formatMegaBytes(device.free)} free
-                            </span>
-                          </div> */}
+                              <div className="flex flex-col items-end gap-1">
+                                <span className="text-main-view-fg/80 text-sm">
+                                  ID: {device.id}
+                                </span>
+                                <span className="text-main-view-fg/80 text-sm">
+                                  Memory: {formatMegaBytes(device.mem)} /{' '}
+                                  {formatMegaBytes(device.free)} free
+                                </span>
+                              </div>
                               <Switch
                                 checked={device.activated}
                                 onCheckedChange={() => {

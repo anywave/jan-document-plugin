@@ -9,6 +9,19 @@ use super::cmd::get_jan_data_folder_path;
 #[cfg(windows)]
 use std::path::Prefix;
 
+/// Case-insensitive path prefix check for Windows (filesystem is case-insensitive)
+#[cfg(windows)]
+pub fn path_starts_with(path: &Path, base: &Path) -> bool {
+    let path_lower = path.to_string_lossy().to_lowercase();
+    let base_lower = base.to_string_lossy().to_lowercase();
+    path_lower.starts_with(&base_lower)
+}
+
+#[cfg(not(windows))]
+pub fn path_starts_with(path: &Path, base: &Path) -> bool {
+    path.starts_with(base)
+}
+
 pub const THREADS_DIR: &str = "threads";
 pub const THREADS_FILE: &str = "thread.json";
 pub const MESSAGES_FILE: &str = "messages.jsonl";
@@ -127,7 +140,7 @@ pub fn write_yaml(
     // TODO: have an internal function to check scope
     let jan_data_folder = get_jan_data_folder_path(app.clone());
     let save_path = normalize_path(&jan_data_folder.join(save_path));
-    if !save_path.starts_with(&jan_data_folder) {
+    if !path_starts_with(&save_path, &jan_data_folder) {
         return Err(format!(
             "Error: save path {} is not under jan_data_folder {}",
             save_path.to_string_lossy(),
@@ -144,7 +157,7 @@ pub fn write_yaml(
 pub fn read_yaml(app: tauri::AppHandle, path: &str) -> Result<serde_json::Value, String> {
     let jan_data_folder = get_jan_data_folder_path(app.clone());
     let path = normalize_path(&jan_data_folder.join(path));
-    if !path.starts_with(&jan_data_folder) {
+    if !path_starts_with(&path, &jan_data_folder) {
         return Err(format!(
             "Error: path {} is not under jan_data_folder {}",
             path.to_string_lossy(),
@@ -161,7 +174,7 @@ pub fn read_yaml(app: tauri::AppHandle, path: &str) -> Result<serde_json::Value,
 pub fn decompress(app: tauri::AppHandle, path: &str, output_dir: &str) -> Result<(), String> {
     let jan_data_folder = get_jan_data_folder_path(app.clone());
     let path_buf = normalize_path(&jan_data_folder.join(path));
-    if !path_buf.starts_with(&jan_data_folder) {
+    if !path_starts_with(&path_buf, &jan_data_folder) {
         return Err(format!(
             "Error: path {} is not under jan_data_folder {}",
             path_buf.to_string_lossy(),
@@ -170,7 +183,7 @@ pub fn decompress(app: tauri::AppHandle, path: &str, output_dir: &str) -> Result
     }
 
     let output_dir_buf = normalize_path(&jan_data_folder.join(output_dir));
-    if !output_dir_buf.starts_with(&jan_data_folder) {
+    if !path_starts_with(&output_dir_buf, &jan_data_folder) {
         return Err(format!(
             "Error: output directory {} is not under jan_data_folder {}",
             output_dir_buf.to_string_lossy(),

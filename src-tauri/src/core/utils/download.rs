@@ -1,6 +1,6 @@
 use crate::core::cmd::get_jan_data_folder_path;
 use crate::core::state::AppState;
-use crate::core::utils::normalize_path;
+use crate::core::utils::{normalize_path, path_starts_with};
 use futures_util::StreamExt;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use std::collections::HashMap;
@@ -297,7 +297,7 @@ async fn _download_files_internal(
         let save_path = jan_data_folder.join(&item.save_path);
         let save_path = normalize_path(&save_path);
 
-        if !save_path.starts_with(&jan_data_folder) {
+        if !path_starts_with(&save_path, &jan_data_folder) {
             return Err(format!(
                 "Path {} is outside of Jan data folder {}",
                 save_path.display(),

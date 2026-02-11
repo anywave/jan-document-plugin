@@ -106,6 +106,18 @@
     }
   },
   {
+    "key": "n_gpu_layers",
+    "title": "GPU Layers (ngl)",
+    "description": "Number of model layers to offload to GPU. Higher = more VRAM used but faster inference. Set to 0 for CPU-only, or 9999 for full GPU offload. Default: 9999 (all layers).",
+    "controllerType": "input",
+    "controllerProps": {
+      "value": 9999,
+      "placeholder": "9999",
+      "type": "number",
+      "textAlign": "right"
+    }
+  },
+  {
     "key": "split_mode",
     "title": "GPU Split Mode",
     "description": "How to split the model across multiple GPUs.",

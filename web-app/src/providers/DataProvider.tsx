@@ -19,7 +19,7 @@ import { route } from '@/constants/routes'
 import { useThreads } from '@/hooks/useThreads'
 
 export function DataProvider() {
-  const { setProviders } = useModelProvider()
+  const { setProviders, updateProvider } = useModelProvider()
 
   const { setMessages } = useMessages()
   const { checkForUpdate } = useAppUpdater()
@@ -29,8 +29,11 @@ export function DataProvider() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    console.log('Initializing DataProvider...')
-    getProviders().then(setProviders)
+    getProviders().then((providers) => {
+      setProviders(providers)
+      // Force-activate llamacpp in case localStorage has stale active:false
+      updateProvider('llamacpp', { active: true })
+    })
     getMCPConfig().then((data) => setServers(data.mcpServers ?? []))
     getAssistants()
       .then((data) => {

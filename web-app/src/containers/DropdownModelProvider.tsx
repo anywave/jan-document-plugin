@@ -75,6 +75,20 @@ const DropdownModelProvider = ({
   const [searchValue, setSearchValue] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
 
+  // Auto-select the first available llamacpp model
+  const getDefaultModel = useCallback((): { provider: string; model: string } | null => {
+    const llamacpp = providers.find((p) => p.provider === 'llamacpp' && p.active)
+    if (llamacpp && llamacpp.models.length > 0) {
+      return { provider: 'llamacpp', model: llamacpp.models[0].id }
+    }
+    // Fallback: first active provider with models
+    const anyProvider = providers.find((p) => p.active && p.models.length > 0)
+    if (anyProvider) {
+      return { provider: anyProvider.provider, model: anyProvider.models[0].id }
+    }
+    return null
+  }, [providers])
+
   // Initialize model provider only once
   useEffect(() => {
     // Auto select model when existing thread is passed
@@ -95,16 +109,16 @@ const DropdownModelProvider = ({
         if (provider && modelExists) {
           selectModelProvider(lastUsed.provider, lastUsed.model)
         } else {
-          // Fallback to default model if last used model no longer exists
-          selectModelProvider('llamacpp', 'llama3.2:3b')
+          const fallback = getDefaultModel()
+          if (fallback) selectModelProvider(fallback.provider, fallback.model)
         }
       } else {
-        // default model, we should add from setting
-        selectModelProvider('llamacpp', 'llama3.2:3b')
+        const fallback = getDefaultModel()
+        if (fallback) selectModelProvider(fallback.provider, fallback.model)
       }
     } else {
-      // default model for non-new-chat contexts
-      selectModelProvider('llamacpp', 'llama3.2:3b')
+      const fallback = getDefaultModel()
+      if (fallback) selectModelProvider(fallback.provider, fallback.model)
     }
   }, [
     model,
@@ -112,6 +126,7 @@ const DropdownModelProvider = ({
     updateCurrentThreadModel,
     providers,
     useLastUsedModel,
+    getDefaultModel,
   ])
 
   // Update display model when selection changes

@@ -1,11 +1,11 @@
 import { sanitizeModelId } from '@/lib/utils'
 import {
   AIEngine,
-  EngineManager,
   SessionInfo,
   SettingComponentProps,
 } from '@janhq/core'
 import { Model as CoreModel } from '@janhq/core'
+import { ExtensionManager } from '@/lib/extension'
 // Types for model catalog
 export interface ModelQuant {
   model_id: string
@@ -60,7 +60,7 @@ export interface HuggingFaceRepo {
 const defaultProvider = 'llamacpp'
 
 const getEngine = (provider: string = defaultProvider) => {
-  return EngineManager.instance().get(provider) as AIEngine | undefined
+  return ExtensionManager.getInstance().getEngine(provider) as AIEngine | undefined
 }
 /**
  * Fetches all available models.

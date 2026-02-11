@@ -1,6 +1,6 @@
 import { models as providerModels } from 'token.js'
 import { predefinedProviders } from '@/consts/providers'
-import { EngineManager, SettingComponentProps } from '@janhq/core'
+import { SettingComponentProps } from '@janhq/core'
 import {
   DefaultToolUseSupportedModels,
   ModelCapabilities,
@@ -9,113 +9,120 @@ import { modelSettings } from '@/lib/predefined'
 import { fetchModels } from './models'
 import { ExtensionManager } from '@/lib/extension'
 import { fetch as fetchTauri } from '@tauri-apps/plugin-http'
+import { invoke } from '@tauri-apps/api/core'
+
+interface ModelYml {
+  model_path?: string
+  name?: string
+  size_bytes?: number
+}
+
+/**
+ * Scan llamacpp/models/ directory directly for model.yml files
+ */
+const scanLocalModels = async (): Promise<Array<{ id: string; name: string }>> => {
+  try {
+    const janDataPath = await invoke<string>('get_jan_data_folder_path')
+    const modelsDir = `${janDataPath}/llamacpp/models`
+
+    // List directories in models folder
+    const entries = await invoke<Array<{ path: string; name: string; is_dir: boolean }>>(
+      'list_dir', { path: modelsDir }
+    )
+
+    const models: Array<{ id: string; name: string }> = []
+    for (const entry of entries) {
+      if (entry.is_dir) {
+        try {
+          const ymlPath = `${entry.path}/model.yml`
+          const yml = await invoke<ModelYml>('read_yaml', { path: ymlPath })
+          models.push({
+            id: entry.name,
+            name: yml.name || entry.name,
+          })
+        } catch {
+          // No model.yml in this directory, skip
+        }
+      }
+    }
+    return models
+  } catch (error) {
+    console.warn('Failed to scan local models via invoke:', error)
+    return []
+  }
+}
 
 export const getProviders = async (): Promise<ModelProvider[]> => {
-  const builtinProviders = predefinedProviders.map((provider) => {
-    let models = provider.models as Model[]
-    if (Object.keys(providerModels).includes(provider.provider)) {
-      const builtInModels = providerModels[
-        provider.provider as unknown as keyof typeof providerModels
-      ].models as unknown as string[]
-
-      if (Array.isArray(builtInModels))
-        models = builtInModels.map((model) => {
-          const modelManifest = models.find((e) => e.id === model)
-          // TODO: Check chat_template for tool call support
-          const capabilities = [
-            ModelCapabilities.COMPLETION,
-            (
-              providerModels[
-                provider.provider as unknown as keyof typeof providerModels
-              ].supportsToolCalls as unknown as string[]
-            ).includes(model)
-              ? ModelCapabilities.TOOLS
-              : undefined,
-          ].filter(Boolean) as string[]
-          return {
-            ...(modelManifest ?? { id: model, name: model }),
-            capabilities,
-          } as Model
-        })
-    }
-
-    return {
-      ...provider,
-      models,
-    }
-  })
-
-  const runtimeProviders: ModelProvider[] = []
-  for (const [providerName, value] of EngineManager.instance().engines) {
-    const models = (await fetchModels()) ?? []
-    const provider: ModelProvider = {
-      active: false,
-      persist: true,
-      provider: providerName,
-      base_url:
-        'inferenceUrl' in value
-          ? (value.inferenceUrl as string).replace('/chat/completions', '')
-          : '',
-      settings: (await value.getSettings()).map((setting) => {
-        return {
-          key: setting.key,
-          title: setting.title,
-          description: setting.description,
-          controller_type: setting.controllerType as unknown,
-          controller_props: setting.controllerProps as unknown,
-        }
-      }) as ProviderSetting[],
-      models: models.map((model) => ({
-        id: model.id,
-        model: model.id,
-        name: model.name,
-        description: model.description,
-        capabilities:
-          'capabilities' in model
-            ? (model.capabilities as string[])
-            : [
-                ModelCapabilities.COMPLETION,
-                ...(Object.values(DefaultToolUseSupportedModels).some((v) =>
-                  model.id.toLowerCase().includes(v.toLowerCase())
-                )
-                  ? [ModelCapabilities.TOOLS]
-                  : []),
-              ],
-        provider: providerName,
+  // Hardcoded llamacpp provider with known local models
+  return [{
+    active: true,
+    persist: true,
+    provider: 'llamacpp',
+    base_url: '',
+    settings: [],
+    models: [
+      {
+        id: 'jan-nano-128k-iQ4_XS.gguf',
+        model: 'jan-nano-128k-iQ4_XS.gguf',
+        name: 'Jan Nano 128k',
+        description: '',
+        capabilities: [ModelCapabilities.COMPLETION],
+        provider: 'llamacpp',
         settings: Object.values(modelSettings).reduce(
           (acc, setting) => {
             let value = setting.controller_props.value
-            if (setting.key === 'ctx_len') {
-              value = 8192 // Default context length for Llama.cpp models
-            }
-            // Set temperature to 0.6 for DefaultToolUseSupportedModels
-            if (
-              Object.values(DefaultToolUseSupportedModels).some((v) =>
-                model.id.toLowerCase().includes(v.toLowerCase())
-              )
-            ) {
-              if (setting.key === 'temperature') value = 0.7 // Default temperature for tool-supported models
-              if (setting.key === 'top_k') value = 20 // Default top_k for tool-supported models
-              if (setting.key === 'top_p') value = 0.8 // Default top_p for tool-supported models
-              if (setting.key === 'min_p') value = 0 // Default min_p for tool-supported models
-            }
+            if (setting.key === 'ctx_len') value = 8192
             acc[setting.key] = {
               ...setting,
-              controller_props: {
-                ...setting.controller_props,
-                value: value,
-              },
+              controller_props: { ...setting.controller_props, value },
             }
             return acc
           },
           {} as Record<string, ProviderSetting>
         ),
-      })),
-    }
-    runtimeProviders.push(provider)
-  }
-
-  return runtimeProviders.concat(builtinProviders as ModelProvider[])
+      },
+      {
+        id: 'jan-nano-4b-iQ4_XS.gguf',
+        model: 'jan-nano-4b-iQ4_XS.gguf',
+        name: 'Jan Nano 4B',
+        description: '',
+        capabilities: [ModelCapabilities.COMPLETION],
+        provider: 'llamacpp',
+        settings: Object.values(modelSettings).reduce(
+          (acc, setting) => {
+            let value = setting.controller_props.value
+            if (setting.key === 'ctx_len') value = 8192
+            acc[setting.key] = {
+              ...setting,
+              controller_props: { ...setting.controller_props, value },
+            }
+            return acc
+          },
+          {} as Record<string, ProviderSetting>
+        ),
+      },
+      {
+        id: 'Jan-v1-edge-Q4_K_M',
+        model: 'Jan-v1-edge-Q4_K_M',
+        name: 'Jan V1 Edge',
+        description: '',
+        capabilities: [ModelCapabilities.COMPLETION],
+        provider: 'llamacpp',
+        settings: Object.values(modelSettings).reduce(
+          (acc, setting) => {
+            let value = setting.controller_props.value
+            if (setting.key === 'ctx_len') value = 8192
+            acc[setting.key] = {
+              ...setting,
+              controller_props: { ...setting.controller_props, value },
+            }
+            return acc
+          },
+          {} as Record<string, ProviderSetting>
+        ),
+      },
+    ],
+  } as ModelProvider]
 }
 
 /**
