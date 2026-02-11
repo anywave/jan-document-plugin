@@ -4,11 +4,13 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { FileText, Search, Library, AlertCircle } from 'lucide-react'
+import { FileText, Search, Library, AlertCircle, Info } from 'lucide-react'
 import { DocumentUpload } from './DocumentUpload'
 import { DocumentLibrary } from './DocumentLibrary'
 import { SearchInterface } from './SearchInterface'
+import { DocumentRAGErrorBoundary } from './DocumentRAGErrorBoundary'
 import { checkPythonStatus, type PythonStatus } from '../python-bridge'
+import { ensureQwenRegistered } from '../qwen-extraction'
 import { toast } from 'sonner'
 
 type Tab = 'upload' | 'library' | 'search'
@@ -27,8 +29,9 @@ export function DocumentRAG({
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab)
   const [pythonStatus, setPythonStatus] = useState<PythonStatus | null>(null)
   const [checkingPython, setCheckingPython] = useState(true)
+  const [qwenAvailable, setQwenAvailable] = useState<boolean | null>(null)
 
-  // Check Python status on mount
+  // Check Python status and Qwen model availability on mount
   useEffect(() => {
     const checkPython = async () => {
       try {
@@ -47,7 +50,18 @@ export function DocumentRAG({
       }
     }
 
+    const checkQwenModel = async () => {
+      try {
+        // Attempt to register Qwen if not already registered, then check availability
+        const registered = await ensureQwenRegistered()
+        setQwenAvailable(registered)
+      } catch {
+        setQwenAvailable(false)
+      }
+    }
+
     checkPython()
+    checkQwenModel()
   }, [])
 
   // Show loading state while checking Python
@@ -88,72 +102,83 @@ export function DocumentRAG({
   }
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      {/* Tab Navigation */}
-      <div className="border-b border-border">
-        <div className="flex gap-1">
-          <TabButton
-            active={activeTab === 'upload'}
-            onClick={() => setActiveTab('upload')}
-            icon={<FileText className="h-4 w-4" />}
-            label="Upload"
-          />
-          <TabButton
-            active={activeTab === 'library'}
-            onClick={() => setActiveTab('library')}
-            icon={<Library className="h-4 w-4" />}
-            label="Library"
-          />
-          <TabButton
-            active={activeTab === 'search'}
-            onClick={() => setActiveTab('search')}
-            icon={<Search className="h-4 w-4" />}
-            label="Search"
-          />
+    <DocumentRAGErrorBoundary>
+      <div className={`space-y-4 ${className}`}>
+        {/* Tab Navigation */}
+        <div className="border-b border-border">
+          <div className="flex gap-1">
+            <TabButton
+              active={activeTab === 'upload'}
+              onClick={() => setActiveTab('upload')}
+              icon={<FileText className="h-4 w-4" />}
+              label="Upload"
+            />
+            <TabButton
+              active={activeTab === 'library'}
+              onClick={() => setActiveTab('library')}
+              icon={<Library className="h-4 w-4" />}
+              label="Library"
+            />
+            <TabButton
+              active={activeTab === 'search'}
+              onClick={() => setActiveTab('search')}
+              icon={<Search className="h-4 w-4" />}
+              label="Search"
+            />
+          </div>
+        </div>
+
+        {/* Status Badges */}
+        <div className="flex items-center gap-4">
+          {pythonStatus && pythonStatus.version && (
+            <div className="flex items-center gap-2 text-xs text-muted-fg">
+              <div className="h-2 w-2 rounded-full bg-green-500" />
+              <span>Python {pythonStatus.version.replace('Python ', '')}</span>
+            </div>
+          )}
+
+          {qwenAvailable === false && (
+            <div className="flex items-center gap-2 text-xs text-amber-600">
+              <Info className="h-3 w-3" />
+              <span>Qwen extraction model not found — RAG will use raw document chunks</span>
+            </div>
+          )}
+        </div>
+
+        {/* Tab Content */}
+        <div className="min-h-[400px]">
+          {activeTab === 'upload' && (
+            <DocumentUpload
+              collectionName={collectionName}
+              onUploadComplete={() => {
+                // Optionally switch to library after upload
+                toast.success('Document indexed! View in Library tab.')
+              }}
+            />
+          )}
+
+          {activeTab === 'library' && (
+            <DocumentLibrary
+              collectionName={collectionName}
+              onDocumentSelect={(doc) => {
+                // Document selection handled by DocumentLibrary
+              }}
+            />
+          )}
+
+          {activeTab === 'search' && (
+            <SearchInterface collectionName={collectionName} />
+          )}
+        </div>
+
+        {/* Footer Info */}
+        <div className="text-xs text-muted-fg text-center pt-4 border-t border-border">
+          <p>
+            Document RAG powered by Python • All processing happens locally • 100% offline
+          </p>
         </div>
       </div>
-
-      {/* Python Status Badge */}
-      {pythonStatus && pythonStatus.version && (
-        <div className="flex items-center gap-2 text-xs text-muted-fg">
-          <div className="h-2 w-2 rounded-full bg-green-500" />
-          <span>Python {pythonStatus.version.replace('Python ', '')}</span>
-        </div>
-      )}
-
-      {/* Tab Content */}
-      <div className="min-h-[400px]">
-        {activeTab === 'upload' && (
-          <DocumentUpload
-            collectionName={collectionName}
-            onUploadComplete={() => {
-              // Optionally switch to library after upload
-              toast.success('Document indexed! View in Library tab.')
-            }}
-          />
-        )}
-
-        {activeTab === 'library' && (
-          <DocumentLibrary
-            collectionName={collectionName}
-            onDocumentSelect={(doc) => {
-              // Document selection handled by DocumentLibrary
-            }}
-          />
-        )}
-
-        {activeTab === 'search' && (
-          <SearchInterface collectionName={collectionName} />
-        )}
-      </div>
-
-      {/* Footer Info */}
-      <div className="text-xs text-muted-fg text-center pt-4 border-t border-border">
-        <p>
-          Document RAG powered by Python • All processing happens locally • 100% offline
-        </p>
-      </div>
-    </div>
+    </DocumentRAGErrorBoundary>
   )
 }
 

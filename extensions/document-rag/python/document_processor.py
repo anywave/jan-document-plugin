@@ -41,17 +41,8 @@ class DocumentProcessor:
         self.vector_store = VectorStore(vector_db_path)
 
         self.supported_extensions = {
-            '.pdf': 'pdf',
-            '.docx': 'docx',
-            '.doc': 'docx',  # Try with docx processor
             '.txt': 'text',
             '.md': 'text',
-            '.png': 'image',
-            '.jpg': 'image',
-            '.jpeg': 'image',
-            '.bmp': 'image',
-            '.tiff': 'image',
-            '.tif': 'image'
         }
 
     def detect_file_type(self, file_path: str) -> str:
@@ -317,6 +308,48 @@ class DocumentProcessor:
             'all_collections': self.vector_store.list_collections()
         }
 
+    def check_health(self, collection_name: str = "documents", auto_recover: bool = False) -> Dict[str, any]:
+        """
+        Check ChromaDB health status.
+
+        Args:
+            collection_name: Collection to check
+            auto_recover: If True, delete and recreate corrupt chroma_db dir
+
+        Returns:
+            Dictionary with health status
+        """
+        result = {
+            'healthy': False,
+            'document_count': 0,
+            'error': None,
+            'recovered': False,
+        }
+
+        try:
+            count = self.vector_store.get_collection_count(collection_name)
+            result['healthy'] = True
+            result['document_count'] = count
+        except Exception as e:
+            result['error'] = str(e)
+
+            if auto_recover:
+                try:
+                    import shutil
+                    db_path = self.vector_store.persist_directory
+                    if os.path.exists(db_path):
+                        shutil.rmtree(db_path)
+                        os.makedirs(db_path, exist_ok=True)
+                    # Reinitialize vector store
+                    self.vector_store = VectorStore(db_path)
+                    result['recovered'] = True
+                    result['healthy'] = True
+                    result['error'] = None
+                except Exception as recover_err:
+                    result['error'] = f"Recovery failed: {recover_err}"
+
+        return result
+
 
 def main():
     """CLI interface for document processor."""
@@ -344,6 +377,11 @@ def main():
     # Stats command
     stats_parser = subparsers.add_parser('stats', help='Show collection statistics')
     stats_parser.add_argument('--collection', default='documents', help='Collection name')
+
+    # Health command
+    health_parser = subparsers.add_parser('health', help='Check ChromaDB health')
+    health_parser.add_argument('--collection', default='documents', help='Collection name')
+    health_parser.add_argument('--auto-recover', action='store_true', help='Auto-recover corrupt DB')
 
     args = parser.parse_args()
 
@@ -410,6 +448,25 @@ def main():
             print(f"Collection: {stats['collection']}")
             print(f"Documents: {stats['document_count']}")
             print(f"\nAll collections: {', '.join(stats['all_collections'])}")
+
+    elif args.command == 'health':
+        health = processor.check_health(
+            collection_name=args.collection,
+            auto_recover=args.auto_recover
+        )
+
+        if args.json:
+            sys.stdout = original_stdout
+            print(json.dumps(health))
+        else:
+            print("\n" + "=" * 80)
+            status = "Healthy" if health['healthy'] else "Unhealthy"
+            print(f"ChromaDB Status: {status}")
+            print(f"Documents: {health['document_count']}")
+            if health['error']:
+                print(f"Error: {health['error']}")
+            if health['recovered']:
+                print("Database was recovered automatically.")
 
     else:
         parser.print_help()

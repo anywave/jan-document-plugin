@@ -65,6 +65,8 @@ pub fn run() {
             core::python_bridge::process_document,
             core::python_bridge::query_documents,
             core::python_bridge::get_collection_stats,
+            core::python_bridge::check_chromadb_health,
+            core::python_bridge::check_jan_lock_status,
             // MCP commands
             core::mcp::get_tools,
             core::mcp::call_tool,

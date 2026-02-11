@@ -66,7 +66,7 @@ export const useChat = () => {
   const { getMessages, addMessage } = useMessages()
   const { setModelLoadError } = useModelLoad()
   const router = useRouter()
-  const { formatContext } = useDocumentContext()
+  const { formatContext, formatContextWithExtraction } = useDocumentContext()
 
   const provider = useMemo(() => {
     return getProviderByName(selectedProvider)
@@ -245,8 +245,9 @@ export const useChat = () => {
           updateLoadingModel(false)
         }
 
-        // Get document context and combine with assistant instructions
-        const documentContext = formatContext(activeThread.id)
+        // Get document context with Qwen extraction and combine with assistant instructions
+        const documentContext = await formatContextWithExtraction(activeThread.id, message)
+          .catch(() => formatContext(activeThread.id))
         const systemInstruction = documentContext
           ? currentAssistant?.instructions
             ? `${currentAssistant.instructions}\n\n${documentContext}`
@@ -475,6 +476,8 @@ export const useChat = () => {
       increaseModelContextSize,
       toggleOnContextShifting,
       setModelLoadError,
+      formatContext,
+      formatContextWithExtraction,
     ]
   )
 
