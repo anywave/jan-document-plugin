@@ -10,6 +10,21 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import json
 from datetime import datetime
+import time
+
+
+def emit_progress(step: int, total_steps: int, step_name: str, detail: str = "", file_path: str = ""):
+    """Write a progress JSON line to stderr for the Rust bridge to pick up."""
+    progress = {
+        "progress": True,
+        "step": step,
+        "total_steps": total_steps,
+        "step_name": step_name,
+        "detail": detail,
+        "file": file_path,
+        "percent": int((step / total_steps) * 100) if total_steps > 0 else 0,
+    }
+    print(json.dumps(progress), file=sys.stderr, flush=True)
 
 # Import all processors
 from pdf_processor import PDFProcessor
@@ -43,6 +58,9 @@ class DocumentProcessor:
         self.supported_extensions = {
             '.txt': 'text',
             '.md': 'text',
+            '.doc': 'docx',
+            '.docx': 'docx',
+            '.rtf': 'text',
         }
 
     def detect_file_type(self, file_path: str) -> str:
@@ -168,10 +186,18 @@ class DocumentProcessor:
         }
 
         try:
-            print(f"Processing: {os.path.basename(file_path)}")
+            file_size = os.path.getsize(file_path)
+            file_name = os.path.basename(file_path)
+            file_size_mb = file_size / (1024 * 1024)
+            start_time = time.time()
+
+            # Estimate expected chunks (rough: ~500 chars/chunk, text files ~1 byte/char)
+            est_chunks = max(1, file_size // 450)
 
             # Step 1: Extract text
-            print("  [1/4] Extracting text...")
+            emit_progress(1, 4, "Extracting text",
+                          f"{file_name} ({file_size_mb:.1f} MB) — est. ~{est_chunks} chunks",
+                          file_path)
             extract_result = self.extract_text_from_file(
                 file_path,
                 use_ocr=use_ocr,
@@ -186,8 +212,14 @@ class DocumentProcessor:
                 result['error'] = "No text extracted from document"
                 return result
 
+            text_len = len(extract_result['text'])
+            elapsed = time.time() - start_time
+
             # Step 2: Chunk and embed
-            print("  [2/4] Chunking text...")
+            est_chunks_from_text = max(1, text_len // 450)
+            emit_progress(2, 4, "Chunking & embedding",
+                          f"{text_len:,} chars extracted in {elapsed:.1f}s — chunking into ~{est_chunks_from_text} pieces & embedding...",
+                          file_path)
             doc_result = self.embedder.embed_document(
                 extract_result['text'],
                 chunk_size=chunk_size,
@@ -200,13 +232,17 @@ class DocumentProcessor:
                 return result
 
             result['chunks_created'] = len(doc_result['chunks'])
+            num_chunks = len(doc_result['chunks'])
+            elapsed = time.time() - start_time
 
             # Step 3: Prepare for storage
-            print(f"  [3/4] Generated {len(doc_result['embeddings'])} embeddings")
+            emit_progress(3, 4, "Preparing storage",
+                          f"{num_chunks} chunks, {len(doc_result['embeddings'])} embeddings ({elapsed:.1f}s elapsed)",
+                          file_path)
 
             # Create unique IDs
             file_id = Path(file_path).stem
-            doc_ids = [f"{file_id}_chunk_{i}" for i in range(len(doc_result['chunks']))]
+            doc_ids = [f"{file_id}_chunk_{i}" for i in range(num_chunks)]
 
             # Prepare documents and metadata
             documents = [chunk['text'] for chunk in doc_result['chunks']]
@@ -219,7 +255,9 @@ class DocumentProcessor:
                 metadatas.append(meta)
 
             # Step 4: Store in vector database
-            print("  [4/4] Storing in vector database...")
+            emit_progress(4, 4, "Storing in ChromaDB",
+                          f"Writing {num_chunks} chunks to collection '{collection_name}'...",
+                          file_path)
             store_result = self.vector_store.add_documents(
                 documents=documents,
                 embeddings=doc_result['embeddings'],
@@ -232,8 +270,9 @@ class DocumentProcessor:
                 result['error'] = f"Storage failed: {store_result['error']}"
                 return result
 
+            total_time = time.time() - start_time
             result['success'] = True
-            print("  [OK] Complete")
+            result['processing_time'] = round(total_time, 1)
 
         except Exception as e:
             result['error'] = str(e)

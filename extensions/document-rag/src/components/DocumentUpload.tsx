@@ -17,13 +17,34 @@ interface DocumentUploadProps {
 interface UploadingFile {
   path: string
   name: string
+  size: number
   status: 'uploading' | 'processing' | 'complete' | 'error'
-  progress?: string
+  step?: number
+  totalSteps?: number
+  stepName?: string
+  stepDetail?: string
+  percent?: number
   chunksCreated?: number
+  processingTime?: number
   error?: string
+  startedAt?: number
 }
 
-const SUPPORTED_EXTENSIONS = ['.txt', '.md']
+const SUPPORTED_EXTENSIONS = ['.txt', '.md', '.doc', '.docx', '.rtf']
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatElapsed(startedAt: number): string {
+  const elapsed = Math.floor((Date.now() - startedAt) / 1000)
+  if (elapsed < 60) return `${elapsed}s`
+  const min = Math.floor(elapsed / 60)
+  const sec = elapsed % 60
+  return `${min}m ${sec}s`
+}
 
 export function DocumentUpload({
   onUploadComplete,
@@ -34,19 +55,54 @@ export function DocumentUpload({
   const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Listen to processing progress events
+  // Timer to update elapsed display
+  const [, setTick] = useState(0)
+  React.useEffect(() => {
+    const hasActive = uploadingFiles.some(
+      f => f.status === 'uploading' || f.status === 'processing'
+    )
+    if (!hasActive) return
+
+    const interval = setInterval(() => setTick(t => t + 1), 1000)
+    return () => clearInterval(interval)
+  }, [uploadingFiles])
+
+  // Listen to processing progress events (granular step updates from Python)
   React.useEffect(() => {
     const setupListener = async () => {
       const unlisten = await onProcessingProgress((progress: ProcessingProgress) => {
         setUploadingFiles(prev => prev.map(file => {
+          // Match by file path
           if (file.path === progress.file) {
-            return {
-              ...file,
-              status: progress.status === 'complete' ? 'complete' :
-                      progress.status === 'failed' ? 'error' : 'processing',
-              progress: progress.status,
-              chunksCreated: progress.chunks,
-              error: progress.error
+            // Granular step progress from Python pipeline
+            if (progress.progress && progress.step != null) {
+              return {
+                ...file,
+                status: 'processing',
+                step: progress.step,
+                totalSteps: progress.total_steps,
+                stepName: progress.step_name,
+                stepDetail: progress.detail,
+                percent: progress.percent,
+              }
+            }
+
+            // Final status events from Rust
+            if (progress.status === 'complete') {
+              return {
+                ...file,
+                status: 'complete',
+                chunksCreated: progress.chunks,
+                percent: 100,
+                stepName: 'Complete',
+              }
+            }
+            if (progress.status === 'failed') {
+              return {
+                ...file,
+                status: 'error',
+                error: progress.error,
+              }
             }
           }
           return file
@@ -79,11 +135,13 @@ export function DocumentUpload({
 
     if (validFiles.length === 0) return
 
-    // Add files to uploading list
+    // Add files to uploading list with size and timestamp
     const newFiles: UploadingFile[] = validFiles.map(file => ({
-      path: (file as any).path || file.name, // Electron provides .path
+      path: (file as any).path || file.name,
       name: file.name,
-      status: 'uploading'
+      size: file.size,
+      status: 'uploading',
+      startedAt: Date.now(),
     }))
 
     setUploadingFiles(prev => [...prev, ...newFiles])
@@ -99,7 +157,10 @@ export function DocumentUpload({
         })
 
         if (result.success) {
-          toast.success(`Processed ${file.name}: ${result.chunks_created} chunks`)
+          const timeStr = result.processing_time
+            ? ` in ${result.processing_time}s`
+            : ''
+          toast.success(`Processed ${file.name}: ${result.chunks_created} chunks${timeStr}`)
           onUploadComplete?.(result.file_path, result.chunks_created)
         } else {
           toast.error(`Failed to process ${file.name}: ${result.error}`)
@@ -112,6 +173,8 @@ export function DocumentUpload({
                 ...f,
                 status: result.success ? 'complete' : 'error',
                 chunksCreated: result.chunks_created,
+                processingTime: result.processing_time ?? undefined,
+                percent: 100,
                 error: result.error || undefined
               }
             : f
@@ -198,57 +261,101 @@ export function DocumentUpload({
             Select Files
           </button>
           <p className="text-xs text-muted-fg mt-4">
-            Supported: TXT, MD (Plain text and Markdown)
+            Supported: TXT, MD, DOC, DOCX, RTF (no PDFs)
           </p>
         </div>
       </div>
 
       {/* Uploading Files List */}
       {uploadingFiles.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <h4 className="text-sm font-medium">Processing Files</h4>
           {uploadingFiles.map((file) => (
             <div
               key={file.path}
-              className="flex items-center gap-3 p-3 rounded-md border border-border bg-background"
+              className="p-3 rounded-md border border-border bg-background space-y-2"
             >
-              {/* Status Icon */}
-              <div className="flex-shrink-0">
-                {file.status === 'uploading' && (
-                  <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+              {/* Header row: icon, name, size, elapsed, remove */}
+              <div className="flex items-center gap-3">
+                {/* Status Icon */}
+                <div className="flex-shrink-0">
+                  {(file.status === 'uploading' || file.status === 'processing') && (
+                    <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                  )}
+                  {file.status === 'complete' && (
+                    <div className="h-4 w-4 rounded-full bg-green-500 flex items-center justify-center">
+                      <span className="text-white text-xs">✓</span>
+                    </div>
+                  )}
+                  {file.status === 'error' && (
+                    <AlertCircle className="h-4 w-4 text-destructive" />
+                  )}
+                </div>
+
+                {/* File name and size */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{file.name}</p>
+                  <p className="text-xs text-muted-fg">
+                    {formatFileSize(file.size)}
+                    {file.startedAt && (file.status === 'uploading' || file.status === 'processing') && (
+                      <> — {formatElapsed(file.startedAt)} elapsed</>
+                    )}
+                    {file.status === 'complete' && file.processingTime && (
+                      <> — completed in {file.processingTime}s</>
+                    )}
+                  </p>
+                </div>
+
+                {/* Remove Button */}
+                {(file.status === 'complete' || file.status === 'error') && (
+                  <button
+                    onClick={() => removeFile(file.path)}
+                    className="p-1 hover:bg-accent rounded transition-colors"
+                  >
+                    <X className="h-4 w-4 text-muted-fg" />
+                  </button>
                 )}
-                {file.status === 'processing' && (
-                  <div className="animate-pulse h-4 w-4 rounded-full bg-primary" />
-                )}
-                {file.status === 'complete' && (
-                  <div className="h-4 w-4 rounded-full bg-green-500 flex items-center justify-center">
-                    <span className="text-white text-xs">✓</span>
+              </div>
+
+              {/* Progress bar */}
+              {(file.status === 'uploading' || file.status === 'processing') && (
+                <div className="space-y-1">
+                  <div className="w-full h-2 bg-border rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${file.percent || (file.status === 'uploading' ? 5 : 10)}%` }}
+                    />
                   </div>
-                )}
-                {file.status === 'error' && (
-                  <AlertCircle className="h-4 w-4 text-destructive" />
-                )}
-              </div>
+                  {/* Step indicator */}
+                  <div className="flex items-center justify-between text-xs text-muted-fg">
+                    <span>
+                      {file.stepName
+                        ? `Step ${file.step}/${file.totalSteps}: ${file.stepName}`
+                        : 'Starting pipeline...'
+                      }
+                    </span>
+                    <span>{file.percent || 0}%</span>
+                  </div>
+                  {file.stepDetail && (
+                    <p className="text-xs text-muted-fg/80 truncate">
+                      {file.stepDetail}
+                    </p>
+                  )}
+                </div>
+              )}
 
-              {/* File Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{file.name}</p>
-                <p className="text-xs text-muted-fg">
-                  {file.status === 'uploading' && 'Uploading...'}
-                  {file.status === 'processing' && `Processing... ${file.progress || ''}`}
-                  {file.status === 'complete' && `Complete • ${file.chunksCreated} chunks`}
-                  {file.status === 'error' && `Error: ${file.error}`}
+              {/* Complete summary */}
+              {file.status === 'complete' && (
+                <p className="text-xs text-green-600">
+                  {file.chunksCreated} chunks created and indexed
                 </p>
-              </div>
+              )}
 
-              {/* Remove Button */}
-              {(file.status === 'complete' || file.status === 'error') && (
-                <button
-                  onClick={() => removeFile(file.path)}
-                  className="p-1 hover:bg-accent rounded transition-colors"
-                >
-                  <X className="h-4 w-4 text-muted-fg" />
-                </button>
+              {/* Error message */}
+              {file.status === 'error' && (
+                <p className="text-xs text-destructive">
+                  {file.error}
+                </p>
               )}
             </div>
           ))}

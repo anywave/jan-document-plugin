@@ -24,6 +24,7 @@ export interface DocumentProcessResult {
   file_path: string
   chunks_created: number
   error: string | null
+  processing_time: number | null
 }
 
 /**
@@ -58,10 +59,17 @@ export interface CollectionStats {
  * Document processing progress event
  */
 export interface ProcessingProgress {
-  status: 'starting' | 'complete' | 'failed'
+  status?: 'starting' | 'complete' | 'failed'
   file: string
   chunks?: number
   error?: string
+  /** Granular progress from Python pipeline */
+  progress?: boolean
+  step?: number
+  total_steps?: number
+  step_name?: string
+  detail?: string
+  percent?: number
 }
 
 /**

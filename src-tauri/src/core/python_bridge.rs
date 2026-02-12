@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command;
 use zip::ZipArchive;
 
@@ -15,7 +15,7 @@ const PYTHON_MAX_DELAY_MS: u64 = 15000;
 const PYTHON_BACKOFF_MULTIPLIER: f64 = 2.0;
 
 // --- Allowed file extensions (defense-in-depth) ---
-const ALLOWED_EXTENSIONS: &[&str] = &[".txt", ".md"];
+const ALLOWED_EXTENSIONS: &[&str] = &[".txt", ".md", ".doc", ".docx", ".rtf"];
 
 /// Response from Python document processor
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -24,6 +24,7 @@ pub struct DocumentProcessResult {
     pub file_path: String,
     pub chunks_created: usize,
     pub error: Option<String>,
+    pub processing_time: Option<f64>,
 }
 
 /// Response from Python query
@@ -308,23 +309,46 @@ async fn execute_python_command(
         .stdout
         .take()
         .ok_or_else(|| "Failed to capture stdout".to_string())?;
-    let mut stderr = child
+    let stderr = child
         .stderr
         .take()
         .ok_or_else(|| "Failed to capture stderr".to_string())?;
 
-    // Read stdout and stderr concurrently, with overall timeout
+    // Stream stderr line-by-line for real-time progress, collect stdout for final result
+    let app_for_stderr = app_handle.clone();
     let result = tokio::time::timeout(timeout, async {
         let mut stdout_buf = String::new();
         let mut stderr_buf = String::new();
 
-        let (stdout_result, stderr_result) = tokio::join!(
-            stdout.read_to_string(&mut stdout_buf),
-            stderr.read_to_string(&mut stderr_buf),
-        );
+        // Read stderr line-by-line and emit progress events in real-time
+        let stderr_task = tokio::spawn(async move {
+            let reader = BufReader::new(stderr);
+            let mut lines = reader.lines();
+            let mut collected = String::new();
 
+            while let Ok(Some(line)) = lines.next_line().await {
+                // Try to parse as progress JSON from Python
+                if let Ok(progress) = serde_json::from_str::<serde_json::Value>(&line) {
+                    if progress.get("progress").and_then(|v| v.as_bool()) == Some(true) {
+                        let _ = app_for_stderr.emit("document-processing", &progress);
+                        continue;
+                    }
+                }
+                // Non-progress stderr lines collected for error reporting
+                if !collected.is_empty() {
+                    collected.push('\n');
+                }
+                collected.push_str(&line);
+            }
+            collected
+        });
+
+        let stdout_result = stdout.read_to_string(&mut stdout_buf).await;
         stdout_result.map_err(|e| format!("Failed to read stdout: {}", e))?;
-        stderr_result.map_err(|e| format!("Failed to read stderr: {}", e))?;
+
+        stderr_buf = stderr_task
+            .await
+            .map_err(|e| format!("stderr task failed: {}", e))?;
 
         let status = child.wait().await.map_err(|e| e.to_string())?;
 
