@@ -231,8 +231,8 @@ class ChatMessage(BaseModel):
 class CapabilitiesConfig(BaseModel):
     """Per-request capability toggles sent from the UI."""
     rag: bool = True                # Retrieve and inject document context
-    soul: bool = True               # Inject consciousness orientation / soul identity
-    consciousness: bool = True      # Run consciousness pipeline on inline attachments
+    soul: bool = False              # LLM2 threading (disabled by default - requires 21GB+ RAM, 12GB+ VRAM)
+    consciousness: bool = False     # Assistant pipeline (disabled by default - requires 21GB+ RAM, 12GB+ VRAM)
 
 
 class ChatCompletionRequest(BaseModel):

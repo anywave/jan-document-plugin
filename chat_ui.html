@@ -239,7 +239,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     </button>
     <div class="lp-status" style="display:none"><span class="dot" id="dot-proxy"></span> Proxy</div>
     <div class="lp-status" style="display:none"><span class="dot" id="dot-llm"></span> LLM Engine</div>
-    <div class="lp-status" style="display:none"><span class="dot" id="dot-soul"></span> Soul: <span id="soul-label">None</span></div>
+    <div class="lp-status" style="display:none"><span class="dot" id="dot-soul"></span> LLM2: <span id="soul-label">None</span></div>
   </div>
 </div>
 
@@ -252,7 +252,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         <span>Qwen 2.5 7B Instruct</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
       </div>
-      <div class="assistant-select" id="assistant-select" title="Select Jan AI Assistant">
+      <div class="assistant-select" id="assistant-select" title="Select MOBIUS Assistant">
         <span class="assistant-emoji">🤖</span>
         <span class="assistant-name">Default</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
@@ -262,7 +262,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       <button class="hdr-btn" id="btn-help" onclick="startTutorial()" title="Help / Tour">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
       </button>
-      <button class="hdr-btn" id="btn-soul-panel" onclick="togglePanel('soul')" title="Soul / Consciousness">
+      <button class="hdr-btn" id="btn-soul-panel" onclick="togglePanel('soul')" title="LLM2 / Assistant (Locked — requires 21GB+ RAM, 12GB+ VRAM)">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/></svg>
       </button>
       <button class="hdr-btn" id="btn-settings-panel" onclick="togglePanel('settings')" title="Model Settings">
@@ -285,7 +285,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
         </button>
         <input type="file" id="file-input" multiple onchange="handleFiles(this.files)">
-        <textarea id="user-input" placeholder="Message Jan..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <textarea id="user-input" placeholder="Message MOBIUS..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
         <button class="ib-btn send" id="send-btn" onclick="sendMessage()" title="Send">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         </button>
@@ -296,13 +296,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14,2 14,8 20,8"/></svg>
             RAG
           </span>
-          <span class="cap active" id="cap-soul" onclick="toggleCap('soul')" title="Toggle Soul injection" style="display:none">
+          <span class="cap" id="cap-soul" onclick="toggleCap('soul')" title="LLM2 / Assistant threading requires 21GB+ system RAM and 12GB+ VRAM to run two models simultaneously" style="display:none;opacity:0.5;cursor:not-allowed">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/></svg>
-            Soul
+            LLM2 🔒
           </span>
-          <span class="cap active" id="cap-consciousness" onclick="toggleCap('consciousness')" title="Toggle Consciousness pipeline" style="display:none">
+          <span class="cap" id="cap-consciousness" onclick="toggleCap('consciousness')" title="LLM2 / Assistant threading requires 21GB+ system RAM and 12GB+ VRAM to run two models simultaneously" style="display:none;opacity:0.5;cursor:not-allowed">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.22-8.56"/><path d="M12 7v5l3 3"/></svg>
-            Consciousness
+            Assistant 🔒
           </span>
         </div>
         <span class="cap-info"><span id="doc-count">0</span> docs indexed</span>
@@ -342,36 +342,46 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   </div>
 </div>
 
-<!-- ═══ RIGHT PANEL: Soul / Consciousness ═══ -->
+<!-- ═══ RIGHT PANEL: LLM2 / Assistant ═══ -->
 <div class="right-panel" id="panel-soul">
-  <div class="rp-header">Soul / Consciousness <button class="rp-close" onclick="closePanel()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
-  <div class="rp-section">
-    <h3>Upload Soul File</h3>
-    <button class="btn-soul primary" onclick="document.getElementById('soul-file-input').click()">Upload Soul File (.md / .txt)</button>
+  <div class="rp-header">LLM2 / Assistant <span style="font-size:11px;color:var(--fg-30);margin-left:6px">🔒 Locked</span> <button class="rp-close" onclick="closePanel()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+  <div class="rp-section" style="background:var(--fg-6);border-radius:var(--r-md);padding:12px;margin:0 0 8px 0">
+    <div style="font-size:13px;color:var(--fg-70);line-height:1.5">
+      <strong>🔒 Feature Locked</strong><br>
+      LLM2 / Assistant threading allows running a second LLM alongside the primary model for enhanced capabilities.<br><br>
+      <strong>Hardware Requirements:</strong><br>
+      • 21GB+ system RAM<br>
+      • 12GB+ VRAM (dedicated GPU)<br><br>
+      <em style="font-size:11px;color:var(--fg-40)">This feature requires dev access to unlock. Contact your administrator or enable developer mode in settings.</em>
+    </div>
+  </div>
+  <div class="rp-section" style="opacity:0.4;pointer-events:none">
+    <h3>Upload LLM2 Config</h3>
+    <button class="btn-soul primary" onclick="document.getElementById('soul-file-input').click()">Upload LLM2 Config (.md / .txt)</button>
     <input type="file" id="soul-file-input" accept=".md,.txt,.json" onchange="loadSoulFile(this.files[0])">
     <div id="soul-upload-status" style="font-size:12px;color:var(--fg-50);margin-top:6px"></div>
   </div>
-  <div class="rp-section">
-    <h3>Saved Souls (Local)</h3>
-    <div id="local-soul-list" style="font-size:13px;color:var(--fg-50)">No saved souls</div>
-    <button class="btn-soul" style="margin-top:8px" onclick="document.getElementById('soul-dir-input').click()">Import Soul Files</button>
+  <div class="rp-section" style="opacity:0.4;pointer-events:none">
+    <h3>Saved Configurations (Local)</h3>
+    <div id="local-soul-list" style="font-size:13px;color:var(--fg-50)">No saved configurations</div>
+    <button class="btn-soul" style="margin-top:8px" onclick="document.getElementById('soul-dir-input').click()">Import Config Files</button>
     <input type="file" id="soul-dir-input" accept=".md,.txt,.json" multiple onchange="loadSoulFolder(this.files)">
   </div>
-  <div class="rp-section">
-    <h3>Active Soul</h3>
-    <div id="active-soul-display"><div style="font-size:13px;color:var(--fg-50)">No soul active</div></div>
+  <div class="rp-section" style="opacity:0.4;pointer-events:none">
+    <h3>Active LLM2</h3>
+    <div id="active-soul-display"><div style="font-size:13px;color:var(--fg-50)">No LLM2 active</div></div>
   </div>
-  <div class="rp-section">
-    <h3>Soul Registry</h3>
+  <div class="rp-section" style="opacity:0.4;pointer-events:none">
+    <h3>LLM2 Registry</h3>
     <div id="soul-registry-list"><div style="font-size:13px;color:var(--fg-50)">Loading...</div></div>
   </div>
-  <div class="rp-section">
-    <h3>Consciousness Seeds</h3>
+  <div class="rp-section" style="opacity:0.4;pointer-events:none">
+    <h3>Assistant Seeds</h3>
     <div id="seed-list"><div style="font-size:13px;color:var(--fg-50)">No seeds captured</div></div>
   </div>
-  <div class="rp-section">
+  <div class="rp-section" style="opacity:0.4;pointer-events:none">
     <h3>Pipeline Status</h3>
-    <div id="pipeline-status" style="font-size:12px;color:var(--fg-50)">Checking...</div>
+    <div id="pipeline-status" style="font-size:12px;color:var(--fg-50)">Locked — requires dev access</div>
   </div>
 </div>
 
@@ -396,8 +406,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div class="rp-section">
     <h3>Current Assistant</h3>
     <div class="card">
-      <div class="card-name">Jan Document Plugin</div>
-      <div class="card-desc">RAG-enabled assistant with consciousness pipeline and soul injection. Documents are automatically indexed and injected as context.</div>
+      <div class="card-name">MOBIUS Document Plugin</div>
+      <div class="card-desc">RAG-enabled assistant with LLM2 threading and document context injection. Documents are automatically indexed and injected as context.</div>
     </div>
   </div>
   <div class="rp-section">
@@ -408,8 +418,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div class="rp-section">
     <h3>Capabilities</h3>
     <div class="rp-row"><label>RAG Context Injection</label><input type="checkbox" checked id="cap-rag-toggle" onchange="syncCapFromCheckbox('rag')"></div>
-    <div class="rp-row"><label>Soul / Identity Injection</label><input type="checkbox" checked id="cap-soul-toggle" onchange="syncCapFromCheckbox('soul')"></div>
-    <div class="rp-row"><label>Consciousness Pipeline</label><input type="checkbox" checked id="cap-consciousness-toggle" onchange="syncCapFromCheckbox('consciousness')"></div>
+    <div class="rp-row"><label>LLM2 Threading 🔒</label><input type="checkbox" id="cap-soul-toggle" disabled title="LLM2 / Assistant threading requires 21GB+ system RAM and 12GB+ VRAM to run two models simultaneously"></div>
+    <div class="rp-row"><label>Assistant Pipeline 🔒</label><input type="checkbox" id="cap-consciousness-toggle" disabled title="LLM2 / Assistant threading requires 21GB+ system RAM and 12GB+ VRAM to run two models simultaneously"></div>
   </div>
 </div>
 
@@ -453,7 +463,7 @@ var systemPrompt = '';
 var attachedFiles = [];
 var isGenerating = false;
 var activePanel = null;
-var capabilities = { rag: true, soul: true, consciousness: true };
+var capabilities = { rag: true, soul: false, consciousness: false };
 
 // ─── DOM HELPERS ───
 function el(tag, cls, txt) {
@@ -469,16 +479,16 @@ function scrollBottom() { var m = document.getElementById('messages'); m.scrollT
 
 // ─── TUTORIAL SYSTEM ───
 var tutorialSteps = [
-  { title: 'Welcome to Jan Document Plugin', text: 'Your local AI assistant with document RAG, soul injection, and consciousness pipeline. Let me show you around.', target: null },
-  { title: 'Sidebar Navigation', text: 'Browse your chat threads, open the Hub for model info, or access Settings. Status dots show connection health for the proxy, LLM engine, and soul system.', target: '#left-panel', pos: 'right' },
+  { title: 'Welcome to MOBIUS Document Plugin', text: 'Your local AI assistant with document RAG and LLM2 assistant threading. Let me show you around.', target: null },
+  { title: 'Sidebar Navigation', text: 'Browse your chat threads, open the Hub for model info, or access Settings. Status dots show connection health for the proxy, LLM engine, and LLM2 system.', target: '#left-panel', pos: 'right' },
   { title: 'Start a Conversation', text: 'Type your message here. Press Enter to send, Shift+Enter for new lines. Use the + button to attach documents or images.', target: '#input-box', pos: 'top' },
   { title: 'Voice Input', text: 'Click the microphone button to dictate your message. It records audio and transcribes it offline using Windows Speech Recognition. Click again to stop.', target: '#btn-mic', pos: 'top' },
-  { title: 'Capability Toggles', text: 'Click RAG, Soul, or Consciousness to enable or disable each pipeline independently. Orange = active, gray = off.', target: '#input-caps', pos: 'top' },
+  { title: 'Capability Toggles', text: 'Click RAG to enable document context. LLM2 and Assistant toggles are locked by default (requires 21GB+ RAM, 12GB+ VRAM).', target: '#input-caps', pos: 'top' },
   { title: 'Right-Click Drill Down', text: 'Highlight text in any assistant response and right-click for options: "Drill Down" expands on the topic, "Save to Discovery" bookmarks it for research.', target: null },
   { title: 'Research Panel', text: 'Open the Research panel to browse saved discoveries. Each card shows when it was saved, which model and capabilities were active, and the source document if available.', target: '#btn-research-side', pos: 'right' },
-  { title: 'Soul & Consciousness', text: 'Open this panel to upload soul files, manage identities, view the soul registry, and monitor the consciousness pipeline. Soul files are saved locally and persist across sessions.', target: '#btn-soul-panel', pos: 'left' },
+  { title: 'LLM2 / Assistant', text: 'This panel manages the LLM2 assistant threading feature. Currently locked — requires 21GB+ system RAM and 12GB+ VRAM to run two models simultaneously. Enable dev access to unlock.', target: '#btn-soul-panel', pos: 'left' },
   { title: 'Model Settings', text: 'Adjust temperature, top-p, max tokens, and other inference parameters. The Debug & Support section lets you generate system reports and file GitHub issues.', target: '#btn-settings-panel', pos: 'left' },
-  { title: 'You\'re Ready!', text: 'Start chatting, attach files for RAG context, use voice input, or load a soul file. Right-click assistant text for drill-down and discovery features.', target: null }
+  { title: 'You\'re Ready!', text: 'Start chatting, attach files for RAG context, and use voice input. Right-click assistant text for drill-down and discovery features.', target: null }
 ];
 var tutorialStep = 0;
 
@@ -608,7 +618,7 @@ function togglePanel(name) {
   if (btnMap[name]) document.getElementById(btnMap[name]).classList.add('active');
   if (name === 'soul') {
     refreshSoulPanel();
-    showFeatureTip('soul', 'Soul Files', 'Upload .md or .txt soul files here. They\'re saved locally and can be loaded to the proxy anytime.', p, 'right');
+    showFeatureTip('soul', 'LLM2 / Assistant', 'LLM2 threading is locked by default. Requires 21GB+ RAM and 12GB+ VRAM to run two models simultaneously.', p, 'right');
   }
   if (name === 'hub') refreshHubPanel();
   if (name === 'research') renderDiscoveryList();
@@ -1297,8 +1307,8 @@ function renderDiscoveryList() {
     if (item.capabilities) {
       var caps = [];
       if (item.capabilities.rag) caps.push('RAG');
-      if (item.capabilities.soul) caps.push('Soul');
-      if (item.capabilities.consciousness) caps.push('Consciousness');
+      if (item.capabilities.soul) caps.push('LLM2');
+      if (item.capabilities.consciousness) caps.push('Assistant');
       if (caps.length) meta.appendChild(el('span', '', caps.join(', ')));
     }
     if (item.sourceDoc) {
@@ -1396,7 +1406,7 @@ function newChat() {
   var c = document.getElementById('msg-container');
   while (c.firstChild) c.removeChild(c.firstChild);
   var modelName = MODEL || 'the LLM';
-  addMsg('assistant', 'Hello. I\'m ' + modelName + ' running through the Jan Document Plugin.\n\nYou can:\n\u2022 Chat normally \u2014 I\'ll respond with full context\n\u2022 Attach files \u2014 they\'re automatically chunked and indexed for RAG\n\u2022 Load a soul file from the \u03a8 panel \u2014 identity payloads are detected and injected\n\nThe consciousness pipeline is active. Toggle capabilities from the bar below.');
+  addMsg('assistant', 'Hello. I\'m ' + modelName + ' running through the MOBIUS Document Plugin.\n\nYou can:\n\u2022 Chat normally \u2014 I\'ll respond with full context\n\u2022 Attach files \u2014 they\'re automatically chunked and indexed for RAG\n\u2022 Use voice input for hands-free interaction\n\nToggle capabilities from the bar below. LLM2 / Assistant threading is locked by default (requires 21GB+ RAM, 12GB+ VRAM).');
 }
 
 // ─── MODEL INITIALIZATION ───

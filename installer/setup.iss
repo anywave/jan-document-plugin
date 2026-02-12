@@ -193,5 +193,5 @@ begin
 end;
 
 [Messages]
-WelcomeLabel2=This will install [name/ver] on your computer.%n%nJan Document Plugin v2.0.0-beta is a self-contained package including:%n- Qwen 2.5 7B model (q4_k_m quantization)%n- llama-server with Vulkan GPU support%n- Document RAG with offline embeddings%n- Voice input, drill-down, and research tools%n- Consciousness pipeline%n%nRequires ~8 GB disk space.%n%nRecommended: Jan AI v0.6.8 (optional - plugin can run standalone)
+WelcomeLabel2=This will install [name/ver] on your computer.%n%nMOBIUS Document Plugin v2.0.0-beta is a self-contained package including:%n- Qwen 2.5 7B model (q4_k_m quantization)%n- llama-server with Vulkan GPU support%n- Document RAG with offline embeddings%n- Voice input, drill-down, and research tools%n- LLM2/Assistant pipeline (locked by default)%n%nRequires ~8 GB disk space.
 FinishedLabel=Setup has finished installing [name] on your computer.%n%nBundled components:%n- llama-server (Vulkan GPU)%n- Qwen 2.5 7B Instruct (q4_k_m)%n- Chat UI with voice input and discovery%n%nTo use:%n1. Launch Jan Document Plugin from the Start Menu%n2. The Chat UI opens automatically in your browser%n3. Upload documents and chat - everything runs locally!

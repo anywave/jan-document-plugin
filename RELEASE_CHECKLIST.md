@@ -70,7 +70,7 @@ Create `RELEASE_NOTES.md`:
 ### 🎨 New Features
 - Bundled LLM stack (llama-server + Qwen 2.5 7B)
 - Built-in Chat UI with voice input
-- Consciousness pipeline for AI identity detection
+- LLM2/Assistant pipeline for secondary model threading (locked by default)
 - Research/Discovery tab for saving findings
 - Debug report generation
 
@@ -113,10 +113,10 @@ After installation:
 - Document RAG with ChromaDB
 - OCR support for PDFs and images
 
-✅ **Consciousness Pipeline** (Unique!)
-- AI identity detection in documents
-- RPP coordinate extraction
-- Soul registry for multi-AI management
+✅ **LLM2 / Assistant Pipeline** (Locked by default)
+- Secondary LLM threading support
+- Requires 21GB+ RAM, 12GB+ VRAM
+- LLM2 registry for multi-model management
 
 ✅ **Chat UI**
 - Voice input (Windows offline speech)

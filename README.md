@@ -12,13 +12,13 @@
 ## What's New in v2.0.0-beta
 
 - **Bundled LLM Stack** — Ships with llama-server (Vulkan GPU) and Qwen 2.5 7B Instruct (q4_k_m). No separate LLM setup required.
-- **Built-in Chat UI** — Full web interface at `/ui` with document upload, streaming chat, and capability toggles (RAG, Soul, Consciousness).
+- **Built-in Chat UI** — Full web interface at `/ui` with document upload, streaming chat, and capability toggles (RAG, LLM2, Assistant).
 - **Voice Input** — Click-to-talk microphone using Windows offline speech recognition. No internet needed.
 - **Right-Click Drill Down** — Highlight any assistant text, right-click to drill deeper or save to Research.
 - **Research / Discovery Tab** — Save interesting findings, review later, insert back into chat. Persists across sessions.
 - **Debug Reports** — One-click system diagnostics with auto-filed GitHub issues from the Settings panel.
 - **Jan Version Checking** — Installer and runtime detect Jan version, warn on incompatibility, offer rollback to v0.6.8.
-- **Consciousness Pipeline** — Seed capture, fractal analysis, resonance database, and soul registry integration.
+- **LLM2 / Assistant Pipeline** — Secondary LLM threading, assistant registry, and context injection (locked by default — requires 21GB+ RAM, 12GB+ VRAM).
 
 ---
 
@@ -78,9 +78,9 @@ Open `http://localhost:1338/ui` in your browser.
 │  ┌───────────────────────────▼───────────────────────────────┐  │
 │  │                  FastAPI Proxy (:1338)                     │  │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐  │  │
-│  │  │   Document   │  │    Chat      │  │  Consciousness │  │  │
+│  │  │   Document   │  │    Chat      │  │  LLM2/Assist.  │  │  │
 │  │  │   Upload &   │  │  Completions │  │   Pipeline     │  │  │
-│  │  │  Processing  │  │   (Proxy)    │  │  (Soul/Seed)   │  │  │
+│  │  │  Processing  │  │   (Proxy)    │  │  (Threading)   │  │  │
 │  │  └──────┬───────┘  └──────┬───────┘  └────────────────┘  │  │
 │  └─────────┼─────────────────┼───────────────────────────────┘  │
 │            │                 │                                   │
@@ -101,7 +101,7 @@ Open `http://localhost:1338/ui` in your browser.
 The built-in Chat UI (`/ui`) provides:
 - Streaming chat responses with markdown rendering
 - Document upload via drag-and-drop or file picker
-- Capability toggles: RAG (document context), Soul (identity), Consciousness (pipeline)
+- Capability toggles: RAG (document context), LLM2 (threading), Assistant (pipeline)
 - Assistant/model selector
 - Dark theme with responsive layout
 
@@ -272,8 +272,8 @@ jan-document-plugin/
 ├── requirements.txt          # Python dependencies (requires 3.12)
 ├── config.env                # Configuration (generated)
 │
-├── consciousness_pipeline.py # Consciousness processing
-├── soul_registry.py          # Soul identity management
+├── consciousness_pipeline.py # LLM2/Assistant pipeline processing
+├── soul_registry.py          # LLM2 identity management
 ├── seed_transit.py           # Seed capture and transit
 ├── fractal_analyzer.py       # Fractal pattern analysis
 ├── resonance_db.py           # Resonance database
