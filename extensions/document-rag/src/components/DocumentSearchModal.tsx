@@ -34,8 +34,8 @@ export const DocumentSearchModal: React.FC<DocumentSearchModalProps> = ({
   const handleResultsFound = (results: QueryResult) => {
     // Convert query results to context items
     const contextItems: DocumentContextItem[] = results.results.map((r) => ({
-      source: r.metadata?.source || 'Unknown',
-      content: r.document,
+      source: r.metadata?.file_name || r.metadata?.source || 'Unknown',
+      content: r.text,
       distance: r.distance,
       metadata: r.metadata,
     }))

@@ -22,6 +22,9 @@ import {
   IconCodeCircle2,
   IconPlayerStopFilled,
   IconX,
+  IconFileSearch,
+  IconSparkles,
+  IconFolder,
 } from '@tabler/icons-react'
 import { useTranslation } from '@/i18n/react-i18next-compat'
 import { useGeneralSetting } from '@/hooks/useGeneralSetting'
@@ -35,8 +38,19 @@ import { ModelLoader } from '@/containers/loaders/ModelLoader'
 import DropdownToolsAvailable from '@/containers/DropdownToolsAvailable'
 import { getConnectedServers } from '@/services/mcp'
 import { ContextIndicator } from '@/extensions/document-rag/src/components/ContextIndicator'
-import { processDocument } from '@/extensions/document-rag/src/python-bridge'
+import { DocumentSearchModal } from '@/extensions/document-rag/src/components/DocumentSearchModal'
+import {
+  processDocument,
+  queryDocuments,
+  processDocumentBatch,
+  scanDirectory,
+  onBatchFileResult,
+  onProcessingProgress,
+  type BatchFileResult,
+} from '@/extensions/document-rag/src/python-bridge'
+import { useDocumentContext } from '@/extensions/document-rag/src/hooks/useDocumentContext'
 import { open } from '@tauri-apps/plugin-dialog'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { toast } from 'sonner'
 import { VoiceRecorder } from '@/components/VoiceRecorder'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
@@ -76,6 +90,26 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
     }>
   >([])
   const [connectedServers, setConnectedServers] = useState<string[]>([])
+  const [showDocSearch, setShowDocSearch] = useState(false)
+  const [smartProcessing, setSmartProcessing] = useState(false)
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false)
+  const [batchFiles, setBatchFiles] = useState<
+    Array<{
+      path: string
+      name: string
+      status: 'pending' | 'processing' | 'complete' | 'error'
+      chunks?: number
+      error?: string
+    }>
+  >([])
+
+  // Allowed extensions for document processing
+  const ALLOWED_DOC_EXTENSIONS = ['txt', 'md', 'doc', 'docx', 'rtf']
+
+  // Refs to read current state inside event listeners without re-registering
+  const isBatchProcessingRef = useRef(isBatchProcessing)
+  isBatchProcessingRef.current = isBatchProcessing
+  const handleBatchProcessRef = useRef<(paths: string[]) => void>(() => {})
 
   // Speech recognition
   const {
@@ -129,6 +163,88 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
     const intervalId = setInterval(checkConnectedServers, 3000)
 
     return () => clearInterval(intervalId)
+  }, [])
+
+  // Drag-and-drop document files onto chat (registered once, reads refs)
+  useEffect(() => {
+    let cancelled = false
+    let unlisten: (() => void) | undefined
+    getCurrentWebviewWindow()
+      .onDragDropEvent((event) => {
+        if (event.payload.type === 'drop' && !isBatchProcessingRef.current) {
+          const exts = ALLOWED_DOC_EXTENSIONS
+          const paths = event.payload.paths.filter((p: string) => {
+            const ext = p.split('.').pop()?.toLowerCase() || ''
+            return exts.includes(ext)
+          })
+          if (paths.length > 0) {
+            handleBatchProcessRef.current(paths)
+          } else if (event.payload.paths.length > 0) {
+            toast.error(`No supported document files. Allowed: ${exts.join(', ')}`)
+          }
+        }
+      })
+      .then((fn) => {
+        if (cancelled) { fn() } else { unlisten = fn }
+      })
+      .catch((err) => console.error('Failed to register drag-drop listener:', err))
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [])
+
+  // Listen for per-file batch results to update pill strip in real-time
+  useEffect(() => {
+    let cancelled = false
+    let unlisten: (() => void) | undefined
+    onBatchFileResult((result: BatchFileResult) => {
+      setBatchFiles((prev) =>
+        prev.map((f) =>
+          f.path === result.file_path
+            ? {
+                ...f,
+                status: result.success ? 'complete' : 'error',
+                chunks: result.chunks_created,
+                error: result.error ?? undefined,
+              }
+            : f
+        )
+      )
+    })
+      .then((fn) => {
+        if (cancelled) { fn() } else { unlisten = fn }
+      })
+      .catch((err) => console.error('Failed to register batch result listener:', err))
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [])
+
+  // Listen for progress events to mark files as "processing"
+  useEffect(() => {
+    let cancelled = false
+    let unlisten: (() => void) | undefined
+    onProcessingProgress((progress) => {
+      if (progress.batch_index !== undefined && progress.file) {
+        setBatchFiles((prev) =>
+          prev.map((f) =>
+            f.path === progress.file && f.status === 'pending'
+              ? { ...f, status: 'processing' }
+              : f
+          )
+        )
+      }
+    })
+      .then((fn) => {
+        if (cancelled) { fn() } else { unlisten = fn }
+      })
+      .catch((err) => console.error('Failed to register progress listener:', err))
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
   }, [])
 
   // Check if there are active MCP servers
@@ -321,23 +437,41 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
     }
   }
 
-  const handleDocUpload = async () => {
-    try {
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: 'Documents', extensions: ['txt', 'md', 'doc', 'docx'] }],
-      })
-      if (!selected) return
-      const filePath = typeof selected === 'string' ? selected : selected
-      const fileName = filePath.split(/[\\/]/).pop() || filePath
+  // Batch process multiple files — model loaded once, per-file progress
+  const handleBatchProcess = async (filePaths: string[]) => {
+    if (isBatchProcessing) {
+      toast.error('Batch processing already in progress')
+      return
+    }
+    if (filePaths.length === 0) return
 
-      // Fire-and-forget — don't block the chat
+    // Single file → use existing detailed path
+    if (filePaths.length === 1) {
+      const filePath = filePaths[0]
+      const fileName = filePath.split(/[\\/]/).pop() || filePath
       toast.loading(`Processing "${fileName}"...`, { id: `doc-${fileName}`, duration: Infinity })
 
-      processDocument(filePath, { collectionName: 'documents' })
+      processDocument(filePath, { collectionName: 'documents', smart: smartProcessing })
         .then((result) => {
           if (result.success) {
-            toast.success(`"${fileName}" indexed — ${result.chunks_created} chunks`, { id: `doc-${fileName}` })
+            const summary = result.document_summary
+            const time = result.processing_time ? ` in ${result.processing_time}s` : ''
+            toast.success(
+              `"${fileName}" indexed — ${result.chunks_created} chunks, ` +
+              `${summary?.word_count?.toLocaleString() || '?'} words${time}`,
+              { id: `doc-${fileName}` }
+            )
+            const sections = summary?.sections_detected?.length
+              ? `\nDetected sections: ${summary.sections_detected.join(', ')}`
+              : ''
+            const stats = summary
+              ? `${summary.word_count.toLocaleString()} words, ${summary.chunks_created} chunks, ${summary.file_size_mb} MB`
+              : `${result.chunks_created} chunks`
+            sendMessage(
+              `I just uploaded "${fileName}" (${stats}).${sections}\n\n` +
+              `Please provide a structured summary of this document including: ` +
+              `key topics, main arguments or findings, and important details.`
+            )
           } else {
             toast.error(`Failed: ${result.error || 'Unknown error'}`, { id: `doc-${fileName}` })
           }
@@ -345,9 +479,93 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
         .catch((err) => {
           toast.error(`Upload error: ${String(err)}`, { id: `doc-${fileName}` })
         })
+      return
+    }
+
+    // Multi-file → batch path
+    setIsBatchProcessing(true)
+    const initialBatch = filePaths.map((p) => ({
+      path: p,
+      name: p.split(/[\\/]/).pop() || p,
+      status: 'pending' as const,
+    }))
+    setBatchFiles(initialBatch)
+    toast.loading(`Batch processing ${filePaths.length} files...`, { id: 'batch', duration: Infinity })
+
+    try {
+      const result = await processDocumentBatch(filePaths, {
+        collectionName: 'documents',
+        smart: smartProcessing,
+      })
+
+      toast.success(
+        `Batch complete: ${result.success_count}/${result.total_files} succeeded in ${result.total_time}s`,
+        { id: 'batch' }
+      )
+
+      // Brief multi-file acknowledgment
+      const fileNames = filePaths.map((p) => p.split(/[\\/]/).pop()).join(', ')
+      sendMessage(
+        `I just indexed ${result.success_count} document${result.success_count !== 1 ? 's' : ''}: ${fileNames}. ` +
+        `Total: ${result.results.reduce((sum, r) => sum + r.chunks_created, 0)} chunks in ${result.total_time}s.` +
+        (result.error_count > 0
+          ? ` ${result.error_count} file${result.error_count !== 1 ? 's' : ''} failed.`
+          : '') +
+        `\n\nPlease briefly acknowledge the indexed documents.`
+      )
+    } catch (err) {
+      toast.error(`Batch error: ${String(err)}`, { id: 'batch' })
+    } finally {
+      setIsBatchProcessing(false)
+      // Clear batch files after a short delay to let user see final state
+      setTimeout(() => setBatchFiles([]), 3000)
+    }
+  }
+  handleBatchProcessRef.current = handleBatchProcess
+
+  const handleDocUpload = async () => {
+    if (isBatchProcessing) return
+    try {
+      const selected = await open({
+        multiple: true,
+        filters: [{ name: 'Documents', extensions: ALLOWED_DOC_EXTENSIONS }],
+      })
+      if (!selected) return
+
+      // open() with multiple:true returns string | string[]
+      const paths = Array.isArray(selected) ? selected : [selected]
+      handleBatchProcess(paths)
     } catch (err) {
       if (String(err).includes('cancelled')) return
       toast.error(`File selection error: ${String(err)}`)
+    }
+  }
+
+  const handleFolderUpload = async () => {
+    if (isBatchProcessing) return
+    try {
+      const selected = await open({ directory: true })
+      if (!selected) return
+      const dirPath = typeof selected === 'string' ? selected : selected
+
+      toast.loading('Scanning folder...', { id: 'folder-scan' })
+      const scanResult = await scanDirectory(dirPath)
+
+      if (scanResult.files.length === 0) {
+        toast.error(`No supported files found (skipped ${scanResult.skipped})`, { id: 'folder-scan' })
+        return
+      }
+
+      const sizeMB = (scanResult.total_size / (1024 * 1024)).toFixed(1)
+      toast.success(
+        `Found ${scanResult.files.length} files (${sizeMB} MB), ${scanResult.skipped} skipped`,
+        { id: 'folder-scan' }
+      )
+
+      handleBatchProcess(scanResult.files.map((f) => f.path))
+    } catch (err) {
+      if (String(err).includes('cancelled')) return
+      toast.error(`Folder scan error: ${String(err)}`, { id: 'folder-scan' })
     }
   }
 
@@ -432,9 +650,40 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                 })}
               </div>
             )}
+            {/* Batch Progress Pill Strip */}
+            {batchFiles.length > 0 && (
+              <div className="px-4 pt-2 flex flex-wrap gap-1.5">
+                {batchFiles.map((f, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border',
+                      f.status === 'pending' && 'bg-main-view-fg/5 border-main-view-fg/10 text-main-view-fg/50',
+                      f.status === 'processing' && 'bg-blue-500/10 border-blue-500/30 text-blue-500',
+                      f.status === 'complete' && 'bg-green-500/10 border-green-500/30 text-green-600',
+                      f.status === 'error' && 'bg-red-500/10 border-red-500/30 text-red-500'
+                    )}
+                    title={f.error || (f.chunks !== undefined ? `${f.chunks} chunks` : f.status)}
+                  >
+                    {f.status === 'processing' && (
+                      <span className="animate-spin h-3 w-3 border border-current border-t-transparent rounded-full" />
+                    )}
+                    <span className="truncate max-w-[120px]">{f.name}</span>
+                    {f.status === 'complete' && f.chunks !== undefined && (
+                      <span className="text-[10px] opacity-70">{f.chunks}</span>
+                    )}
+                  </div>
+                ))}
+                {isBatchProcessing && (
+                  <div className="text-xs text-main-view-fg/40 self-center ml-1">
+                    {batchFiles.filter((f) => f.status === 'complete').length}/{batchFiles.length}
+                  </div>
+                )}
+              </div>
+            )}
             <TextareaAutosize
               ref={textareaRef}
-              disabled={Boolean(streamingContent)}
+              disabled={Boolean(streamingContent) || isBatchProcessing}
               minRows={2}
               rows={1}
               maxRows={10}
@@ -627,13 +876,16 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                     </Tooltip>
                   </TooltipProvider>
                 )}
-                {/* Document Upload - Always available */}
+                {/* Document Upload - Always available, supports multi-select */}
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
                         onClick={handleDocUpload}
-                        className="h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1 cursor-pointer"
+                        className={cn(
+                          "h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1 cursor-pointer",
+                          isBatchProcessing && "opacity-50 pointer-events-none"
+                        )}
                       >
                         <IconPaperclip
                           size={18}
@@ -642,7 +894,74 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Upload Document</p>
+                      <p>Upload Documents</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                {/* Upload Folder */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        onClick={handleFolderUpload}
+                        className={cn(
+                          "h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1 cursor-pointer",
+                          isBatchProcessing && "opacity-50 pointer-events-none"
+                        )}
+                      >
+                        <IconFolder
+                          size={18}
+                          className="text-main-view-fg/50"
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Upload Folder</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                {/* Smart Processing Toggle */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        onClick={() => setSmartProcessing(!smartProcessing)}
+                        className={cn(
+                          "h-6 p-1 flex items-center justify-center rounded-sm transition-all duration-200 ease-in-out gap-1 cursor-pointer",
+                          smartProcessing
+                            ? "bg-primary/20 text-primary"
+                            : "hover:bg-main-view-fg/10 text-main-view-fg/50"
+                        )}
+                      >
+                        <IconSparkles size={18} />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold">{smartProcessing ? 'Smart Processing: ON' : 'Smart Processing: OFF'}</p>
+                      <p className="text-xs mt-1">
+                        {smartProcessing
+                          ? 'Structure-aware chunking — preserves sections, headings, and paragraphs. Better for legal docs, reports, and research papers. Fewer but larger, more meaningful chunks.'
+                          : 'Standard chunking — fast, fixed-size 500 char splits. Good for quick lookups and short documents.'}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                {/* Search Indexed Documents */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        onClick={() => setShowDocSearch(true)}
+                        className="h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1 cursor-pointer"
+                      >
+                        <IconFileSearch
+                          size={18}
+                          className="text-main-view-fg/50"
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Search Documents</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -702,6 +1021,14 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
         </div>
       )}
 
+      {/* Document Search Modal */}
+      {currentThreadId && (
+        <DocumentSearchModal
+          isOpen={showDocSearch}
+          onClose={() => setShowDocSearch(false)}
+          threadId={currentThreadId}
+        />
+      )}
     </div>
   )
 }

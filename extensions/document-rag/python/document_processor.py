@@ -13,7 +13,8 @@ from datetime import datetime
 import time
 
 
-def emit_progress(step: int, total_steps: int, step_name: str, detail: str = "", file_path: str = ""):
+def emit_progress(step: int, total_steps: int, step_name: str, detail: str = "",
+                   file_path: str = "", batch_index: int = -1, batch_total: int = -1):
     """Write a progress JSON line to stderr for the Rust bridge to pick up."""
     progress = {
         "progress": True,
@@ -24,7 +25,28 @@ def emit_progress(step: int, total_steps: int, step_name: str, detail: str = "",
         "file": file_path,
         "percent": int((step / total_steps) * 100) if total_steps > 0 else 0,
     }
+    if batch_index >= 0:
+        progress["batch_index"] = batch_index
+        progress["batch_total"] = batch_total
     print(json.dumps(progress), file=sys.stderr, flush=True)
+
+
+def emit_file_result(file_path: str, success: bool, chunks_created: int,
+                     error: Optional[str], processing_time: float,
+                     batch_index: int, batch_total: int):
+    """Emit a per-file result on stderr so Rust can forward immediately."""
+    result = {
+        "file_result": True,
+        "file_path": file_path,
+        "file_name": os.path.basename(file_path),
+        "success": success,
+        "chunks_created": chunks_created,
+        "error": error,
+        "processing_time": round(processing_time, 1),
+        "batch_index": batch_index,
+        "batch_total": batch_total,
+    }
+    print(json.dumps(result), file=sys.stderr, flush=True)
 
 # Import all processors
 from pdf_processor import PDFProcessor
@@ -162,7 +184,8 @@ class DocumentProcessor:
         chunk_size: int = 500,
         overlap: int = 50,
         use_ocr: bool = True,
-        password: Optional[str] = None
+        password: Optional[str] = None,
+        smart: bool = False
     ) -> Dict[str, any]:
         """
         Complete processing pipeline: extract, chunk, embed, store.
@@ -224,7 +247,8 @@ class DocumentProcessor:
                 extract_result['text'],
                 chunk_size=chunk_size,
                 overlap=overlap,
-                metadata=extract_result['metadata']
+                metadata=extract_result['metadata'],
+                smart=smart
             )
 
             if doc_result['error']:
@@ -274,10 +298,133 @@ class DocumentProcessor:
             result['success'] = True
             result['processing_time'] = round(total_time, 1)
 
+            # Build document summary for the frontend
+            full_text = extract_result['text']
+            words = full_text.split()
+            word_count = len(words)
+
+            # Detect sections by looking for heading-like lines
+            lines = full_text.split('\n')
+            sections = []
+            for line in lines:
+                stripped = line.strip()
+                # Heuristic: short lines in ALL CAPS or ending with colon are likely headings
+                if stripped and len(stripped) < 120:
+                    if stripped.isupper() and len(stripped) > 3:
+                        sections.append(stripped)
+                    elif stripped.endswith(':') and len(stripped) < 80:
+                        sections.append(stripped.rstrip(':'))
+            # Deduplicate and limit
+            seen = set()
+            unique_sections = []
+            for s in sections:
+                key = s.lower()
+                if key not in seen:
+                    seen.add(key)
+                    unique_sections.append(s)
+            sections = unique_sections[:20]
+
+            # Text preview (first ~500 chars)
+            preview = full_text[:500].strip()
+            if len(full_text) > 500:
+                preview += '...'
+
+            result['document_summary'] = {
+                'file_name': file_name,
+                'file_size_bytes': file_size,
+                'file_size_mb': round(file_size_mb, 2),
+                'word_count': word_count,
+                'char_count': text_len,
+                'chunks_created': num_chunks,
+                'sections_detected': sections,
+                'preview': preview,
+                'processing_time': round(total_time, 1),
+            }
+
         except Exception as e:
             result['error'] = str(e)
 
         return result
+
+    def process_batch(
+        self,
+        file_paths: List[str],
+        collection_name: str = "documents",
+        chunk_size: int = 500,
+        overlap: int = 50,
+        use_ocr: bool = True,
+        smart: bool = False,
+    ) -> Dict[str, any]:
+        """
+        Process multiple files in a single batch. Model is loaded ONCE.
+
+        Emits per-file progress on stderr with batch_index/batch_total.
+        Emits file_result JSON on stderr after each file completes.
+        Returns aggregate result on stdout.
+        """
+        batch_total = len(file_paths)
+        results = []
+        success_count = 0
+        error_count = 0
+        batch_start = time.time()
+
+        for idx, file_path in enumerate(file_paths):
+            file_start = time.time()
+            file_name = os.path.basename(file_path)
+
+            emit_progress(1, 4, "Extracting text",
+                          f"[{idx+1}/{batch_total}] {file_name}",
+                          file_path, batch_index=idx, batch_total=batch_total)
+
+            try:
+                result = self.process_and_index_document(
+                    file_path=file_path,
+                    collection_name=collection_name,
+                    chunk_size=chunk_size,
+                    overlap=overlap,
+                    use_ocr=use_ocr,
+                    smart=smart,
+                )
+            except Exception as e:
+                result = {
+                    'success': False,
+                    'file_path': file_path,
+                    'chunks_created': 0,
+                    'error': str(e),
+                    'processing_time': round(time.time() - file_start, 1),
+                }
+
+            file_time = time.time() - file_start
+            if 'processing_time' not in result or result.get('processing_time') is None:
+                result['processing_time'] = round(file_time, 1)
+
+            if result.get('success'):
+                success_count += 1
+            else:
+                error_count += 1
+
+            results.append(result)
+
+            # Emit per-file result on stderr for real-time Rust forwarding
+            emit_file_result(
+                file_path=file_path,
+                success=result.get('success', False),
+                chunks_created=result.get('chunks_created', 0),
+                error=result.get('error'),
+                processing_time=result.get('processing_time', file_time),
+                batch_index=idx,
+                batch_total=batch_total,
+            )
+
+        total_time = round(time.time() - batch_start, 1)
+
+        return {
+            'results': results,
+            'success_count': success_count,
+            'error_count': error_count,
+            'total_files': batch_total,
+            'total_time': total_time,
+        }
 
     def query_documents(
         self,
@@ -397,6 +544,8 @@ def main():
 
     parser = argparse.ArgumentParser(description="AVACHATTER Document Processor")
     parser.add_argument('--json', action='store_true', help='Output results as JSON')
+    parser.add_argument('--db-path', default='./chroma_db',
+                        help='Path to ChromaDB persistence directory (absolute recommended)')
     subparsers = parser.add_subparsers(dest='command', help='Command to execute')
 
     # Process command
@@ -406,6 +555,8 @@ def main():
     process_parser.add_argument('--no-ocr', action='store_true', help='Disable OCR')
     process_parser.add_argument('--password', help='PDF password')
     process_parser.add_argument('--chunk-size', type=int, default=500, help='Chunk size')
+    process_parser.add_argument('--smart', action='store_true',
+                                help='Use structure-aware chunking (preserves sections/headings)')
 
     # Query command
     query_parser = subparsers.add_parser('query', help='Query indexed documents')
@@ -416,6 +567,15 @@ def main():
     # Stats command
     stats_parser = subparsers.add_parser('stats', help='Show collection statistics')
     stats_parser.add_argument('--collection', default='documents', help='Collection name')
+
+    # Batch command
+    batch_parser = subparsers.add_parser('batch', help='Process multiple documents in one batch')
+    batch_parser.add_argument('--files', nargs='+', required=True, help='Paths to documents')
+    batch_parser.add_argument('--collection', default='documents', help='Collection name')
+    batch_parser.add_argument('--no-ocr', action='store_true', help='Disable OCR')
+    batch_parser.add_argument('--chunk-size', type=int, default=500, help='Chunk size')
+    batch_parser.add_argument('--smart', action='store_true',
+                              help='Use structure-aware chunking (preserves sections/headings)')
 
     # Health command
     health_parser = subparsers.add_parser('health', help='Check ChromaDB health')
@@ -433,8 +593,8 @@ def main():
         original_stdout = sys.stdout
         sys.stdout = io.StringIO()
 
-    # Initialize processor
-    processor = DocumentProcessor()
+    # Initialize processor with the specified ChromaDB path
+    processor = DocumentProcessor(vector_db_path=args.db_path)
 
     if args.command == 'process':
         result = processor.process_and_index_document(
@@ -442,7 +602,8 @@ def main():
             collection_name=args.collection,
             chunk_size=args.chunk_size,
             use_ocr=not args.no_ocr,
-            password=args.password
+            password=args.password,
+            smart=args.smart
         )
 
         if args.json:
@@ -454,6 +615,28 @@ def main():
                 print(f"[OK] Success: Created {result['chunks_created']} chunks")
             else:
                 print(f"[ERROR] Error: {result['error']}")
+
+    elif args.command == 'batch':
+        result = processor.process_batch(
+            file_paths=args.files,
+            collection_name=args.collection,
+            chunk_size=args.chunk_size,
+            use_ocr=not args.no_ocr,
+            smart=args.smart,
+        )
+
+        if args.json:
+            sys.stdout = original_stdout
+            print(json.dumps(result))
+        else:
+            print("\n" + "=" * 80)
+            print(f"Batch complete: {result['success_count']}/{result['total_files']} succeeded, "
+                  f"{result['error_count']} errors, {result['total_time']}s total")
+            for r in result['results']:
+                status = "OK" if r['success'] else "FAIL"
+                print(f"  [{status}] {os.path.basename(r['file_path'])} — "
+                      f"{r['chunks_created']} chunks, {r.get('processing_time', '?')}s"
+                      f"{' — ' + r['error'] if r.get('error') else ''}")
 
     elif args.command == 'query':
         result = processor.query_documents(

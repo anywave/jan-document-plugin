@@ -81,7 +81,7 @@ export const useDocumentContext = create<DocumentContextState>((set, get) => ({
   },
 
   formatContext: (threadId) => {
-    const items = get().getContext(threadId)
+    const items = get().getContext(threadId).filter((item) => item.content)
     if (items.length === 0) return ''
 
     // Format as structured context
@@ -109,7 +109,7 @@ Please use this context when relevant to the user's question. Cite sources when 
     set({ isExtracting: true })
 
     try {
-      const rawChunks = items.map((item) => item.content.trim())
+      const rawChunks = items.map((item) => (item.content || '').trim()).filter(Boolean)
       const result: ExtractionResult = await refineDocumentChunks(rawChunks, userQuery)
 
       const sources = items

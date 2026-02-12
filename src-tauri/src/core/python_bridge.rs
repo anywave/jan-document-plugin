@@ -25,6 +25,21 @@ pub struct DocumentProcessResult {
     pub chunks_created: usize,
     pub error: Option<String>,
     pub processing_time: Option<f64>,
+    pub document_summary: Option<DocumentSummary>,
+}
+
+/// Rich document summary returned after processing
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DocumentSummary {
+    pub file_name: String,
+    pub file_size_bytes: u64,
+    pub file_size_mb: f64,
+    pub word_count: usize,
+    pub char_count: usize,
+    pub chunks_created: usize,
+    pub sections_detected: Vec<String>,
+    pub preview: String,
+    pub processing_time: f64,
 }
 
 /// Response from Python query
@@ -87,6 +102,46 @@ pub struct JanLockStatus {
     pub mobius_locked: bool,
 }
 
+/// A scanned file entry from directory scanning
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ScannedFile {
+    pub path: String,
+    pub name: String,
+    pub size: u64,
+    pub extension: String,
+}
+
+/// Result of scanning a directory for processable files
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ScanDirectoryResult {
+    pub files: Vec<ScannedFile>,
+    pub total_size: u64,
+    pub skipped: usize,
+}
+
+/// Per-file result emitted during batch processing (from stderr)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BatchFileResult {
+    pub file_path: String,
+    pub file_name: String,
+    pub success: bool,
+    pub chunks_created: usize,
+    pub error: Option<String>,
+    pub processing_time: f64,
+    pub batch_index: usize,
+    pub batch_total: usize,
+}
+
+/// Aggregate result from batch processing (from stdout)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BatchProcessResult {
+    pub results: Vec<DocumentProcessResult>,
+    pub success_count: usize,
+    pub error_count: usize,
+    pub total_files: usize,
+    pub total_time: f64,
+}
+
 /// Get path to the extracted Python 3.12 directory (in app data)
 fn get_python_dir(app_handle: &AppHandle) -> PathBuf {
     app_handle
@@ -118,6 +173,15 @@ fn get_python_exe(app_handle: &AppHandle) -> PathBuf {
 /// Get path to the bundled Python scripts directory
 fn get_python_scripts_path(app_handle: &AppHandle) -> PathBuf {
     get_python_dir(app_handle).join("scripts")
+}
+
+/// Get path to the ChromaDB persistence directory (in app data, not source tree)
+fn get_chromadb_dir(app_handle: &AppHandle) -> PathBuf {
+    app_handle
+        .path()
+        .app_data_dir()
+        .expect("Failed to get app data dir")
+        .join("chroma_db")
 }
 
 // --- Input Validation (Phase 1B) ---
@@ -327,10 +391,14 @@ async fn execute_python_command(
             let mut collected = String::new();
 
             while let Ok(Some(line)) = lines.next_line().await {
-                // Try to parse as progress JSON from Python
-                if let Ok(progress) = serde_json::from_str::<serde_json::Value>(&line) {
-                    if progress.get("progress").and_then(|v| v.as_bool()) == Some(true) {
-                        let _ = app_for_stderr.emit("document-processing", &progress);
+                // Try to parse as JSON from Python
+                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&line) {
+                    if parsed.get("progress").and_then(|v| v.as_bool()) == Some(true) {
+                        let _ = app_for_stderr.emit("document-processing", &parsed);
+                        continue;
+                    }
+                    if parsed.get("file_result").and_then(|v| v.as_bool()) == Some(true) {
+                        let _ = app_for_stderr.emit("batch-file-result", &parsed);
                         continue;
                     }
                 }
@@ -498,6 +566,7 @@ pub async fn process_document(
     collection_name: Option<String>,
     use_ocr: Option<bool>,
     password: Option<String>,
+    smart: Option<bool>,
 ) -> Result<DocumentProcessResult, String> {
     log::info!("Processing document: {}", file_path);
 
@@ -510,9 +579,12 @@ pub async fn process_document(
         serde_json::json!({"status": "starting", "file": &file_path}),
     );
 
-    // Build command args
+    // Build command args — pass app data dir for ChromaDB so it doesn't write to source tree
+    let db_path = get_chromadb_dir(&app_handle);
     let mut args = vec![
         "--json".to_string(),
+        "--db-path".to_string(),
+        db_path.to_string_lossy().to_string(),
         "process".to_string(),
         file_path.clone(),
         "--collection".to_string(),
@@ -526,6 +598,10 @@ pub async fn process_document(
     if let Some(pwd) = password {
         args.push("--password".to_string());
         args.push(pwd);
+    }
+
+    if smart.unwrap_or(false) {
+        args.push("--smart".to_string());
     }
 
     // Execute Python script with retry and extraction timeout
@@ -567,8 +643,11 @@ pub async fn query_documents(
     log::info!("Querying documents: {}", query);
 
     // Build command args
+    let db_path = get_chromadb_dir(&app_handle);
     let args = vec![
         "--json".to_string(),
+        "--db-path".to_string(),
+        db_path.to_string_lossy().to_string(),
         "query".to_string(),
         query.clone(),
         "--collection".to_string(),
@@ -602,8 +681,11 @@ pub async fn get_collection_stats(
     log::info!("Getting collection stats");
 
     // Build command args
+    let db_path = get_chromadb_dir(&app_handle);
     let args = vec![
         "--json".to_string(),
+        "--db-path".to_string(),
+        db_path.to_string_lossy().to_string(),
         "stats".to_string(),
         "--collection".to_string(),
         collection_name.unwrap_or_else(|| "documents".to_string()),
@@ -634,8 +716,11 @@ pub async fn check_chromadb_health(
 ) -> Result<ChromaDbHealth, String> {
     log::info!("Checking ChromaDB health");
 
+    let db_path = get_chromadb_dir(&app_handle);
     let mut args = vec![
         "--json".to_string(),
+        "--db-path".to_string(),
+        db_path.to_string_lossy().to_string(),
         "health".to_string(),
         "--collection".to_string(),
         collection_name.unwrap_or_else(|| "documents".to_string()),
@@ -795,4 +880,146 @@ pub async fn check_jan_lock_status() -> Result<JanLockStatus, String> {
             mobius_locked: false,
         })
     }
+}
+
+/// Scan a directory for processable document files (pure Rust, no Python)
+#[tauri::command]
+pub async fn scan_directory(directory_path: String) -> Result<ScanDirectoryResult, String> {
+    log::info!("Scanning directory: {}", directory_path);
+
+    let dir = Path::new(&directory_path);
+    if !dir.is_dir() {
+        return Err(format!("Not a directory: {}", directory_path));
+    }
+
+    let mut files = Vec::new();
+    let mut total_size: u64 = 0;
+    let mut skipped: usize = 0;
+
+    fn walk_dir(
+        dir: &Path,
+        files: &mut Vec<ScannedFile>,
+        total_size: &mut u64,
+        skipped: &mut usize,
+    ) -> Result<(), String> {
+        let entries =
+            std::fs::read_dir(dir).map_err(|e| format!("Failed to read directory: {}", e))?;
+
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+            let path = entry.path();
+
+            if path.is_dir() {
+                walk_dir(&path, files, total_size, skipped)?;
+            } else if path.is_file() {
+                if let Some(ext) = path.extension() {
+                    let ext_str = format!(".{}", ext.to_string_lossy().to_lowercase());
+                    if ALLOWED_EXTENSIONS.contains(&ext_str.as_str()) {
+                        let metadata = std::fs::metadata(&path)
+                            .map_err(|e| format!("Failed to get metadata: {}", e))?;
+                        let size = metadata.len();
+                        *total_size += size;
+                        files.push(ScannedFile {
+                            path: path.to_string_lossy().to_string(),
+                            name: path
+                                .file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_default(),
+                            size,
+                            extension: ext_str,
+                        });
+                    } else {
+                        *skipped += 1;
+                    }
+                } else {
+                    *skipped += 1;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    walk_dir(dir, &mut files, &mut total_size, &mut skipped)?;
+
+    // Sort by name for consistent ordering
+    files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+    Ok(ScanDirectoryResult {
+        files,
+        total_size,
+        skipped,
+    })
+}
+
+/// Process multiple documents in a single batch (model loaded once)
+#[tauri::command]
+pub async fn process_document_batch(
+    app_handle: AppHandle,
+    file_paths: Vec<String>,
+    collection_name: Option<String>,
+    smart: Option<bool>,
+) -> Result<BatchProcessResult, String> {
+    let file_count = file_paths.len();
+    log::info!("Processing batch of {} documents", file_count);
+
+    if file_paths.is_empty() {
+        return Err("No files provided for batch processing".to_string());
+    }
+
+    // Validate all file paths upfront
+    for fp in &file_paths {
+        validate_file_path(fp)?;
+    }
+
+    // Emit batch starting event
+    let _ = app_handle.emit(
+        "document-processing",
+        serde_json::json!({
+            "status": "starting",
+            "batch_total": file_count,
+        }),
+    );
+
+    // Build command args
+    let db_path = get_chromadb_dir(&app_handle);
+    let mut args = vec![
+        "--json".to_string(),
+        "--db-path".to_string(),
+        db_path.to_string_lossy().to_string(),
+        "batch".to_string(),
+        "--files".to_string(),
+    ];
+    args.extend(file_paths.clone());
+    args.push("--collection".to_string());
+    args.push(collection_name.unwrap_or_else(|| "documents".to_string()));
+
+    if smart.unwrap_or(false) {
+        args.push("--smart".to_string());
+    }
+
+    // Dynamic timeout: 300s base + 120s per file, capped at 1 hour
+    let timeout_secs = std::cmp::min(300 + 120 * file_count as u64, 3600);
+    let timeout = Duration::from_secs(timeout_secs);
+
+    // Execute Python batch command (no retry — batch is not idempotent mid-run)
+    let output =
+        execute_python_command(&app_handle, "document_processor.py", args, timeout).await?;
+
+    // Parse aggregate result
+    let result: BatchProcessResult = serde_json::from_str(&output)
+        .map_err(|e| format!("Failed to parse batch output: {}", e))?;
+
+    // Emit batch completion event
+    let _ = app_handle.emit(
+        "document-processing",
+        serde_json::json!({
+            "status": "complete",
+            "batch_total": result.total_files,
+            "success_count": result.success_count,
+            "error_count": result.error_count,
+            "total_time": result.total_time,
+        }),
+    );
+
+    Ok(result)
 }

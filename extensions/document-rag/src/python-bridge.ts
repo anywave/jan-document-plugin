@@ -17,6 +17,21 @@ export interface PythonStatus {
 }
 
 /**
+ * Rich document summary returned after processing
+ */
+export interface DocumentSummary {
+  file_name: string
+  file_size_bytes: number
+  file_size_mb: number
+  word_count: number
+  char_count: number
+  chunks_created: number
+  sections_detected: string[]
+  preview: string
+  processing_time: number
+}
+
+/**
  * Document processing result
  */
 export interface DocumentProcessResult {
@@ -25,6 +40,7 @@ export interface DocumentProcessResult {
   chunks_created: number
   error: string | null
   processing_time: number | null
+  document_summary: DocumentSummary | null
 }
 
 /**
@@ -56,11 +72,56 @@ export interface CollectionStats {
 }
 
 /**
+ * A scanned file entry from directory scanning
+ */
+export interface ScannedFile {
+  path: string
+  name: string
+  size: number
+  extension: string
+}
+
+/**
+ * Result of scanning a directory for processable files
+ */
+export interface ScanDirectoryResult {
+  files: ScannedFile[]
+  total_size: number
+  skipped: number
+}
+
+/**
+ * Per-file result emitted during batch processing (from stderr)
+ */
+export interface BatchFileResult {
+  file_result: true
+  file_path: string
+  file_name: string
+  success: boolean
+  chunks_created: number
+  error: string | null
+  processing_time: number
+  batch_index: number
+  batch_total: number
+}
+
+/**
+ * Aggregate result from batch processing
+ */
+export interface BatchProcessResult {
+  results: DocumentProcessResult[]
+  success_count: number
+  error_count: number
+  total_files: number
+  total_time: number
+}
+
+/**
  * Document processing progress event
  */
 export interface ProcessingProgress {
   status?: 'starting' | 'complete' | 'failed'
-  file: string
+  file?: string
   chunks?: number
   error?: string
   /** Granular progress from Python pipeline */
@@ -70,6 +131,12 @@ export interface ProcessingProgress {
   step_name?: string
   detail?: string
   percent?: number
+  /** Batch fields */
+  batch_index?: number
+  batch_total?: number
+  success_count?: number
+  error_count?: number
+  total_time?: number
 }
 
 /**
@@ -122,6 +189,7 @@ export async function processDocument(
     collectionName?: string
     useOcr?: boolean
     password?: string
+    smart?: boolean
   }
 ): Promise<DocumentProcessResult> {
   return invoke<DocumentProcessResult>('process_document', {
@@ -129,6 +197,7 @@ export async function processDocument(
     collectionName: options?.collectionName,
     useOcr: options?.useOcr,
     password: options?.password,
+    smart: options?.smart,
   })
 }
 
@@ -217,6 +286,55 @@ export async function onPythonError(
   callback: (error: PythonBridgeError) => void
 ) {
   return listen<PythonBridgeError>('python-error', (event) => {
+    callback(event.payload)
+  })
+}
+
+/**
+ * Scan a directory for processable document files (pure Rust, instant)
+ *
+ * @param directoryPath - Path to directory to scan
+ * @returns Scan results with file list, total size, and skipped count
+ */
+export async function scanDirectory(
+  directoryPath: string
+): Promise<ScanDirectoryResult> {
+  return invoke<ScanDirectoryResult>('scan_directory', {
+    directoryPath,
+  })
+}
+
+/**
+ * Process multiple documents in a single batch (model loaded once)
+ *
+ * @param filePaths - Array of file paths to process
+ * @param options - Processing options
+ * @returns Aggregate batch result
+ */
+export async function processDocumentBatch(
+  filePaths: string[],
+  options?: {
+    collectionName?: string
+    smart?: boolean
+  }
+): Promise<BatchProcessResult> {
+  return invoke<BatchProcessResult>('process_document_batch', {
+    filePaths,
+    collectionName: options?.collectionName,
+    smart: options?.smart,
+  })
+}
+
+/**
+ * Listen to per-file batch result events (emitted in real-time during batch)
+ *
+ * @param callback - Callback for each file result
+ * @returns Unlisten function
+ */
+export async function onBatchFileResult(
+  callback: (result: BatchFileResult) => void
+) {
+  return listen<BatchFileResult>('batch-file-result', (event) => {
     callback(event.payload)
   })
 }

@@ -77,7 +77,7 @@ class Embedder:
         overlap: int = 50
     ) -> List[Dict[str, any]]:
         """
-        Split text into overlapping chunks.
+        Split text into overlapping chunks (standard mode).
 
         Args:
             text: Input text
@@ -118,12 +118,226 @@ class Embedder:
 
         return chunks
 
+    def chunk_text_smart(
+        self,
+        text: str,
+        max_chunk_size: int = 1500,
+        min_chunk_size: int = 200,
+    ) -> List[Dict[str, any]]:
+        """
+        Structure-aware chunking that preserves document sections and paragraphs.
+        Splits on headings, double newlines, then sentences — producing variable-size
+        chunks that respect semantic boundaries.
+
+        Args:
+            text: Input text
+            max_chunk_size: Maximum characters per chunk (larger = more context per chunk)
+            min_chunk_size: Minimum chunk size before merging with neighbors
+
+        Returns:
+            List of dictionaries with 'text', 'start', 'end', 'section' (heading if detected)
+        """
+        import re
+
+        # Step 1: Split into sections by headings and double newlines
+        # Heading patterns: ALL CAPS lines, lines ending with colon, markdown-style headings
+        heading_pattern = re.compile(
+            r'^(?:'
+            r'#{1,6}\s+.+|'           # Markdown headings
+            r'[A-Z][A-Z\s,.\-&]{3,}$|'  # ALL CAPS lines (4+ chars)
+            r'.{5,80}:\s*$'            # Lines ending with colon
+            r')',
+            re.MULTILINE
+        )
+
+        # Find all heading positions
+        headings = [(m.start(), m.end(), m.group().strip()) for m in heading_pattern.finditer(text)]
+
+        # Helper: split a large text block into sentence-bounded chunks
+        def split_by_sentences(block: str, block_start: int, section_label: str, target_size: int) -> list:
+            """Split oversized text by sentences, respecting target_size."""
+            sentences = re.split(r'(?<=[.!?])\s+', block)
+            result = []
+            buf = ''
+            buf_start = block_start
+            for sentence in sentences:
+                if len(buf) + len(sentence) + 1 <= target_size:
+                    if buf:
+                        buf += ' '
+                    buf += sentence
+                else:
+                    if buf.strip():
+                        result.append({
+                            'text': buf.strip(),
+                            'start': buf_start,
+                            'end': buf_start + len(buf),
+                            'section': section_label,
+                        })
+                    buf_start = buf_start + len(buf) + 1
+                    buf = sentence
+            if buf.strip():
+                result.append({
+                    'text': buf.strip(),
+                    'start': buf_start,
+                    'end': buf_start + len(buf),
+                    'section': section_label,
+                })
+            return result
+
+        # Build raw sections from heading boundaries
+        raw_sections = []
+        if not headings:
+            # No headings found — split by double newlines, then single newlines
+            paragraphs = re.split(r'\n\s*\n', text)
+            # If we get very few paragraphs from double-newline split, try single newlines
+            if len(paragraphs) <= 3 and len(text) > max_chunk_size * 2:
+                paragraphs = text.split('\n')
+            pos = 0
+            for para in paragraphs:
+                para_stripped = para.strip()
+                if para_stripped:
+                    start = text.find(para_stripped, pos)
+                    if start == -1:
+                        start = pos
+                    raw_sections.append({
+                        'text': para_stripped,
+                        'start': start,
+                        'end': start + len(para_stripped),
+                        'section': '',
+                    })
+                    pos = start + len(para_stripped)
+        else:
+            # Split by headings
+            for i, (h_start, h_end, h_text) in enumerate(headings):
+                next_start = headings[i + 1][0] if i + 1 < len(headings) else len(text)
+                section_text = text[h_start:next_start].strip()
+                if section_text:
+                    raw_sections.append({
+                        'text': section_text,
+                        'start': h_start,
+                        'end': next_start,
+                        'section': h_text,
+                    })
+            # Capture text before first heading
+            if headings[0][0] > 0:
+                preamble = text[:headings[0][0]].strip()
+                if preamble:
+                    raw_sections.insert(0, {
+                        'text': preamble,
+                        'start': 0,
+                        'end': headings[0][0],
+                        'section': '(Preamble)',
+                    })
+
+        # Step 2: Split oversized sections, merge undersized ones
+        chunks = []
+        buffer_text = ''
+        buffer_start = 0
+        buffer_section = ''
+
+        for section in raw_sections:
+            sec_text = section['text']
+            sec_start = section['start']
+            sec_section = section['section']
+
+            if len(sec_text) > max_chunk_size:
+                # Flush buffer first
+                if buffer_text.strip():
+                    chunks.append({
+                        'text': buffer_text.strip(),
+                        'start': buffer_start,
+                        'end': buffer_start + len(buffer_text),
+                        'section': buffer_section,
+                    })
+                    buffer_text = ''
+
+                # Split large section by paragraphs, then by sentences
+                paragraphs = re.split(r'\n\s*\n', sec_text)
+                sub_buffer = ''
+                sub_start = sec_start
+
+                for para in paragraphs:
+                    para = para.strip()
+                    if not para:
+                        continue
+
+                    # If a single paragraph is itself oversized, split by sentences
+                    if len(para) > max_chunk_size:
+                        if sub_buffer.strip():
+                            chunks.append({
+                                'text': sub_buffer.strip(),
+                                'start': sub_start,
+                                'end': sub_start + len(sub_buffer),
+                                'section': sec_section,
+                            })
+                            sub_start = sub_start + len(sub_buffer) + 2
+                            sub_buffer = ''
+                        chunks.extend(split_by_sentences(para, sub_start, sec_section, max_chunk_size))
+                        sub_start = sub_start + len(para) + 2
+                        continue
+
+                    if len(sub_buffer) + len(para) + 2 <= max_chunk_size:
+                        if sub_buffer:
+                            sub_buffer += '\n\n'
+                        sub_buffer += para
+                    else:
+                        if sub_buffer.strip():
+                            chunks.append({
+                                'text': sub_buffer.strip(),
+                                'start': sub_start,
+                                'end': sub_start + len(sub_buffer),
+                                'section': sec_section,
+                            })
+                        sub_start = sub_start + len(sub_buffer) + 2
+                        sub_buffer = para
+
+                if sub_buffer.strip():
+                    chunks.append({
+                        'text': sub_buffer.strip(),
+                        'start': sub_start,
+                        'end': sub_start + len(sub_buffer),
+                        'section': sec_section,
+                    })
+
+            elif len(buffer_text) + len(sec_text) + 2 <= max_chunk_size and len(sec_text) < min_chunk_size:
+                # Merge small section into buffer
+                if not buffer_text:
+                    buffer_start = sec_start
+                    buffer_section = sec_section
+                if buffer_text:
+                    buffer_text += '\n\n'
+                buffer_text += sec_text
+            else:
+                # Flush buffer, start new one
+                if buffer_text.strip():
+                    chunks.append({
+                        'text': buffer_text.strip(),
+                        'start': buffer_start,
+                        'end': buffer_start + len(buffer_text),
+                        'section': buffer_section,
+                    })
+                buffer_text = sec_text
+                buffer_start = sec_start
+                buffer_section = sec_section
+
+        # Flush remaining buffer
+        if buffer_text.strip():
+            chunks.append({
+                'text': buffer_text.strip(),
+                'start': buffer_start,
+                'end': buffer_start + len(buffer_text),
+                'section': buffer_section,
+            })
+
+        return chunks
+
     def embed_document(
         self,
         text: str,
         chunk_size: int = 500,
         overlap: int = 50,
-        metadata: Dict = None
+        metadata: Dict = None,
+        smart: bool = False
     ) -> Dict[str, any]:
         """
         Process document: chunk text and generate embeddings.
@@ -133,6 +347,7 @@ class Embedder:
             chunk_size: Maximum characters per chunk
             overlap: Overlap between chunks
             metadata: Optional metadata to attach
+            smart: Use structure-aware chunking instead of fixed-size
 
         Returns:
             Dictionary with:
@@ -148,8 +363,11 @@ class Embedder:
         }
 
         try:
-            # Chunk text
-            chunks = self.chunk_text(text, chunk_size, overlap)
+            # Chunk text — smart mode preserves document structure
+            if smart:
+                chunks = self.chunk_text_smart(text, max_chunk_size=1500, min_chunk_size=200)
+            else:
+                chunks = self.chunk_text(text, chunk_size, overlap)
             result['chunks'] = chunks
 
             # Generate embeddings
