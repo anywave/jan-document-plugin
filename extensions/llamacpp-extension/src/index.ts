@@ -1161,7 +1161,21 @@ export default class llamacpp_extension extends AIEngine {
       }
     }
     const args: string[] = []
-    const cfg = { ...this.config, ...(overrideSettings ?? {}) }
+
+    // Check for MOBIUS optimization overrides stored during first-launch auto-optimization
+    let mobiusOverrides: Partial<LlamacppConfig> | undefined
+    try {
+      const mobiusKey = `mobius_model_settings_${modelId}`
+      const mobiusSettings = localStorage.getItem(mobiusKey)
+      if (mobiusSettings) {
+        mobiusOverrides = JSON.parse(mobiusSettings)
+      }
+    } catch {
+      // Ignore parse errors
+    }
+
+    // MOBIUS defaults < extension config < explicit overrides
+    const cfg = { ...this.config, ...(mobiusOverrides ?? {}), ...(overrideSettings ?? {}) }
     const [version, backend] = cfg.version_backend.split('/')
     if (!version || !backend) {
       throw new Error(

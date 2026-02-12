@@ -43,8 +43,6 @@ class DocumentProcessor:
         self.supported_extensions = {
             '.txt': 'text',
             '.md': 'text',
-            '.doc': 'docx',
-            '.docx': 'docx',
         }
 
     def detect_file_type(self, file_path: str) -> str:

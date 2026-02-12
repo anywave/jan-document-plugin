@@ -15,7 +15,7 @@ const PYTHON_MAX_DELAY_MS: u64 = 15000;
 const PYTHON_BACKOFF_MULTIPLIER: f64 = 2.0;
 
 // --- Allowed file extensions (defense-in-depth) ---
-const ALLOWED_EXTENSIONS: &[&str] = &[".txt", ".md", ".doc", ".docx"];
+const ALLOWED_EXTENSIONS: &[&str] = &[".txt", ".md"];
 
 /// Response from Python document processor
 #[derive(Debug, Serialize, Deserialize, Clone)]

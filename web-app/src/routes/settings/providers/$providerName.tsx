@@ -40,6 +40,7 @@ import { useEffect, useState } from 'react'
 import { predefinedProviders } from '@/consts/providers'
 import { useModelLoad } from '@/hooks/useModelLoad'
 import { useLlamacppDevices } from '@/hooks/useLlamacppDevices'
+import { useLockStatus } from '@/hooks/useLockStatus'
 
 // as route.threadsDetail
 export const Route = createFileRoute('/settings/providers/$providerName')({
@@ -55,6 +56,14 @@ export const Route = createFileRoute('/settings/providers/$providerName')({
 function ProviderDetail() {
   const { t } = useTranslation()
   const { setModelLoadError } = useModelLoad()
+  const { lockStatus, fetchLockStatus } = useLockStatus()
+
+  useEffect(() => {
+    fetchLockStatus()
+  }, [fetchLockStatus])
+
+  const isLocked = lockStatus?.mobius_locked === true
+
   const steps = [
     {
       target: '.first-step-setup-remote-provider',
@@ -274,6 +283,18 @@ function ProviderDetail() {
                 </h1>
               </div>
 
+              {isLocked && (
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/10">
+                  <svg className="h-5 w-5 text-amber-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-amber-700">Settings managed by MOBIUS</p>
+                    <p className="text-xs text-amber-600/80">Uninstall MOBIUS to edit these settings directly.</p>
+                  </div>
+                </div>
+              )}
+
               <div
                 className={cn(
                   'flex flex-col gap-3',
@@ -301,9 +322,11 @@ function ProviderDetail() {
                             className={cn(
                               setting.key === 'api-key' &&
                                 'third-step-setup-remote-provider',
-                              setting.key === 'device' && 'hidden'
+                              setting.key === 'device' && 'hidden',
+                              isLocked && 'pointer-events-none opacity-60'
                             )}
                             onChange={(newValue) => {
+                              if (isLocked) return
                               if (provider) {
                                 const newSettings = [...provider.settings]
                                 // Handle different value types by forcing the type

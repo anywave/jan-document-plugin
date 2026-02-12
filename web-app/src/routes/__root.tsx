@@ -26,6 +26,7 @@ import {
 import { useCallback } from 'react'
 import GlobalError from '@/containers/GlobalError'
 import { GlobalEventHandler } from '@/providers/GlobalEventHandler'
+import { useModelOptimizer } from '@/hooks/useModelOptimizer'
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -141,6 +142,7 @@ const LogsLayout = () => {
 }
 
 function RootLayout() {
+  useModelOptimizer() // runs once on first launch
   const router = useRouterState()
 
   const isLocalAPIServerLogsRoute =
