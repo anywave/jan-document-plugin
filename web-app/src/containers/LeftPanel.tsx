@@ -14,6 +14,13 @@ import {
   IconSearch,
   IconClipboardSmileFilled,
   IconFileTextFilled,
+  IconArchive,
+  IconArchiveOff,
+  IconShare,
+  IconChecks,
+  IconChevronDown,
+  IconChevronRight,
+  IconSquareCheckFilled,
 } from '@tabler/icons-react'
 import { route } from '@/constants/routes'
 import ThreadList from './ThreadList'
@@ -148,8 +155,15 @@ const LeftPanel = () => {
     select: (state) => state.location.pathname,
   })
 
-  const { deleteAllThreads, unstarAllThreads, getFilteredThreads, threads } =
-    useThreads()
+  const {
+    deleteAllThreads, unstarAllThreads, getFilteredThreads, threads,
+    selectMode, selectedIds, setSelectMode, toggleSelected,
+    selectAll, clearSelection, deleteSelected, archiveSelected,
+    unarchiveThread, deleteAllArchived, unarchiveAll,
+  } = useThreads()
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [archiveExpanded, setArchiveExpanded] = useState(false)
+  const [deleteSelectedDialogOpen, setDeleteSelectedDialogOpen] = useState(false)
 
   const filteredThreads = useMemo(() => {
     return getFilteredThreads(searchTerm)
@@ -158,12 +172,21 @@ const LeftPanel = () => {
 
   // Memoize categorized threads based on filteredThreads
   const favoritedThreads = useMemo(() => {
-    return filteredThreads.filter((t) => t.isFavorite)
+    return filteredThreads.filter((t) => t.isFavorite && !t.isArchived)
   }, [filteredThreads])
 
   const unFavoritedThreads = useMemo(() => {
-    return filteredThreads.filter((t) => !t.isFavorite)
+    return filteredThreads.filter((t) => !t.isFavorite && !t.isArchived)
   }, [filteredThreads])
+
+  const archivedThreads = useMemo(() => {
+    return filteredThreads.filter((t) => t.isArchived)
+  }, [filteredThreads])
+
+  // All visible (non-archived) thread IDs for "select all"
+  const allVisibleIds = useMemo(() => {
+    return [...favoritedThreads, ...unFavoritedThreads].map((t) => t.id)
+  }, [favoritedThreads, unFavoritedThreads])
 
   // Disable body scroll when panel is open on small screens
   useEffect(() => {
@@ -302,6 +325,96 @@ const LeftPanel = () => {
                 )}
               </div>
             )}
+            {/* Bulk action bar in select mode */}
+            {selectMode && (
+              <div className="flex items-center gap-1 px-1 py-1.5 mb-2 bg-left-panel-fg/5 rounded-sm mx-1">
+                <span className="text-xs text-left-panel-fg/80 font-medium mr-auto">
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  title={selectedIds.size === allVisibleIds.length ? 'Deselect All' : 'Select All'}
+                  className="size-5 flex items-center justify-center rounded hover:bg-left-panel-fg/10"
+                  onClick={() => {
+                    if (selectedIds.size === allVisibleIds.length) clearSelection()
+                    else selectAll(allVisibleIds)
+                  }}
+                >
+                  <IconChecks size={14} className="text-left-panel-fg/70" />
+                </button>
+                <button
+                  title="Archive"
+                  className="size-5 flex items-center justify-center rounded hover:bg-left-panel-fg/10"
+                  onClick={() => {
+                    if (selectedIds.size === 0) return
+                    archiveSelected()
+                    toast.success('Threads archived', { id: 'archive-selected' })
+                  }}
+                >
+                  <IconArchive size={14} className="text-left-panel-fg/70" />
+                </button>
+                <button
+                  title="Delete"
+                  className="size-5 flex items-center justify-center rounded hover:bg-left-panel-fg/10"
+                  onClick={() => {
+                    if (selectedIds.size === 0) return
+                    setDeleteSelectedDialogOpen(true)
+                  }}
+                >
+                  <IconTrash size={14} className="text-left-panel-fg/70" />
+                </button>
+                <button
+                  title="Export"
+                  className="size-5 flex items-center justify-center rounded hover:bg-left-panel-fg/10"
+                  onClick={() => {
+                    if (selectedIds.size === 0) return
+                    setShowExportDialog(true)
+                  }}
+                >
+                  <IconShare size={14} className="text-left-panel-fg/70" />
+                </button>
+                <button
+                  title="Cancel"
+                  className="size-5 flex items-center justify-center rounded hover:bg-left-panel-fg/10"
+                  onClick={() => setSelectMode(false)}
+                >
+                  <IconX size={14} className="text-left-panel-fg/70" />
+                </button>
+              </div>
+            )}
+
+            {/* Delete selected confirmation dialog */}
+            <Dialog open={deleteSelectedDialogOpen} onOpenChange={setDeleteSelectedDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Delete {selectedIds.size} thread{selectedIds.size !== 1 ? 's' : ''}?</DialogTitle>
+                  <DialogDescription>
+                    This action cannot be undone. The selected threads and all their messages will be permanently deleted.
+                  </DialogDescription>
+                  <DialogFooter className="mt-2">
+                    <DialogClose asChild>
+                      <Button variant="link" size="sm" className="hover:no-underline">
+                        {t('common:cancel')}
+                      </Button>
+                    </DialogClose>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        deleteSelected()
+                        setDeleteSelectedDialogOpen(false)
+                        toast.success(`${selectedIds.size} thread${selectedIds.size !== 1 ? 's' : ''} deleted`, {
+                          id: 'delete-selected',
+                        })
+                        setTimeout(() => navigate({ to: route.home }), 0)
+                      }}
+                    >
+                      {t('common:delete')}
+                    </Button>
+                  </DialogFooter>
+                </DialogHeader>
+              </DialogContent>
+            </Dialog>
+
             <div className="flex flex-col w-full overflow-y-auto overflow-x-hidden">
               <div className="h-full w-full overflow-y-auto">
                 {favoritedThreads.length > 0 && (
@@ -346,6 +459,9 @@ const LeftPanel = () => {
                       <ThreadList
                         threads={favoritedThreads}
                         isFavoriteSection={true}
+                        selectMode={selectMode}
+                        selectedIds={selectedIds}
+                        onToggleSelect={toggleSelected}
                       />
                       {favoritedThreads.length === 0 && (
                         <p className="text-xs text-left-panel-fg/50 px-1 font-semibold">
@@ -379,6 +495,12 @@ const LeftPanel = () => {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent side="bottom" align="end">
+                            <DropdownMenuItem
+                              onClick={() => setSelectMode(true)}
+                            >
+                              <IconSquareCheckFilled size={16} />
+                              <span>Select</span>
+                            </DropdownMenuItem>
                             <DialogTrigger asChild>
                               <DropdownMenuItem
                                 onSelect={(e) => e.preventDefault()}
@@ -471,8 +593,80 @@ const LeftPanel = () => {
                 )}
 
                 <div className="flex flex-col">
-                  <ThreadList threads={unFavoritedThreads} />
+                  <ThreadList
+                    threads={unFavoritedThreads}
+                    selectMode={selectMode}
+                    selectedIds={selectedIds}
+                    onToggleSelect={toggleSelected}
+                  />
                 </div>
+
+                {/* Archived threads section */}
+                {archivedThreads.length > 0 && (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <button
+                        className="flex items-center gap-0.5 text-xs text-left-panel-fg/50 px-1 font-semibold"
+                        onClick={() => setArchiveExpanded(!archiveExpanded)}
+                      >
+                        {archiveExpanded
+                          ? <IconChevronDown size={14} />
+                          : <IconChevronRight size={14} />
+                        }
+                        Archived ({archivedThreads.length})
+                      </button>
+                      <div className="relative">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="size-6 flex cursor-pointer items-center justify-center rounded hover:bg-left-panel-fg/10 transition-all duration-200 ease-in-out data-[state=open]:bg-left-panel-fg/10">
+                              <IconDots size={18} className="text-left-panel-fg/60" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent side="bottom" align="end">
+                            <DropdownMenuItem onClick={() => {
+                              unarchiveAll()
+                              toast.success('All threads unarchived', { id: 'unarchive-all' })
+                            }}>
+                              <IconArchiveOff size={16} />
+                              <span>Unarchive All</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              deleteAllArchived()
+                              toast.success('All archived threads deleted', { id: 'delete-archived' })
+                            }}>
+                              <IconTrash size={16} />
+                              <span>Delete All Archived</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                    {archiveExpanded && (
+                      <div className="flex flex-col">
+                        {archivedThreads.map((thread) => (
+                          <div
+                            key={thread.id}
+                            className="mb-1 rounded hover:bg-left-panel-fg/10 flex items-center justify-between gap-2 px-1.5 group/thread-list transition-all cursor-pointer"
+                          >
+                            <div className="py-1 pr-2 truncate">
+                              <span className="text-left-panel-fg/60">{thread.title || 'New Thread'}</span>
+                            </div>
+                            <button
+                              title="Unarchive"
+                              className="size-5 flex items-center justify-center rounded hover:bg-left-panel-fg/10 opacity-0 group-hover/thread-list:opacity-100"
+                              onClick={() => {
+                                unarchiveThread(thread.id)
+                                toast.success('Thread unarchived', { id: 'unarchive-thread' })
+                              }}
+                            >
+                              <IconArchiveOff size={14} className="text-left-panel-fg/60" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -505,8 +699,80 @@ const LeftPanel = () => {
             <DownloadManagement />
           </div>
         </div>
+        {/* Export dialog */}
+        <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+          <DialogContent>
+            <ExportDialog
+              threadIds={Array.from(selectedIds)}
+              onClose={() => {
+                setShowExportDialog(false)
+                setSelectMode(false)
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       </aside>
     </>
+  )
+}
+
+/** Inline export dialog component */
+function ExportDialog({ threadIds, onClose }: { threadIds: string[]; onClose: () => void }) {
+  const [format, setFormat] = useState<'clipboard' | 'text' | 'docx'>('clipboard')
+  const [exporting, setExporting] = useState(false)
+  const { t } = useTranslation()
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const { exportThreads } = await import('@/lib/exportThreads')
+      await exportThreads(threadIds, format)
+      toast.success(
+        format === 'clipboard'
+          ? 'Copied to clipboard'
+          : `Saved as .${format} file`,
+        { id: 'export-threads' }
+      )
+      onClose()
+    } catch (err) {
+      toast.error('Export failed', { id: 'export-error' })
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  return (
+    <DialogHeader>
+      <DialogTitle>Export {threadIds.length} thread{threadIds.length !== 1 ? 's' : ''}</DialogTitle>
+      <div className="flex flex-col gap-2 mt-3">
+        {([
+          { value: 'clipboard' as const, label: 'Copy to clipboard' },
+          { value: 'text' as const, label: 'Save as .txt' },
+          { value: 'docx' as const, label: 'Save as Word (.docx)' },
+        ]).map((opt) => (
+          <label key={opt.value} className="flex items-center gap-2 cursor-pointer text-sm">
+            <input
+              type="radio"
+              name="export-format"
+              checked={format === opt.value}
+              onChange={() => setFormat(opt.value)}
+              className="accent-left-panel-fg"
+            />
+            {opt.label}
+          </label>
+        ))}
+      </div>
+      <DialogFooter className="mt-4">
+        <DialogClose asChild>
+          <Button variant="link" size="sm" className="hover:no-underline">
+            {t('common:cancel')}
+          </Button>
+        </DialogClose>
+        <Button size="sm" disabled={exporting} onClick={handleExport}>
+          {exporting ? 'Exporting...' : 'Export'}
+        </Button>
+      </DialogFooter>
+    </DialogHeader>
   )
 }
 

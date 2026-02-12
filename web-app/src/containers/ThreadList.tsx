@@ -18,6 +18,8 @@ import {
   IconTrash,
   IconEdit,
   IconStar,
+  IconSquare,
+  IconSquareCheckFilled,
 } from '@tabler/icons-react'
 import { useThreads } from '@/hooks/useThreads'
 import { useLeftPanel } from '@/hooks/useLeftPanel'
@@ -47,7 +49,14 @@ import { useNavigate, useMatches } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 
-const SortableItem = memo(({ thread }: { thread: Thread }) => {
+type SortableItemProps = {
+  thread: Thread
+  selectMode?: boolean
+  isSelected?: boolean
+  onToggleSelect?: (id: string) => void
+}
+
+const SortableItem = memo(({ thread, selectMode, isSelected, onToggleSelect }: SortableItemProps) => {
   const {
     attributes,
     listeners,
@@ -79,6 +88,10 @@ const SortableItem = memo(({ thread }: { thread: Thread }) => {
   )
 
   const handleClick = () => {
+    if (selectMode) {
+      onToggleSelect?.(thread.id)
+      return
+    }
     if (!isDragging) {
       // Only close panel and navigate if the thread is not already active
       if (!isActive) {
@@ -113,13 +126,19 @@ const SortableItem = memo(({ thread }: { thread: Thread }) => {
       className={cn(
         'mb-1 rounded hover:bg-left-panel-fg/10 flex items-center justify-between gap-2 px-1.5 group/thread-list transition-all',
         isDragging ? 'cursor-move' : 'cursor-pointer',
-        isActive && 'bg-left-panel-fg/10'
+        isActive && !selectMode && 'bg-left-panel-fg/10',
+        selectMode && isSelected && 'bg-left-panel-fg/15'
       )}
     >
-      <div className="py-1 pr-2 truncate">
-        <span>{thread.title || t('common:newThread')}</span>
+      <div className="py-1 pr-2 truncate flex items-center gap-1.5">
+        {selectMode && (
+          isSelected
+            ? <IconSquareCheckFilled size={16} className="text-left-panel-fg shrink-0" />
+            : <IconSquare size={16} className="text-left-panel-fg/40 shrink-0" />
+        )}
+        <span className="truncate">{thread.title || t('common:newThread')}</span>
       </div>
-      <div className="flex items-center">
+      {!selectMode && <div className="flex items-center">
         <DropdownMenu
           open={openDropdown}
           onOpenChange={(open) => setOpenDropdown(open)}
@@ -268,7 +287,7 @@ const SortableItem = memo(({ thread }: { thread: Thread }) => {
             </Dialog>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
+      </div>}
     </div>
   )
 })
@@ -276,9 +295,12 @@ const SortableItem = memo(({ thread }: { thread: Thread }) => {
 type ThreadListProps = {
   threads: Thread[]
   isFavoriteSection?: boolean
+  selectMode?: boolean
+  selectedIds?: Set<string>
+  onToggleSelect?: (id: string) => void
 }
 
-function ThreadList({ threads }: ThreadListProps) {
+function ThreadList({ threads, selectMode, selectedIds, onToggleSelect }: ThreadListProps) {
   const sortedThreads = useMemo(() => {
     return threads.sort((a, b) => {
       return (b.updated || 0) - (a.updated || 0)
@@ -302,7 +324,13 @@ function ThreadList({ threads }: ThreadListProps) {
         strategy={verticalListSortingStrategy}
       >
         {sortedThreads.map((thread, index) => (
-          <SortableItem key={index} thread={thread} />
+          <SortableItem
+            key={index}
+            thread={thread}
+            selectMode={selectMode}
+            isSelected={selectedIds?.has(thread.id)}
+            onToggleSelect={onToggleSelect}
+          />
         ))}
       </SortableContext>
     </DndContext>

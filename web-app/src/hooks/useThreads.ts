@@ -27,11 +27,25 @@ type ThreadState = {
   updateCurrentThreadAssistant: (assistant: Assistant) => void
   updateThreadTimestamp: (threadId: string) => void
   searchIndex: Fzf<Thread[]> | null
+  // Multi-select state
+  selectMode: boolean
+  selectedIds: Set<string>
+  setSelectMode: (on: boolean) => void
+  toggleSelected: (id: string) => void
+  selectAll: (ids: string[]) => void
+  clearSelection: () => void
+  deleteSelected: () => void
+  archiveSelected: () => void
+  unarchiveThread: (threadId: string) => void
+  deleteAllArchived: () => void
+  unarchiveAll: () => void
 }
 
 export const useThreads = create<ThreadState>()((set, get) => ({
   threads: {},
   searchIndex: null,
+  selectMode: false,
+  selectedIds: new Set<string>(),
   setThreads: (threads) => {
     const threadMap = threads.reduce(
       (acc: Record<string, Thread>, thread) => {
@@ -293,6 +307,107 @@ export const useThreads = create<ThreadState>()((set, get) => ({
           selector: (item: Thread) => item.title,
         }),
       }
+    })
+  },
+  setSelectMode: (on) => {
+    set({ selectMode: on, selectedIds: on ? get().selectedIds : new Set() })
+  },
+  toggleSelected: (id) => {
+    set((state) => {
+      const next = new Set(state.selectedIds)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return { selectedIds: next }
+    })
+  },
+  selectAll: (ids) => {
+    set({ selectedIds: new Set(ids) })
+  },
+  clearSelection: () => {
+    set({ selectedIds: new Set() })
+  },
+  deleteSelected: () => {
+    const { selectedIds, threads } = get()
+    const remaining = { ...threads }
+    selectedIds.forEach((id) => {
+      deleteThread(id)
+      delete remaining[id]
+    })
+    set({
+      threads: remaining,
+      selectedIds: new Set(),
+      selectMode: false,
+      searchIndex: new Fzf<Thread[]>(Object.values(remaining), {
+        selector: (item: Thread) => item.title,
+      }),
+    })
+  },
+  archiveSelected: () => {
+    const { selectedIds } = get()
+    set((state) => {
+      const updatedThreads = { ...state.threads }
+      selectedIds.forEach((id) => {
+        if (updatedThreads[id]) {
+          updatedThreads[id] = {
+            ...updatedThreads[id],
+            isArchived: true,
+            updated: Date.now() / 1000,
+          }
+          updateThread(updatedThreads[id])
+        }
+      })
+      return {
+        threads: updatedThreads,
+        selectedIds: new Set(),
+        selectMode: false,
+        searchIndex: new Fzf<Thread[]>(Object.values(updatedThreads), {
+          selector: (item: Thread) => item.title,
+        }),
+      }
+    })
+  },
+  unarchiveThread: (threadId) => {
+    set((state) => {
+      const thread = state.threads[threadId]
+      if (!thread) return state
+      const updatedThread = { ...thread, isArchived: false, updated: Date.now() / 1000 }
+      updateThread(updatedThread)
+      return {
+        threads: { ...state.threads, [threadId]: updatedThread },
+      }
+    })
+  },
+  deleteAllArchived: () => {
+    set((state) => {
+      const remaining: Record<string, Thread> = {}
+      Object.entries(state.threads).forEach(([id, thread]) => {
+        if (thread.isArchived) {
+          deleteThread(id)
+        } else {
+          remaining[id] = thread
+        }
+      })
+      return {
+        threads: remaining,
+        searchIndex: new Fzf<Thread[]>(Object.values(remaining), {
+          selector: (item: Thread) => item.title,
+        }),
+      }
+    })
+  },
+  unarchiveAll: () => {
+    set((state) => {
+      const updatedThreads: Record<string, Thread> = {}
+      Object.entries(state.threads).forEach(([id, thread]) => {
+        if (thread.isArchived) {
+          const updated = { ...thread, isArchived: false, updated: Date.now() / 1000 }
+          updateThread(updated)
+          updatedThreads[id] = updated
+        } else {
+          updatedThreads[id] = thread
+        }
+      })
+      return { threads: updatedThreads }
     })
   },
 }))

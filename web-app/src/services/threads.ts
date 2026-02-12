@@ -23,6 +23,7 @@ export const fetchThreads = async (): Promise<Thread[]> => {
                 : (e.updated ?? 0),
             order: e.metadata?.order,
             isFavorite: e.metadata?.is_favorite,
+            isArchived: e.metadata?.is_archived,
             model: {
               id: e.assistants?.[0]?.model?.id,
               provider: e.assistants?.[0]?.model?.engine,
@@ -109,6 +110,7 @@ export const updateThread = (thread: Thread) => {
       ],
       metadata: {
         is_favorite: thread.isFavorite,
+        is_archived: thread.isArchived,
         order: thread.order,
       },
       object: 'thread',

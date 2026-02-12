@@ -46,6 +46,17 @@ vi.mock('@/hooks/useThreads', () => ({
     getFilteredThreads: vi.fn(() => []),
     filteredThreads: [],
     currentThreadId: null,
+    selectMode: false,
+    selectedIds: new Set(),
+    setSelectMode: vi.fn(),
+    toggleSelected: vi.fn(),
+    selectAll: vi.fn(),
+    clearSelection: vi.fn(),
+    deleteSelected: vi.fn(),
+    archiveSelected: vi.fn(),
+    unarchiveThread: vi.fn(),
+    deleteAllArchived: vi.fn(),
+    unarchiveAll: vi.fn(),
   })),
 }))
 
