@@ -15,7 +15,7 @@ const PYTHON_MAX_DELAY_MS: u64 = 15000;
 const PYTHON_BACKOFF_MULTIPLIER: f64 = 2.0;
 
 // --- Allowed file extensions (defense-in-depth) ---
-const ALLOWED_EXTENSIONS: &[&str] = &[".txt", ".md"];
+const ALLOWED_EXTENSIONS: &[&str] = &[".txt", ".md", ".doc", ".docx"];
 
 /// Response from Python document processor
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -97,11 +97,16 @@ fn get_python_dir(app_handle: &AppHandle) -> PathBuf {
 
 /// Get path to the bundled Python zip archive (in resources)
 fn get_python_zip_path(app_handle: &AppHandle) -> PathBuf {
-    app_handle
+    let resource_dir = app_handle
         .path()
         .resource_dir()
-        .expect("Failed to get resource dir")
-        .join("python312.zip")
+        .expect("Failed to get resource dir");
+    let direct = resource_dir.join("python312.zip");
+    if direct.exists() {
+        return direct;
+    }
+    // In dev mode, resources are nested under a resources/ subdirectory
+    resource_dir.join("resources").join("python312.zip")
 }
 
 /// Get path to the bundled Python executable

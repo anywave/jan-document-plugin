@@ -3,6 +3,7 @@ export const route = {
   home: '/',
   appLogs: '/logs',
   assistant: '/assistant',
+  documents: '/documents',
   settings: {
     index: '/settings',
     model_providers: '/settings/providers',

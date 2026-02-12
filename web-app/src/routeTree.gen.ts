@@ -13,6 +13,7 @@
 import { Route as rootRoute } from './routes/__root'
 import { Route as SystemMonitorImport } from './routes/system-monitor'
 import { Route as LogsImport } from './routes/logs'
+import { Route as DocumentsImport } from './routes/documents'
 import { Route as AssistantImport } from './routes/assistant'
 import { Route as IndexImport } from './routes/index'
 import { Route as ThreadsThreadIdImport } from './routes/threads/$threadId'
@@ -40,6 +41,12 @@ const SystemMonitorRoute = SystemMonitorImport.update({
 const LogsRoute = LogsImport.update({
   id: '/logs',
   path: '/logs',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const DocumentsRoute = DocumentsImport.update({
+  id: '/documents',
+  path: '/documents',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -150,6 +157,13 @@ declare module '@tanstack/react-router' {
       path: '/assistant'
       fullPath: '/assistant'
       preLoaderRoute: typeof AssistantImport
+      parentRoute: typeof rootRoute
+    }
+    '/documents': {
+      id: '/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof DocumentsImport
       parentRoute: typeof rootRoute
     }
     '/logs': {
@@ -265,6 +279,7 @@ declare module '@tanstack/react-router' {
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/assistant': typeof AssistantRoute
+  '/documents': typeof DocumentsRoute
   '/logs': typeof LogsRoute
   '/system-monitor': typeof SystemMonitorRoute
   '/local-api-server/logs': typeof LocalApiServerLogsRoute
@@ -285,6 +300,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/assistant': typeof AssistantRoute
+  '/documents': typeof DocumentsRoute
   '/logs': typeof LogsRoute
   '/system-monitor': typeof SystemMonitorRoute
   '/local-api-server/logs': typeof LocalApiServerLogsRoute
@@ -306,6 +322,7 @@ export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
   '/assistant': typeof AssistantRoute
+  '/documents': typeof DocumentsRoute
   '/logs': typeof LogsRoute
   '/system-monitor': typeof SystemMonitorRoute
   '/local-api-server/logs': typeof LocalApiServerLogsRoute
@@ -328,6 +345,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/assistant'
+    | '/documents'
     | '/logs'
     | '/system-monitor'
     | '/local-api-server/logs'
@@ -347,6 +365,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/assistant'
+    | '/documents'
     | '/logs'
     | '/system-monitor'
     | '/local-api-server/logs'
@@ -366,6 +385,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/assistant'
+    | '/documents'
     | '/logs'
     | '/system-monitor'
     | '/local-api-server/logs'
@@ -387,6 +407,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AssistantRoute: typeof AssistantRoute
+  DocumentsRoute: typeof DocumentsRoute
   LogsRoute: typeof LogsRoute
   SystemMonitorRoute: typeof SystemMonitorRoute
   LocalApiServerLogsRoute: typeof LocalApiServerLogsRoute
@@ -407,6 +428,7 @@ export interface RootRouteChildren {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AssistantRoute: AssistantRoute,
+  DocumentsRoute: DocumentsRoute,
   LogsRoute: LogsRoute,
   SystemMonitorRoute: SystemMonitorRoute,
   LocalApiServerLogsRoute: LocalApiServerLogsRoute,
@@ -436,6 +458,7 @@ export const routeTree = rootRoute
       "children": [
         "/",
         "/assistant",
+        "/documents",
         "/logs",
         "/system-monitor",
         "/local-api-server/logs",
@@ -458,6 +481,9 @@ export const routeTree = rootRoute
     },
     "/assistant": {
       "filePath": "assistant.tsx"
+    },
+    "/documents": {
+      "filePath": "documents.tsx"
     },
     "/logs": {
       "filePath": "logs.tsx"

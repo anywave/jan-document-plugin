@@ -2,10 +2,9 @@ import { useRef, useState } from 'react'
 
 import { ThreadMessage } from '@janhq/core'
 
-import { CheckIcon, ClipboardIcon, SearchCodeIcon } from 'lucide-react'
+import { CheckIcon, ClipboardIcon, BugIcon } from 'lucide-react'
 
 const ErrorMessage = ({ message }: { message?: ThreadMessage }) => {
-  // const setModalTroubleShooting = useSetAtom(modalTroubleShootingAtom)
   const errorDivRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
 
@@ -18,6 +17,20 @@ const ErrorMessage = ({ message }: { message?: ThreadMessage }) => {
         setTimeout(() => setCopied(false), 2000)
       }
     }
+  }
+
+  const handleReportBug = () => {
+    const errorText = message?.content[0]?.text?.value || 'Unknown error'
+    const title = encodeURIComponent(`[Bug] Chat error: ${errorText.slice(0, 80)}`)
+    const body = encodeURIComponent(
+      `## Description\nA chat error occurred in MOBIUS.\n\n` +
+      `## Error Message\n\`\`\`\n${errorText}\n\`\`\`\n\n` +
+      `## Environment\n- Platform: ${navigator.platform}\n- User Agent: ${navigator.userAgent}\n`
+    )
+    window.open(
+      `https://github.com/anywave/jan-document-plugin/issues/new?title=${title}&body=${body}`,
+      '_blank'
+    )
   }
 
   const getErrorTitle = () => {
@@ -53,12 +66,11 @@ const ErrorMessage = ({ message }: { message?: ThreadMessage }) => {
             <div className="font-semibold">
               <span
                 className="flex cursor-pointer items-center gap-x-1 text-[hsla(var(--app-link))]"
-                // onClick={() => setModalTroubleShooting(true)}
+                onClick={handleReportBug}
               >
-                <SearchCodeIcon size={14} className="text-inherit" />
-                Troubleshooting
+                <BugIcon size={14} className="text-inherit" />
+                Report Bug
               </span>
-              {/* <ModalTroubleShooting /> */}
             </div>
             <div
               className="flex cursor-pointer items-center gap-x-1 font-semibold text-[hsla(var(--text-secondary))]"

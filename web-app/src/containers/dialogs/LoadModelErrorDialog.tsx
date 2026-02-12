@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, BugIcon } from 'lucide-react'
 import { IconCopy, IconCopyCheck } from '@tabler/icons-react'
 import { useTranslation } from '@/i18n/react-i18next-compat'
 import { useModelLoad } from '@/hooks/useModelLoad'
@@ -81,6 +81,20 @@ export default function LoadModelErrorDialog() {
     } finally {
       setTimeout(() => setIsCopying(false), 2000)
     }
+  }
+
+  const handleReportBug = () => {
+    const errorText = formatErrorForCopy(modelLoadError)
+    const title = encodeURIComponent(`[Bug] Model load error: ${errorText.slice(0, 80)}`)
+    const body = encodeURIComponent(
+      `## Description\nModel failed to load in MOBIUS.\n\n` +
+      `## Error\n\`\`\`\n${errorText}\n\`\`\`\n\n` +
+      `## Environment\n- Platform: ${navigator.platform}\n- User Agent: ${navigator.userAgent}\n`
+    )
+    window.open(
+      `https://github.com/anywave/jan-document-plugin/issues/new?title=${title}&body=${body}`,
+      '_blank'
+    )
   }
 
   const handleDialogOpen = (open: boolean) => {
@@ -166,6 +180,14 @@ export default function LoadModelErrorDialog() {
             className="flex-1 text-right sm:flex-none"
           >
             {t('common:cancel')}
+          </Button>
+          <Button
+            variant="link"
+            onClick={handleReportBug}
+            className="flex-1 text-right sm:flex-none border border-main-view-fg/20 !px-2"
+          >
+            <BugIcon className="size-4" />
+            Report Bug
           </Button>
           <Button
             variant="link"

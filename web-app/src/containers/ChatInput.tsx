@@ -22,7 +22,6 @@ import {
   IconCodeCircle2,
   IconPlayerStopFilled,
   IconX,
-  IconFileSearch,
 } from '@tabler/icons-react'
 import { useTranslation } from '@/i18n/react-i18next-compat'
 import { useGeneralSetting } from '@/hooks/useGeneralSetting'
@@ -35,8 +34,10 @@ import DropdownModelProvider from '@/containers/DropdownModelProvider'
 import { ModelLoader } from '@/containers/loaders/ModelLoader'
 import DropdownToolsAvailable from '@/containers/DropdownToolsAvailable'
 import { getConnectedServers } from '@/services/mcp'
-import { DocumentSearchModal } from '@/extensions/document-rag/src/components/DocumentSearchModal'
 import { ContextIndicator } from '@/extensions/document-rag/src/components/ContextIndicator'
+import { processDocument } from '@/extensions/document-rag/src/python-bridge'
+import { open } from '@tauri-apps/plugin-dialog'
+import { toast } from 'sonner'
 import { VoiceRecorder } from '@/components/VoiceRecorder'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 
@@ -75,7 +76,6 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
     }>
   >([])
   const [connectedServers, setConnectedServers] = useState<string[]>([])
-  const [showDocumentSearch, setShowDocumentSearch] = useState(false)
 
   // Speech recognition
   const {
@@ -318,6 +318,36 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
 
     if (textareaRef.current) {
       textareaRef.current.focus()
+    }
+  }
+
+  const handleDocUpload = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: 'Documents', extensions: ['txt', 'md', 'doc', 'docx'] }],
+      })
+      if (!selected) return
+      const filePath = typeof selected === 'string' ? selected : selected
+      const fileName = filePath.split(/[\\/]/).pop() || filePath
+
+      // Fire-and-forget — don't block the chat
+      toast.loading(`Processing "${fileName}"...`, { id: `doc-${fileName}`, duration: Infinity })
+
+      processDocument(filePath, { collectionName: 'documents' })
+        .then((result) => {
+          if (result.success) {
+            toast.success(`"${fileName}" indexed — ${result.chunks_created} chunks`, { id: `doc-${fileName}` })
+          } else {
+            toast.error(`Failed: ${result.error || 'Unknown error'}`, { id: `doc-${fileName}` })
+          }
+        })
+        .catch((err) => {
+          toast.error(`Upload error: ${String(err)}`, { id: `doc-${fileName}` })
+        })
+    } catch (err) {
+      if (String(err).includes('cancelled')) return
+      toast.error(`File selection error: ${String(err)}`)
     }
   }
 
@@ -597,22 +627,22 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                     </Tooltip>
                   </TooltipProvider>
                 )}
-                {/* Document Search - Always available */}
+                {/* Document Upload - Always available */}
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
-                        onClick={() => setShowDocumentSearch(true)}
+                        onClick={handleDocUpload}
                         className="h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1 cursor-pointer"
                       >
-                        <IconFileSearch
+                        <IconPaperclip
                           size={18}
                           className="text-main-view-fg/50"
                         />
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Search Documents</p>
+                      <p>Upload Document</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -672,14 +702,6 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
         </div>
       )}
 
-      {/* Document Search Modal */}
-      {currentThreadId && (
-        <DocumentSearchModal
-          isOpen={showDocumentSearch}
-          onClose={() => setShowDocumentSearch(false)}
-          threadId={currentThreadId}
-        />
-      )}
     </div>
   )
 }

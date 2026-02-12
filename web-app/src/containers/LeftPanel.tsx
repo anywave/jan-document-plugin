@@ -13,6 +13,7 @@ import {
   IconX,
   IconSearch,
   IconClipboardSmileFilled,
+  IconFileTextFilled,
 } from '@tabler/icons-react'
 import { route } from '@/constants/routes'
 import ThreadList from './ThreadList'
@@ -49,6 +50,11 @@ const mainMenus = [
     title: 'common:newChat',
     icon: IconCirclePlusFilled,
     route: route.home,
+  },
+  {
+    title: 'common:documents',
+    icon: IconFileTextFilled,
+    route: route.documents,
   },
   {
     title: 'common:assistants',
