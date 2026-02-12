@@ -76,30 +76,76 @@ export async function listSupportedBackends(): Promise<
     supportedBackends.push('macos-arm64')
   }
 
-  const releases = await _fetchGithubReleases('menloresearch', 'llama.cpp')
-  releases.sort((a, b) => b.tag_name.localeCompare(a.tag_name))
-  releases.splice(10) // keep only the latest 10 releases
+  let backendVersions: { version: string; backend: string }[] = []
 
-  let backendVersions = []
-  for (const release of releases) {
-    const version = release.tag_name
-    const prefix = `llama-${version}-bin-`
+  try {
+    const releases = await _fetchGithubReleases('menloresearch', 'llama.cpp')
+    releases.sort((a, b) => b.tag_name.localeCompare(a.tag_name))
+    releases.splice(10) // keep only the latest 10 releases
 
-    // NOTE: there is checksum.yml. we can also download it to verify the download
-    for (const asset of release.assets) {
-      const name = asset.name
-      if (!name.startsWith(prefix)) {
-        continue
+    for (const release of releases) {
+      const version = release.tag_name
+      const prefix = `llama-${version}-bin-`
+
+      // NOTE: there is checksum.yml. we can also download it to verify the download
+      for (const asset of release.assets) {
+        const name = asset.name
+        if (!name.startsWith(prefix)) {
+          continue
+        }
+
+        const backend = name.replace(prefix, '').replace('.tar.gz', '')
+        if (supportedBackends.includes(backend)) {
+          backendVersions.push({ version, backend })
+        }
       }
+    }
+  } catch (e) {
+    console.warn('GitHub API unreachable, scanning local backends:', e)
+    backendVersions = await scanLocalBackends(supportedBackends)
+  }
 
-      const backend = name.replace(prefix, '').replace('.tar.gz', '')
-      if (supportedBackends.includes(backend)) {
-        backendVersions.push({ version, backend })
+  return backendVersions
+}
+
+/**
+ * Scans locally installed backends when GitHub API is unreachable.
+ * Returns version/backend pairs for backends that are already downloaded
+ * and have a valid llama-server executable.
+ */
+export async function scanLocalBackends(
+  supportedBackends: string[]
+): Promise<{ version: string; backend: string }[]> {
+  const janDataFolderPath = await getJanDataFolderPath()
+  const backendsDir = await joinPath([janDataFolderPath, 'llamacpp', 'backends'])
+
+  if (!(await fs.existsSync(backendsDir))) return []
+
+  const results: { version: string; backend: string }[] = []
+  const versionDirs = await fs.readdirSync(backendsDir)
+
+  for (const versionEntry of versionDirs) {
+    const versionPath = await joinPath([backendsDir, versionEntry])
+    const stat = await fs.fileStat(versionPath)
+    if (!stat.isDirectory) continue
+
+    const backendDirs = await fs.readdirSync(versionPath)
+    for (const backendEntry of backendDirs) {
+      const backendPath = await joinPath([versionPath, backendEntry])
+      const bStat = await fs.fileStat(backendPath)
+      if (!bStat.isDirectory) continue
+
+      // Only include backends compatible with this system
+      if (!supportedBackends.includes(backendEntry)) continue
+
+      // Verify llama-server executable exists
+      if (await isBackendInstalled(backendEntry, versionEntry)) {
+        results.push({ version: versionEntry, backend: backendEntry })
       }
     }
   }
 
-  return backendVersions
+  return results
 }
 
 export async function getBackendDir(

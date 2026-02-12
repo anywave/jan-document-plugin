@@ -240,14 +240,14 @@ export default class llamacpp_extension extends AIEngine {
         version_backends = await listSupportedBackends()
         if (version_backends.length === 0) {
           throw new Error(
-            'No supported backend binaries found for this system. Backend selection and auto-update will be unavailable.'
+            'No supported backend binaries found. If this is a fresh install, an internet connection is required to download the inference engine.'
           )
         } else {
           version_backends.sort((a, b) => b.version.localeCompare(a.version))
         }
       } catch (error) {
         throw new Error(
-          `Failed to fetch supported backends: ${
+          `Failed to initialize backend: ${
             error instanceof Error ? error.message : error
           }`
         )
@@ -1179,7 +1179,7 @@ export default class llamacpp_extension extends AIEngine {
     const [version, backend] = cfg.version_backend.split('/')
     if (!version || !backend) {
       throw new Error(
-        "Initial setup for the backend failed due to a network issue. Please restart the app!"
+        'No inference engine is configured. This usually means the initial download failed due to a network issue. Please check your internet connection and restart the app.'
       )
     }
 
