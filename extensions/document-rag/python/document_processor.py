@@ -235,7 +235,7 @@ class DocumentProcessor:
                 return result
 
             result['success'] = True
-            print("  ✓ Complete")
+            print("  [OK] Complete")
 
         except Exception as e:
             result['error'] = str(e)
@@ -389,6 +389,8 @@ def main():
 
     # Suppress progress output when in JSON mode
     if args.json:
+        # Disable tqdm progress bars to avoid pipe buffer deadlocks
+        os.environ['TQDM_DISABLE'] = '1'
         # Redirect stdout temporarily to capture only final JSON
         import io
         original_stdout = sys.stdout
@@ -412,9 +414,9 @@ def main():
         else:
             print("\n" + "=" * 80)
             if result['success']:
-                print(f"✓ Success: Created {result['chunks_created']} chunks")
+                print(f"[OK] Success: Created {result['chunks_created']} chunks")
             else:
-                print(f"✗ Error: {result['error']}")
+                print(f"[ERROR] Error: {result['error']}")
 
     elif args.command == 'query':
         result = processor.query_documents(
@@ -429,7 +431,7 @@ def main():
         else:
             print("\n" + "=" * 80)
             if result['error']:
-                print(f"✗ Error: {result['error']}")
+                print(f"[ERROR] Error: {result['error']}")
             else:
                 print(f"Query: {result['query']}")
                 print(f"Found {len(result['results'])} results:\n")

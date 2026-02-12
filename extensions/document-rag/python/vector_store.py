@@ -49,7 +49,7 @@ class VectorStore:
 
         return self.client.get_or_create_collection(
             name=collection_name,
-            metadata=metadata or {}
+            metadata=metadata if metadata else None
         )
 
     def add_documents(

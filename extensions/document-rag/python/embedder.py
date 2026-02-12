@@ -98,7 +98,8 @@ class Embedder:
                 # Look for sentence end markers
                 for marker in ['. ', '.\n', '! ', '!\n', '? ', '?\n']:
                     last_marker = text[start:end].rfind(marker)
-                    if last_marker != -1:
+                    # Only use boundary if chunk stays larger than overlap
+                    if last_marker != -1 and last_marker + 1 > overlap:
                         end = start + last_marker + 1
                         break
 
@@ -111,8 +112,9 @@ class Embedder:
             if chunk['text']:
                 chunks.append(chunk)
 
-            # Move to next chunk with overlap
-            start = end - overlap if end < len(text) else end
+            # Move to next chunk with overlap, always advancing
+            next_start = end - overlap if end < len(text) else end
+            start = max(start + 1, next_start)
 
         return chunks
 
