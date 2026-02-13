@@ -21,4 +21,6 @@ export const localStorageKey = {
   ragEnabled: 'rag-enabled',
   chatExcerpts: 'chat-excerpts',
   ttsVoice: 'tts-voice',
+  codexState: 'codex-state',
+  breathSync: 'breath-sync',
 }

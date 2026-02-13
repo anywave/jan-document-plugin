@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { route } from '@/constants/routes'
 import { useState } from 'react'
 
-import { useAssistant } from '@/hooks/useAssistant'
+import { useAssistant, builtInAssistantIds } from '@/hooks/useAssistant'
 
 import HeaderPage from '@/containers/HeaderPage'
 import { IconCirclePlus, IconPencil, IconTrash } from '@tabler/icons-react'
@@ -96,13 +96,15 @@ function Assistant() {
                     >
                       <IconPencil size={18} className="text-main-view-fg/50" />
                     </div>
-                    <div
-                      className="size-6 cursor-pointer flex items-center justify-center rounded hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out"
-                      title={t('assistants:deleteAssistant')}
-                      onClick={() => handleDelete(assistant.id)}
-                    >
-                      <IconTrash size={18} className="text-main-view-fg/50" />
-                    </div>
+                    {!builtInAssistantIds.has(assistant.id) && (
+                      <div
+                        className="size-6 cursor-pointer flex items-center justify-center rounded hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out"
+                        title={t('assistants:deleteAssistant')}
+                        onClick={() => handleDelete(assistant.id)}
+                      >
+                        <IconTrash size={18} className="text-main-view-fg/50" />
+                      </div>
+                    )}
                   </div>
                 </div>
                 <p

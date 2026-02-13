@@ -26,4 +26,5 @@ export const route = {
   systemMonitor: '/system-monitor',
   threadsDetail: '/threads/$threadId',
   docs: '/docs',
+  codex: '/codex',
 }

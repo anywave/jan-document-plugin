@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { useAssistant, defaultAssistant } from '../useAssistant'
+import {
+  useAssistant,
+  defaultAssistant,
+  allBuiltInAssistants,
+  builtInAssistantIds,
+} from '../useAssistant'
 
 // Mock the services
 vi.mock('@/services/assistants', () => ({
@@ -112,10 +117,10 @@ describe('useAssistant', () => {
     expect(result.current.currentAssistant).toEqual(newAssistant)
   })
 
-  it('should set assistants', () => {
+  it('should set assistants and merge built-ins', () => {
     const { result } = renderHook(() => useAssistant())
 
-    const assistants = [
+    const userAssistants = [
       {
         id: 'assistant-1',
         name: 'Assistant 1',
@@ -137,11 +142,21 @@ describe('useAssistant', () => {
     ]
 
     act(() => {
-      result.current.setAssistants(assistants)
+      result.current.setAssistants(userAssistants)
     })
 
-    expect(result.current.assistants).toEqual(assistants)
-    expect(result.current.assistants).toHaveLength(2)
+    // User assistants + missing built-ins are merged
+    expect(result.current.assistants).toHaveLength(
+      userAssistants.length + allBuiltInAssistants.length
+    )
+    expect(result.current.assistants[0].id).toBe('assistant-1')
+    expect(result.current.assistants[1].id).toBe('assistant-2')
+    // Built-ins are appended
+    for (const builtIn of allBuiltInAssistants) {
+      expect(
+        result.current.assistants.find((a) => a.id === builtIn.id)
+      ).toBeDefined()
+    }
   })
 
   it('should maintain assistant structure', () => {
@@ -160,14 +175,59 @@ describe('useAssistant', () => {
     expect(typeof result.current.currentAssistant.parameters).toBe('object')
   })
 
-  it('should handle empty assistants list', () => {
+  it('should preserve built-in assistants when setting empty list', () => {
     const { result } = renderHook(() => useAssistant())
 
     act(() => {
       result.current.setAssistants([])
     })
 
-    expect(result.current.assistants).toEqual([])
+    // Built-ins are always present even when disk returns empty
+    expect(result.current.assistants).toHaveLength(allBuiltInAssistants.length)
+    for (const builtIn of allBuiltInAssistants) {
+      expect(
+        result.current.assistants.find((a) => a.id === builtIn.id)
+      ).toBeDefined()
+    }
+  })
+
+  it('should not delete built-in assistants', () => {
+    const { result } = renderHook(() => useAssistant())
+
+    // Add a user assistant alongside the default
+    const userAssistant = {
+      id: 'user-1',
+      name: 'User Assistant',
+      avatar: '🤖',
+      description: 'User-created',
+      instructions: 'Help',
+      created_at: Date.now(),
+      parameters: {},
+    }
+
+    act(() => {
+      result.current.addAssistant(userAssistant)
+    })
+
+    const countBefore = result.current.assistants.length
+
+    // Try to delete a built-in — should be a no-op
+    act(() => {
+      result.current.deleteAssistant('jan')
+    })
+
+    expect(result.current.assistants).toHaveLength(countBefore)
+    expect(result.current.assistants.find((a) => a.id === 'jan')).toBeDefined()
+
+    // User assistant can still be deleted
+    act(() => {
+      result.current.deleteAssistant('user-1')
+    })
+
+    expect(result.current.assistants).toHaveLength(countBefore - 1)
+    expect(
+      result.current.assistants.find((a) => a.id === 'user-1')
+    ).toBeUndefined()
   })
 
   it('should update assistant in current assistant if it matches', () => {
