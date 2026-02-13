@@ -222,7 +222,7 @@ export const useChat = () => {
   )
 
   const sendMessage = useCallback(
-    async (message: string, troubleshooting = true) => {
+    async (message: string, troubleshooting = true, ragEnabled = false) => {
       const activeThread = await getCurrentThread()
 
       resetTokenSpeed()
@@ -246,30 +246,34 @@ export const useChat = () => {
           updateLoadingModel(false)
         }
 
-        // Auto-retrieve relevant document chunks from ChromaDB based on user's message
-        try {
-          const queryResult = await queryDocuments(message, { topK: 15 })
-          if (!queryResult.error && queryResult.results.length > 0) {
-            const contextItems = queryResult.results.map((r) => ({
-              source: r.metadata?.file_name || 'Unknown',
-              content: r.text,
-              distance: r.distance,
-              metadata: r.metadata,
-            }))
-            addToContext(activeThread.id, contextItems)
-          }
-        } catch (e) {
-          console.warn('[useChat] Auto document query failed:', e)
-        }
+        let systemInstruction = currentAssistant?.instructions
 
-        // Get document context with Qwen extraction and combine with assistant instructions
-        const documentContext = await formatContextWithExtraction(activeThread.id, message)
-          .catch(() => formatContext(activeThread.id))
-        const systemInstruction = documentContext
-          ? currentAssistant?.instructions
-            ? `${currentAssistant.instructions}\n\n${documentContext}`
-            : documentContext
-          : currentAssistant?.instructions
+        if (ragEnabled) {
+          // Auto-retrieve relevant document chunks from ChromaDB based on user's message
+          try {
+            const queryResult = await queryDocuments(message, { topK: 15 })
+            if (!queryResult.error && queryResult.results.length > 0) {
+              const contextItems = queryResult.results.map((r) => ({
+                source: r.metadata?.file_name || 'Unknown',
+                content: r.text,
+                distance: r.distance,
+                metadata: r.metadata,
+              }))
+              addToContext(activeThread.id, contextItems)
+            }
+          } catch (e) {
+            console.warn('[useChat] Auto document query failed:', e)
+          }
+
+          // Get document context with Qwen extraction and combine with assistant instructions
+          const documentContext = await formatContextWithExtraction(activeThread.id, message)
+            .catch(() => formatContext(activeThread.id))
+          systemInstruction = documentContext
+            ? currentAssistant?.instructions
+              ? `${currentAssistant.instructions}\n\n${documentContext}`
+              : documentContext
+            : currentAssistant?.instructions
+        }
 
         const builder = new CompletionMessagesBuilder(
           messages,

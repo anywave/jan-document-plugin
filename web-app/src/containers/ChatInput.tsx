@@ -2,6 +2,8 @@
 
 import TextareaAutosize from 'react-textarea-autosize'
 import { cn, toGigabytes } from '@/lib/utils'
+import { useNavigate } from '@tanstack/react-router'
+import { route } from '@/constants/routes'
 import { usePrompt } from '@/hooks/usePrompt'
 import { useThreads } from '@/hooks/useThreads'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -25,10 +27,12 @@ import {
   IconFileSearch,
   IconSparkles,
   IconFolder,
+  IconDatabase,
 } from '@tabler/icons-react'
 import { useTranslation } from '@/i18n/react-i18next-compat'
 import { useGeneralSetting } from '@/hooks/useGeneralSetting'
 import { useModelProvider } from '@/hooks/useModelProvider'
+import { localStorageKey } from '@/constants/localStorage'
 
 import { useAppState } from '@/hooks/useAppState'
 import { MovingBorder } from './MovingBorder'
@@ -77,6 +81,13 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
 
   const { selectedModel } = useModelProvider()
   const { sendMessage } = useChat()
+  const navigate = useNavigate()
+
+  const openDocs = (section: string) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    navigate({ to: `${route.docs}#${section}` as any })
+  }
   const [message, setMessage] = useState('')
   const [dropdownToolsAvailable, setDropdownToolsAvailable] = useState(false)
   const [tooltipToolsAvailable, setTooltipToolsAvailable] = useState(false)
@@ -92,6 +103,18 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
   const [connectedServers, setConnectedServers] = useState<string[]>([])
   const [showDocSearch, setShowDocSearch] = useState(false)
   const [smartProcessing, setSmartProcessing] = useState(false)
+  const [ragEnabled, setRagEnabled] = useState(() => {
+    const stored = localStorage.getItem(localStorageKey.ragEnabled)
+    return stored === 'true'
+  })
+
+  const toggleRag = () => {
+    setRagEnabled((prev) => {
+      const next = !prev
+      localStorage.setItem(localStorageKey.ragEnabled, String(next))
+      return next
+    })
+  }
   const [isBatchProcessing, setIsBatchProcessing] = useState(false)
   const [batchFiles, setBatchFiles] = useState<
     Array<{
@@ -145,8 +168,10 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [toggleListening])
 
-  // Check for connected MCP servers
+  // Check for connected MCP servers (only in Tauri context)
   useEffect(() => {
+    if (!(window as any).__TAURI_INTERNALS__) return
+
     const checkConnectedServers = async () => {
       try {
         const servers = await getConnectedServers()
@@ -167,27 +192,33 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
 
   // Drag-and-drop document files onto chat (registered once, reads refs)
   useEffect(() => {
+    // Only register in Tauri context (not plain browser)
+    if (!(window as any).__TAURI_INTERNALS__) return
     let cancelled = false
     let unlisten: (() => void) | undefined
-    getCurrentWebviewWindow()
-      .onDragDropEvent((event) => {
-        if (event.payload.type === 'drop' && !isBatchProcessingRef.current) {
-          const exts = ALLOWED_DOC_EXTENSIONS
-          const paths = event.payload.paths.filter((p: string) => {
-            const ext = p.split('.').pop()?.toLowerCase() || ''
-            return exts.includes(ext)
-          })
-          if (paths.length > 0) {
-            handleBatchProcessRef.current(paths)
-          } else if (event.payload.paths.length > 0) {
-            toast.error(`No supported document files. Allowed: ${exts.join(', ')}`)
+    try {
+      getCurrentWebviewWindow()
+        .onDragDropEvent((event) => {
+          if (event.payload.type === 'drop' && !isBatchProcessingRef.current) {
+            const exts = ALLOWED_DOC_EXTENSIONS
+            const paths = event.payload.paths.filter((p: string) => {
+              const ext = p.split('.').pop()?.toLowerCase() || ''
+              return exts.includes(ext)
+            })
+            if (paths.length > 0) {
+              handleBatchProcessRef.current(paths)
+            } else if (event.payload.paths.length > 0) {
+              toast.error(`No supported document files. Allowed: ${exts.join(', ')}`)
+            }
           }
-        }
-      })
-      .then((fn) => {
-        if (cancelled) { fn() } else { unlisten = fn }
-      })
-      .catch((err) => console.error('Failed to register drag-drop listener:', err))
+        })
+        .then((fn) => {
+          if (cancelled) { fn() } else { unlisten = fn }
+        })
+        .catch((err) => console.error('Failed to register drag-drop listener:', err))
+    } catch (err) {
+      console.warn('Drag-drop not available (not in Tauri context):', err)
+    }
     return () => {
       cancelled = true
       unlisten?.()
@@ -196,6 +227,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
 
   // Listen for per-file batch results to update pill strip in real-time
   useEffect(() => {
+    if (!(window as any).__TAURI_INTERNALS__) return
     let cancelled = false
     let unlisten: (() => void) | undefined
     onBatchFileResult((result: BatchFileResult) => {
@@ -224,6 +256,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
 
   // Listen for progress events to mark files as "processing"
   useEffect(() => {
+    if (!(window as any).__TAURI_INTERNALS__) return
     let cancelled = false
     let unlisten: (() => void) | undefined
     onProcessingProgress((progress) => {
@@ -259,7 +292,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
       return
     }
     setMessage('')
-    sendMessage(prompt)
+    sendMessage(prompt, true, ragEnabled)
   }
 
   useEffect(() => {
@@ -758,12 +791,16 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger disabled={dropdownToolsAvailable}>
-                        <div className="h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1">
+                        <div
+                          className="h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1"
+                          onContextMenu={openDocs('vision')}
+                        >
                           <IconEye size={18} className="text-main-view-fg/50" />
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>{t('vision')}</p>
+
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -772,7 +809,10 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className="h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1">
+                        <div
+                          className="h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1"
+                          onContextMenu={openDocs('embeddings')}
+                        >
                           <IconCodeCircle2
                             size={18}
                             className="text-main-view-fg/50"
@@ -781,6 +821,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>{t('embeddings')}</p>
+
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -803,6 +844,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                               setDropdownToolsAvailable(false)
                               e.stopPropagation()
                             }}
+                            onContextMenu={openDocs('tools')}
                           >
                             <DropdownToolsAvailable
                               initialMessage={initialMessage}
@@ -838,6 +880,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>{t('tools')}</p>
+  
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -846,7 +889,10 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className="h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1">
+                        <div
+                          className="h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1"
+                          onContextMenu={openDocs('web-search')}
+                        >
                           <IconWorld
                             size={18}
                             className="text-main-view-fg/50"
@@ -855,6 +901,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>Web Search</p>
+
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -863,7 +910,10 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className="h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1">
+                        <div
+                          className="h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1"
+                          onContextMenu={openDocs('reasoning')}
+                        >
                           <IconAtom
                             size={18}
                             className="text-main-view-fg/50"
@@ -872,6 +922,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>{t('reasoning')}</p>
+
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -882,6 +933,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                     <TooltipTrigger asChild>
                       <div
                         onClick={handleDocUpload}
+                        onContextMenu={openDocs('upload-documents')}
                         className={cn(
                           "h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1 cursor-pointer",
                           isBatchProcessing && "opacity-50 pointer-events-none"
@@ -895,6 +947,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Upload Documents</p>
+
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -904,6 +957,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                     <TooltipTrigger asChild>
                       <div
                         onClick={handleFolderUpload}
+                        onContextMenu={openDocs('upload-folder')}
                         className={cn(
                           "h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1 cursor-pointer",
                           isBatchProcessing && "opacity-50 pointer-events-none"
@@ -917,6 +971,35 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Upload Folder</p>
+
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                {/* Document RAG Toggle */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        onClick={toggleRag}
+                        onContextMenu={openDocs('rag-toggle')}
+                        className={cn(
+                          "h-6 p-1 flex items-center justify-center rounded-sm transition-all duration-200 ease-in-out gap-1 cursor-pointer",
+                          ragEnabled
+                            ? "bg-primary/20 text-primary"
+                            : "hover:bg-main-view-fg/10 text-main-view-fg/50"
+                        )}
+                      >
+                        <IconDatabase size={18} />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold">{ragEnabled ? 'Document RAG: ON' : 'Document RAG: OFF'}</p>
+                      <p className="text-xs mt-1">
+                        {ragEnabled
+                          ? 'Chat messages will search your indexed documents and include relevant context. May add latency.'
+                          : 'Chat goes directly to the model without document retrieval. Toggle ON to use your indexed documents.'}
+                      </p>
+
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -926,6 +1009,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                     <TooltipTrigger asChild>
                       <div
                         onClick={() => setSmartProcessing(!smartProcessing)}
+                        onContextMenu={openDocs('smart-processing')}
                         className={cn(
                           "h-6 p-1 flex items-center justify-center rounded-sm transition-all duration-200 ease-in-out gap-1 cursor-pointer",
                           smartProcessing
@@ -943,6 +1027,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                           ? 'Structure-aware chunking — preserves sections, headings, and paragraphs. Better for legal docs, reports, and research papers. Fewer but larger, more meaningful chunks.'
                           : 'Standard chunking — fast, fixed-size 500 char splits. Good for quick lookups and short documents.'}
                       </p>
+
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -952,6 +1037,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                     <TooltipTrigger asChild>
                       <div
                         onClick={() => setShowDocSearch(true)}
+                        onContextMenu={openDocs('search-documents')}
                         className="h-6 p-1 flex items-center justify-center rounded-sm hover:bg-main-view-fg/10 transition-all duration-200 ease-in-out gap-1 cursor-pointer"
                       >
                         <IconFileSearch
@@ -962,6 +1048,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Search Documents</p>
+
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -971,8 +1058,10 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                   isSupported={isSpeechSupported}
                   onToggle={toggleListening}
                   error={speechError}
+                  onContextMenu={openDocs('voice-input')}
                 />
               </div>
+              <span className="text-[10px] text-main-view-fg/30 italic select-none">Right click for more info...</span>
             </div>
 
             {streamingContent ? (
