@@ -142,6 +142,29 @@ pub struct BatchProcessResult {
     pub total_time: f64,
 }
 
+/// A chunk within a source document group
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DocumentChunk {
+    pub id: String,
+    pub text: String,
+    pub metadata: serde_json::Value,
+}
+
+/// A document group (source file with its chunks)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DocumentGroup {
+    pub file_name: String,
+    pub chunk_count: usize,
+    pub chunks: Vec<DocumentChunk>,
+}
+
+/// Result of listing documents grouped by source
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DocumentsBySourceResult {
+    pub documents: Vec<DocumentGroup>,
+    pub error: Option<String>,
+}
+
 /// Get path to the extracted Python 3.12 directory (in app data)
 fn get_python_dir(app_handle: &AppHandle) -> PathBuf {
     app_handle
@@ -1020,6 +1043,38 @@ pub async fn process_document_batch(
             "total_time": result.total_time,
         }),
     );
+
+    Ok(result)
+}
+
+/// List all documents grouped by source file
+#[tauri::command]
+pub async fn list_documents_by_source(
+    app_handle: AppHandle,
+    collection_name: Option<String>,
+) -> Result<DocumentsBySourceResult, String> {
+    log::info!("Listing documents by source");
+
+    let db_path = get_chromadb_dir(&app_handle);
+    let args = vec![
+        "--json".to_string(),
+        "--db-path".to_string(),
+        db_path.to_string_lossy().to_string(),
+        "list-by-source".to_string(),
+        "--collection".to_string(),
+        collection_name.unwrap_or_else(|| "documents".to_string()),
+    ];
+
+    let output = execute_python_command_with_retry(
+        &app_handle,
+        "document_processor.py",
+        args,
+        PYTHON_COMMAND_TIMEOUT,
+    )
+    .await?;
+
+    let result: DocumentsBySourceResult = serde_json::from_str(&output)
+        .map_err(|e| format!("Failed to parse Python output: {}", e))?;
 
     Ok(result)
 }

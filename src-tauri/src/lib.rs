@@ -69,6 +69,7 @@ pub fn run() {
             core::python_bridge::check_jan_lock_status,
             core::python_bridge::scan_directory,
             core::python_bridge::process_document_batch,
+            core::python_bridge::list_documents_by_source,
             // MCP commands
             core::mcp::get_tools,
             core::mcp::call_tool,

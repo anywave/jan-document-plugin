@@ -1,8 +1,16 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { localStorageKey } from '@/constants/localStorage'
-import { sep } from '@tauri-apps/api/path'
 import { modelSettings } from '@/lib/predefined'
+
+// Safe path separator — avoids Tauri API dependency that crashes outside webview
+const pathSep = () => {
+  try {
+    return navigator?.userAgent?.includes('Windows') ? '\\' : '/'
+  } catch {
+    return '/'
+  }
+}
 
 type ModelProviderState = {
   providers: ModelProvider[]
@@ -93,7 +101,7 @@ export const useModelProvider = create<ModelProviderState>()(
                   ? legacyModels
                   : models
                 ).find(
-                  (m) => m.id.split(':').slice(0, 2).join(sep()) === model.id
+                  (m) => m.id.split(':').slice(0, 2).join(pathSep()) === model.id
                 )?.settings || model.settings
               const existingModel = models.find((m) => m.id === model.id)
               return {

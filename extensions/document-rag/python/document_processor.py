@@ -536,6 +536,57 @@ class DocumentProcessor:
 
         return result
 
+    def list_by_source(self, collection_name: str = "documents") -> Dict[str, any]:
+        """
+        List all document chunks grouped by their source file.
+
+        Args:
+            collection_name: Collection name
+
+        Returns:
+            Dictionary with documents grouped by file_name metadata
+        """
+        result = {
+            'documents': [],
+            'error': None,
+        }
+
+        try:
+            collection = self.vector_store.get_or_create_collection(collection_name)
+            # Get all documents with metadata (no embedding needed)
+            all_docs = collection.get(include=['documents', 'metadatas'])
+
+            if not all_docs['ids']:
+                return result
+
+            # Group by file_name metadata
+            grouped = {}
+            for i, doc_id in enumerate(all_docs['ids']):
+                metadata = all_docs['metadatas'][i] if all_docs['metadatas'] else {}
+                file_name = metadata.get('file_name', 'Unknown')
+                text = all_docs['documents'][i] if all_docs['documents'] else ''
+
+                if file_name not in grouped:
+                    grouped[file_name] = {
+                        'file_name': file_name,
+                        'chunk_count': 0,
+                        'chunks': [],
+                    }
+
+                grouped[file_name]['chunk_count'] += 1
+                grouped[file_name]['chunks'].append({
+                    'id': doc_id,
+                    'text': text,
+                    'metadata': metadata,
+                })
+
+            result['documents'] = list(grouped.values())
+
+        except Exception as e:
+            result['error'] = str(e)
+
+        return result
+
 
 def main():
     """CLI interface for document processor."""
@@ -581,6 +632,10 @@ def main():
     health_parser = subparsers.add_parser('health', help='Check ChromaDB health')
     health_parser.add_argument('--collection', default='documents', help='Collection name')
     health_parser.add_argument('--auto-recover', action='store_true', help='Auto-recover corrupt DB')
+
+    # List-by-source command
+    list_source_parser = subparsers.add_parser('list-by-source', help='List documents grouped by source file')
+    list_source_parser.add_argument('--collection', default='documents', help='Collection name')
 
     args = parser.parse_args()
 
@@ -691,6 +746,21 @@ def main():
                 print(f"Error: {health['error']}")
             if health['recovered']:
                 print("Database was recovered automatically.")
+
+    elif args.command == 'list-by-source':
+        result = processor.list_by_source(args.collection)
+
+        if args.json:
+            sys.stdout = original_stdout
+            print(json.dumps(result))
+        else:
+            print("\n" + "=" * 80)
+            if result['error']:
+                print(f"[ERROR] {result['error']}")
+            else:
+                print(f"Found {len(result['documents'])} source documents:\n")
+                for doc in result['documents']:
+                    print(f"  {doc['file_name']} ({doc['chunk_count']} chunks)")
 
     else:
         parser.print_help()

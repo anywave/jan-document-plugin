@@ -117,6 +117,32 @@ export interface BatchProcessResult {
 }
 
 /**
+ * A chunk within a source document group
+ */
+export interface DocumentChunk {
+  id: string
+  text: string
+  metadata: Record<string, any>
+}
+
+/**
+ * A document group (source file with its chunks)
+ */
+export interface DocumentGroup {
+  file_name: string
+  chunk_count: number
+  chunks: DocumentChunk[]
+}
+
+/**
+ * Result of listing documents grouped by source
+ */
+export interface DocumentsBySourceResult {
+  documents: DocumentGroup[]
+  error: string | null
+}
+
+/**
  * Document processing progress event
  */
 export interface ProcessingProgress {
@@ -301,6 +327,20 @@ export async function scanDirectory(
 ): Promise<ScanDirectoryResult> {
   return invoke<ScanDirectoryResult>('scan_directory', {
     directoryPath,
+  })
+}
+
+/**
+ * List all documents grouped by source file
+ *
+ * @param collectionName - Collection name (default: "documents")
+ * @returns Documents grouped by source file with chunks
+ */
+export async function listDocumentsBySource(
+  collectionName?: string
+): Promise<DocumentsBySourceResult> {
+  return invoke<DocumentsBySourceResult>('list_documents_by_source', {
+    collectionName,
   })
 }
 

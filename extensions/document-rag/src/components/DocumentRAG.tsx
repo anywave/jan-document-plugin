@@ -4,16 +4,17 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { FileText, Search, Library, AlertCircle, Info } from 'lucide-react'
+import { FileText, Search, Library, AlertCircle, Info, FolderTree } from 'lucide-react'
 import { DocumentUpload } from './DocumentUpload'
 import { DocumentLibrary } from './DocumentLibrary'
 import { SearchInterface } from './SearchInterface'
+import { XtractLib } from './XtractLib'
 import { DocumentRAGErrorBoundary } from './DocumentRAGErrorBoundary'
 import { checkPythonStatus, type PythonStatus } from '../python-bridge'
 import { ensureQwenRegistered } from '../qwen-extraction'
 import { toast } from 'sonner'
 
-type Tab = 'upload' | 'library' | 'search'
+type Tab = 'upload' | 'library' | 'search' | 'xtract-lib'
 
 interface DocumentRAGProps {
   defaultTab?: Tab
@@ -125,6 +126,12 @@ export function DocumentRAG({
               icon={<Search className="h-4 w-4" />}
               label="Search"
             />
+            <TabButton
+              active={activeTab === 'xtract-lib'}
+              onClick={() => setActiveTab('xtract-lib')}
+              icon={<FolderTree className="h-4 w-4" />}
+              label="Xtract Lib"
+            />
           </div>
         </div>
 
@@ -168,6 +175,10 @@ export function DocumentRAG({
 
           {activeTab === 'search' && (
             <SearchInterface collectionName={collectionName} />
+          )}
+
+          {activeTab === 'xtract-lib' && (
+            <XtractLib collectionName={collectionName} />
           )}
         </div>
 

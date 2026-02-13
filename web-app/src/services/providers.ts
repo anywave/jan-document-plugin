@@ -121,6 +121,26 @@ export const getProviders = async (): Promise<ModelProvider[]> => {
           {} as Record<string, ProviderSetting>
         ),
       },
+      {
+        id: 'qwen2.5-7b-instruct-q4_k_m',
+        model: 'qwen2.5-7b-instruct-q4_k_m',
+        name: 'Qwen 2.5 7B Instruct',
+        description: 'Document processing & instruction following',
+        capabilities: [ModelCapabilities.COMPLETION],
+        provider: 'llamacpp',
+        settings: Object.values(modelSettings).reduce(
+          (acc, setting) => {
+            let value = setting.controller_props.value
+            if (setting.key === 'ctx_len') value = 8192
+            acc[setting.key] = {
+              ...setting,
+              controller_props: { ...setting.controller_props, value },
+            }
+            return acc
+          },
+          {} as Record<string, ProviderSetting>
+        ),
+      },
     ],
   } as ModelProvider]
 }
