@@ -18,4 +18,6 @@ export const localStorageKey = {
   lastUsedModel: 'last-used-model',
   lastUsedAssistant: 'last-used-assistant',
   setupCompleted: 'setup-completed',
+  ragEnabled: 'rag-enabled',
+  chatExcerpts: 'chat-excerpts',
 }

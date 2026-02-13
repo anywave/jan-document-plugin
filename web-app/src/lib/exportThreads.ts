@@ -1,6 +1,7 @@
 import { useThreads } from '@/hooks/useThreads'
 import { fetchMessages } from '@/services/messages'
 import type { ThreadMessage } from '@janhq/core'
+import { useChatExcerpts } from '@/hooks/useChatExcerpts'
 
 type ExportFormat = 'clipboard' | 'text' | 'docx'
 
@@ -103,7 +104,20 @@ export async function exportThreads(
     }
   } else if (format === 'docx') {
     // Lazy-load docx to keep the main bundle slim
-    const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import('docx')
+    const {
+      Document,
+      Packer,
+      Paragraph,
+      TextRun,
+      HeadingLevel,
+      CommentRangeStart,
+      CommentRangeEnd,
+      CommentReference,
+    } = await import('docx')
+
+    const excerptStore = useChatExcerpts.getState()
+    let commentId = 0
+    const allComments: { id: number; children: InstanceType<typeof Paragraph>[]; author: string; date: Date }[] = []
 
     const sections = valid.map((e) => {
       const children: InstanceType<typeof Paragraph>[] = []
@@ -137,21 +151,47 @@ export async function exportThreads(
         const text = messageText(msg)
         if (!text) continue
 
-        children.push(
-          new Paragraph({
-            children: [
-              new TextRun({ text: `[${roleLabel(msg.role)}]: `, bold: true }),
-              new TextRun({ text }),
-            ],
+        const annotation = msg.id ? excerptStore.getAnnotationForMessage(msg.id) : undefined
+
+        if (annotation) {
+          const cid = commentId++
+          children.push(
+            new Paragraph({
+              children: [
+                new CommentRangeStart(cid),
+                new TextRun({ text: `[${roleLabel(msg.role)}]: `, bold: true }),
+                new TextRun({ text }),
+                new CommentRangeEnd(cid),
+                new CommentReference(cid),
+              ],
+            })
+          )
+          allComments.push({
+            id: cid,
+            author: 'MOBIUS',
+            date: new Date(annotation.createdAt),
+            children: [new Paragraph({ text: annotation.summary })],
           })
-        )
+        } else {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: `[${roleLabel(msg.role)}]: `, bold: true }),
+                new TextRun({ text }),
+              ],
+            })
+          )
+        }
         children.push(new Paragraph({}))
       }
 
       return { children }
     })
 
-    const doc = new Document({ sections })
+    const doc = new Document({
+      sections,
+      ...(allComments.length > 0 ? { comments: { children: allComments } } : {}),
+    })
     const buffer = await Packer.toBlob(doc)
     const filename =
       valid.length === 1

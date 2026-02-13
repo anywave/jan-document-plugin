@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, useParams } from '@tanstack/react-router'
 import { UIEventHandler } from 'react'
 import debounce from 'lodash.debounce'
 import cloneDeep from 'lodash.clonedeep'
 import { cn } from '@/lib/utils'
 import { ArrowDown, Play } from 'lucide-react'
+import { toast } from 'sonner'
 
 import HeaderPage from '@/containers/HeaderPage'
 import { useThreads } from '@/hooks/useThreads'
@@ -23,6 +24,13 @@ import { ContentType, ThreadMessage } from '@janhq/core'
 import { useTranslation } from '@/i18n/react-i18next-compat'
 import { useChat } from '@/hooks/useChat'
 import { useSmallScreen } from '@/hooks/useMediaQuery'
+import { usePrompt } from '@/hooks/usePrompt'
+import { useModelProvider } from '@/hooks/useModelProvider'
+import { useChatExcerpts } from '@/hooks/useChatExcerpts'
+import { useTextSelection } from '@/hooks/useTextSelection'
+import { sendCompletion, isCompletionResponse } from '@/lib/completion'
+import { SelectionContextMenu } from '@/components/SelectionContextMenu'
+import { AnnotationCard } from '@/components/AnnotationCard'
 
 // as route.threadsDetail
 export const Route = createFileRoute('/threads/$threadId')({
@@ -43,6 +51,9 @@ function ThreadDetail() {
   const { appMainViewBgColor, chatWidth } = useAppearance()
   const { sendMessage } = useChat()
   const isSmallScreen = useSmallScreen()
+  const { setPrompt } = usePrompt()
+  const { getProviderByName } = useModelProvider()
+  const { addExcerpt, addAnnotation, removeAnnotation } = useChatExcerpts()
 
   const { messages } = useMessages(
     useShallow((state) => ({
@@ -55,6 +66,119 @@ function ThreadDetail() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isFirstRender = useRef(true)
   const messagesCount = useMemo(() => messages?.length ?? 0, [messages])
+
+  // Text selection context menu
+  const { selection, clearSelection } = useTextSelection(scrollContainerRef)
+
+  // Annotations for this thread
+  const threadAnnotations = useChatExcerpts(
+    useShallow((s) => s.annotations.filter((a) => a.threadId === threadId))
+  )
+  const annotationsMap = useMemo(
+    () => new Map(threadAnnotations.map((a) => [a.messageId, a])),
+    [threadAnnotations]
+  )
+
+  // Helper: find the input prompt (most recent user message before target)
+  const findInputPrompt = useCallback(
+    (targetIndex: number): string | null => {
+      if (!messages) return null
+      for (let i = targetIndex - 1; i >= 0; i--) {
+        if (messages[i].role === 'user') {
+          return messages[i].content?.[0]?.text?.value ?? null
+        }
+      }
+      return null
+    },
+    [messages]
+  )
+
+  // Handler: Send selected text to chat input
+  const handleSendToChat = useCallback(() => {
+    if (!selection) return
+    setPrompt(selection.selectedText)
+    clearSelection()
+  }, [selection, setPrompt, clearSelection])
+
+  // Handler: Save selected text to Xtract Library
+  const handleSaveToXtractLib = useCallback(() => {
+    if (!selection || !messages) return
+    const msg = messages.find((m) => m.id === selection.messageId)
+    if (!msg) return
+
+    const fullMessage = msg.content
+      ?.map((c) => c.text?.value ?? '')
+      .filter(Boolean)
+      .join('\n') ?? ''
+
+    const assistantName = thread?.assistants?.[0]?.name || thread?.assistants?.[0]?.id || 'Assistant'
+
+    addExcerpt({
+      threadId,
+      messageId: selection.messageId,
+      highlightText: selection.selectedText,
+      fullMessage,
+      assistantName,
+      timestamp: msg.created_at ?? Date.now(),
+      inputPrompt: findInputPrompt(selection.messageIndex),
+    })
+    toast.success('Saved to Xtract Library')
+    clearSelection()
+  }, [selection, messages, thread, threadId, addExcerpt, findInputPrompt, clearSelection])
+
+  // Handler: Summarize selected text via LLM
+  const handleSummarize = useCallback(async () => {
+    if (!selection || !thread?.model) return
+
+    const providerName = thread.model.provider
+    if (!providerName) {
+      toast.error('No model provider configured')
+      return
+    }
+    const provider = getProviderByName(providerName)
+    if (!provider) {
+      toast.error('Model provider not found')
+      return
+    }
+
+    const toastId = toast.loading('Summarizing...')
+    const abort = new AbortController()
+
+    try {
+      const result = await sendCompletion(
+        thread,
+        provider,
+        [
+          { role: 'system', content: 'Summarize the following text in 2-3 concise sentences. Focus on key points.' },
+          { role: 'user', content: selection.selectedText },
+        ],
+        abort,
+        [],
+        false
+      )
+
+      if (result && isCompletionResponse(result)) {
+        const choices = (result as { choices: { message: { content: string } }[] }).choices
+        const summary = choices[0]?.message?.content ?? ''
+        if (summary) {
+          addAnnotation({
+            threadId,
+            messageId: selection.messageId,
+            sourceText: selection.selectedText,
+            summary,
+          })
+          toast.success('Summary added', { id: toastId })
+        } else {
+          toast.error('Empty summary response', { id: toastId })
+        }
+      } else {
+        toast.error('Summarization failed', { id: toastId })
+      }
+    } catch (err) {
+      toast.error('Summarization error', { id: toastId })
+    }
+    clearSelection()
+  }, [selection, thread, threadId, getProviderByName, addAnnotation, clearSelection])
 
   // Function to check scroll position and scrollbar presence
   const checkScrollState = () => {
@@ -277,13 +401,25 @@ function ThreadDetail() {
               messages.map((item, index) => {
                 // Only pass isLastMessage to the last message in the array
                 const isLastMessage = index === messages.length - 1
+                const annotation = annotationsMap.get(item.id)
                 return (
                   <div
                     key={item.id}
                     data-test-id={`message-${item.role}-${item.id}`}
                     data-message-author-role={item.role}
-                    className="mb-4"
+                    data-message-id={item.id}
+                    data-message-index={index}
+                    className="mb-4 relative"
                   >
+                    {annotation && (
+                      <div className="absolute right-full top-0 mr-3 w-48 hidden lg:block">
+                        <div className="absolute top-4 -right-3 w-3 h-px bg-main-view-fg/20" />
+                        <AnnotationCard
+                          annotation={annotation}
+                          onRemove={removeAnnotation}
+                        />
+                      </div>
+                    )}
                     <ThreadContent
                       {...item}
                       isLastMessage={isLastMessage}
@@ -350,6 +486,15 @@ function ThreadDetail() {
           <ChatInput model={threadModel} />
         </div>
       </div>
+      {selection && (
+        <SelectionContextMenu
+          selection={selection}
+          onSendToChat={handleSendToChat}
+          onSaveToXtractLib={handleSaveToXtractLib}
+          onSummarize={handleSummarize}
+          onClose={clearSelection}
+        />
+      )}
     </div>
   )
 }
