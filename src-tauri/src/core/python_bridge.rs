@@ -1078,3 +1078,105 @@ pub async fn list_documents_by_source(
 
     Ok(result)
 }
+
+// --- TTS Types ---
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TtsSynthResult {
+    pub success: bool,
+    pub output_path: Option<String>,
+    pub size_bytes: Option<u64>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TtsVoice {
+    pub id: String,
+    pub name: String,
+    pub gender: String,
+    pub locale: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TtsVoiceListResult {
+    pub success: bool,
+    pub voices: Option<Vec<TtsVoice>>,
+    pub error: Option<String>,
+}
+
+/// Synthesize speech to WAV using SAPI (fully offline)
+#[tauri::command]
+pub async fn synthesize_speech(
+    app_handle: AppHandle,
+    text: String,
+    voice: String,
+    output_path: String,
+    rate: Option<i32>,
+    volume: Option<f64>,
+) -> Result<TtsSynthResult, String> {
+    log::info!("Synthesizing speech: {} chars, voice={}", text.len(), voice);
+
+    // Validate output path — must end in .wav and parent must exist
+    if !output_path.ends_with(".wav") {
+        return Err("Output path must end in .wav".to_string());
+    }
+    if let Some(parent) = Path::new(&output_path).parent() {
+        if !parent.exists() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create output directory: {}", e))?;
+        }
+    }
+
+    let mut args = vec![
+        "synthesize".to_string(),
+        text,
+        voice,
+        output_path,
+    ];
+    if let Some(r) = rate {
+        args.push(r.to_string());
+    }
+    if let Some(v) = volume {
+        // Need rate arg before volume arg (positional)
+        if rate.is_none() {
+            args.push("150".to_string()); // default rate
+        }
+        args.push(v.to_string());
+    }
+
+    let output = execute_python_command_with_retry(
+        &app_handle,
+        "tts_engine.py",
+        args,
+        PYTHON_COMMAND_TIMEOUT,
+    )
+    .await?;
+
+    let result: TtsSynthResult = serde_json::from_str(&output)
+        .map_err(|e| format!("Failed to parse TTS output: {}", e))?;
+
+    Ok(result)
+}
+
+/// List available SAPI TTS voices
+#[tauri::command]
+pub async fn list_tts_voices(
+    app_handle: AppHandle,
+) -> Result<TtsVoiceListResult, String> {
+    log::info!("Listing TTS voices");
+
+    let args = vec!["list-voices".to_string()];
+
+    let output = execute_python_command_with_retry(
+        &app_handle,
+        "tts_engine.py",
+        args,
+        PYTHON_COMMAND_TIMEOUT,
+    )
+    .await?;
+
+    let result: TtsVoiceListResult = serde_json::from_str(&output)
+        .map_err(|e| format!("Failed to parse TTS voices output: {}", e))?;
+
+    Ok(result)
+}

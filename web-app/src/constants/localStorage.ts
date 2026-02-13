@@ -20,4 +20,5 @@ export const localStorageKey = {
   setupCompleted: 'setup-completed',
   ragEnabled: 'rag-enabled',
   chatExcerpts: 'chat-excerpts',
+  ttsVoice: 'tts-voice',
 }

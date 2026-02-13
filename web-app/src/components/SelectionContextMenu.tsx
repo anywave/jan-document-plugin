@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { MessageSquare, Bookmark, FileSearch } from 'lucide-react'
+import { MessageSquare, Bookmark, FileSearch, Volume2 } from 'lucide-react'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import type { TextSelectionInfo } from '@/hooks/useTextSelection'
 
@@ -9,6 +9,7 @@ interface SelectionContextMenuProps {
   onSendToChat: () => void
   onSaveToXtractLib: () => void
   onSummarize: () => void
+  onReadAloud: () => void
   onClose: () => void
 }
 
@@ -17,6 +18,7 @@ export function SelectionContextMenu({
   onSendToChat,
   onSaveToXtractLib,
   onSummarize,
+  onReadAloud,
   onClose,
 }: SelectionContextMenuProps) {
   const menuRef = useClickOutside<HTMLDivElement>(onClose)
@@ -56,6 +58,11 @@ export function SelectionContextMenu({
         icon={<Bookmark className="h-4 w-4" />}
         label="Save to Xtract Library"
         onClick={() => { onSaveToXtractLib(); onClose() }}
+      />
+      <MenuItem
+        icon={<Volume2 className="h-4 w-4" />}
+        label="Read Aloud"
+        onClick={() => { onReadAloud(); onClose() }}
       />
       {showSummarize && (
         <MenuItem

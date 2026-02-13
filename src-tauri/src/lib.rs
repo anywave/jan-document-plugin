@@ -70,6 +70,8 @@ pub fn run() {
             core::python_bridge::scan_directory,
             core::python_bridge::process_document_batch,
             core::python_bridge::list_documents_by_source,
+            core::python_bridge::synthesize_speech,
+            core::python_bridge::list_tts_voices,
             // MCP commands
             core::mcp::get_tools,
             core::mcp::call_tool,

@@ -31,6 +31,8 @@ import { useTextSelection } from '@/hooks/useTextSelection'
 import { sendCompletion, isCompletionResponse } from '@/lib/completion'
 import { SelectionContextMenu } from '@/components/SelectionContextMenu'
 import { AnnotationCard } from '@/components/AnnotationCard'
+import { useTTS } from '@/hooks/useTTS'
+import { TTSControls } from '@/components/TTSControls'
 
 // as route.threadsDetail
 export const Route = createFileRoute('/threads/$threadId')({
@@ -54,6 +56,7 @@ function ThreadDetail() {
   const { setPrompt } = usePrompt()
   const { getProviderByName } = useModelProvider()
   const { addExcerpt, addAnnotation, removeAnnotation } = useChatExcerpts()
+  const ttsPlay = useTTS((s) => s.play)
 
   const { messages } = useMessages(
     useShallow((state) => ({
@@ -179,6 +182,16 @@ function ThreadDetail() {
     }
     clearSelection()
   }, [selection, thread, threadId, getProviderByName, addAnnotation, clearSelection])
+
+  // Handler: Read Aloud selected text via TTS
+  const handleReadAloud = useCallback(() => {
+    if (!selection) return
+    const threadTitle = thread?.title || undefined
+    ttsPlay(selection.selectedText, threadTitle).catch(() => {
+      toast.error('Failed to generate speech')
+    })
+    clearSelection()
+  }, [selection, thread, ttsPlay, clearSelection])
 
   // Function to check scroll position and scrollbar presence
   const checkScrollState = () => {
@@ -409,7 +422,7 @@ function ThreadDetail() {
                     data-message-author-role={item.role}
                     data-message-id={item.id}
                     data-message-index={index}
-                    className="mb-4 relative"
+                    className="mb-4 relative group/msg"
                   >
                     {annotation && (
                       <div className="absolute right-full top-0 mr-3 w-48 hidden lg:block">
@@ -435,6 +448,14 @@ function ThreadDetail() {
                       index={index}
                       updateMessage={updateMessage}
                     />
+                    {item.role === 'assistant' && item.content?.[0]?.text?.value && (
+                      <div className="flex justify-end mt-1 mr-2 opacity-0 hover:opacity-100 transition-opacity group-hover/msg:opacity-60">
+                        <TTSControls
+                          text={item.content.map((c) => c.text?.value ?? '').filter(Boolean).join('\n')}
+                          threadTitle={thread?.title}
+                        />
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -492,6 +513,7 @@ function ThreadDetail() {
           onSendToChat={handleSendToChat}
           onSaveToXtractLib={handleSaveToXtractLib}
           onSummarize={handleSummarize}
+          onReadAloud={handleReadAloud}
           onClose={clearSelection}
         />
       )}
