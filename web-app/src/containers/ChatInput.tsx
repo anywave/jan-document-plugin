@@ -804,10 +804,10 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
 
         <div className="absolute z-20 bg-transparent bottom-0 w-full p-2 ">
           <div className="flex justify-between items-center w-full">
-            <div className="px-1 flex items-center gap-1">
+            <div className="px-1 flex flex-col gap-0.5">
               <div
                 className={cn(
-                  'px-1 flex items-center gap-1',
+                  'px-1 flex items-center gap-1 flex-wrap',
                   streamingContent && 'opacity-50 pointer-events-none'
                 )}
               >
