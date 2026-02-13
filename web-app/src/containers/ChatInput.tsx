@@ -65,6 +65,13 @@ import {
   stopVoiceRelay,
   getVoiceRelayStatus,
 } from '@/extensions/document-rag/src/python-bridge'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 
 type ChatInputProps = {
   className?: string
@@ -162,6 +169,16 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
     error: relayError,
   } = useVoiceRelay()
   const [relayActive, setRelayActive] = useState(false)
+  const [showQrModal, setShowQrModal] = useState(false)
+
+  // Show QR modal when voice relay starts and setup URL is ready
+  useEffect(() => {
+    if (relaySetupUrl && relayActive) {
+      setShowQrModal(true)
+    } else {
+      setShowQrModal(false)
+    }
+  }, [relaySetupUrl, relayActive])
 
   // Sync local speech transcript to prompt
   useEffect(() => {
@@ -1216,6 +1233,40 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
           threadId={currentThreadId}
         />
       )}
+
+      {/* Voice Relay QR Code Modal */}
+      <Dialog open={showQrModal} onOpenChange={setShowQrModal}>
+        <DialogContent className="sm:max-w-md" aria-describedby="qr-desc">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconDeviceMobile size={22} />
+              Phone Mic Setup
+            </DialogTitle>
+            <DialogDescription id="qr-desc">
+              Scan this QR code with your phone to use it as a wireless microphone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-4">
+            {relaySetupUrl ? (
+              <img
+                src={`http://localhost:${new URL(relaySetupUrl).port || '8089'}/qr.svg`}
+                alt="QR Code for phone mic setup"
+                className="bg-white rounded-xl p-4"
+                style={{ width: 300, height: 300 }}
+              />
+            ) : (
+              <div className="w-[300px] h-[300px] bg-main-view-fg/5 rounded-xl flex items-center justify-center text-main-view-fg/40">
+                Loading QR...
+              </div>
+            )}
+            {relaySetupUrl && (
+              <p className="text-xs text-main-view-fg/50 text-center">
+                Or open the setup page on your phone browser
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

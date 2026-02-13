@@ -40,7 +40,7 @@ import CodeEditor from '@uiw/react-textarea-code-editor'
 import '@uiw/react-textarea-code-editor/dist.css'
 import { useTranslation } from '@/i18n/react-i18next-compat'
 import { MessageTTS } from '@/components/MessageTTS'
-import { useTextToSpeech } from '@/hooks/useTextToSpeech'
+import { useTTS } from '@/hooks/useTTS'
 
 const CopyButton = ({ text }: { text: string }) => {
   const [copied, setCopied] = useState(false)
@@ -154,25 +154,17 @@ export const ThreadContent = memo(
   ) => {
     const { t } = useTranslation()
     const [currentSpeakingId, setCurrentSpeakingId] = useState<string | null>(null)
-    const {
-      speak,
-      stop,
-      pause,
-      resume,
-      isSpeaking,
-      isPaused,
-      isSupported: isTTSSupported,
-    } = useTextToSpeech()
+    const { isPlaying, isGenerating, play, stop: ttsStop } = useTTS()
 
     const handleSpeak = useCallback((messageId: string, text: string) => {
       setCurrentSpeakingId(messageId)
-      speak(text)
-    }, [speak])
+      play(text).catch((err) => console.error('TTS error:', err))
+    }, [play])
 
     const handleStop = useCallback(() => {
       setCurrentSpeakingId(null)
-      stop()
-    }, [stop])
+      ttsStop()
+    }, [ttsStop])
 
     // Use useMemo to stabilize the components prop
     const linkComponents = useMemo(
@@ -404,13 +396,13 @@ export const ThreadContent = memo(
                     <CopyButton text={item.content?.[0]?.text.value || ''} />
                     <MessageTTS
                       text={item.content?.[0]?.text.value || ''}
-                      isSpeaking={isSpeaking && currentSpeakingId === item.id}
-                      isPaused={isPaused}
-                      isSupported={isTTSSupported}
+                      isSpeaking={(isPlaying || isGenerating) && currentSpeakingId === item.id}
+                      isPaused={false}
+                      isSupported={true}
                       onSpeak={(text) => handleSpeak(item.id, text)}
                       onStop={handleStop}
-                      onPause={pause}
-                      onResume={resume}
+                      onPause={handleStop}
+                      onResume={() => {}}
                     />
                     <Tooltip>
                       <TooltipTrigger asChild>

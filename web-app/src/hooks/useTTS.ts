@@ -14,29 +14,37 @@ export interface VoiceProfile {
 /**
  * Built-in voice personas.
  * sapiVoice is matched against installed SAPI voices (substring, case-insensitive).
- * If "Catherine" isn't installed, falls back to Zira (Female) or David (Male).
- * Install en-AU speech pack in Windows Settings for Catherine.
+ * tts_engine.py prefers "Desktop" SAPI voices over OneCore stubs.
+ * Catherine auto-activates once en-AU speech pack is installed via Windows Settings.
  */
 export const VOICE_PROFILES: VoiceProfile[] = [
   {
-    id: 'melania',
-    displayName: 'Melania Tonia Evans',
-    sapiVoice: 'Catherine',   // en-AU — needs Windows speech pack
+    id: 'catherine',
+    displayName: 'Microsoft Catherine',
+    sapiVoice: 'Catherine',
     locale: 'en-AU',
     gender: 'Female',
     rate: 150,
   },
   {
-    id: 'mobius',
-    displayName: 'MOBIUS',
+    id: 'james',
+    displayName: 'Microsoft James',
+    sapiVoice: 'James',
+    locale: 'en-AU',
+    gender: 'Male',
+    rate: 150,
+  },
+  {
+    id: 'david',
+    displayName: 'Microsoft David',
     sapiVoice: 'David',
     locale: 'en-US',
     gender: 'Male',
     rate: 150,
   },
   {
-    id: 'aria',
-    displayName: 'Aria',
+    id: 'zira',
+    displayName: 'Microsoft Zira',
     sapiVoice: 'Zira',
     locale: 'en-US',
     gender: 'Female',
@@ -92,9 +100,9 @@ interface TTSState {
 
 function loadVoicePreference(): string {
   try {
-    return localStorage.getItem(localStorageKey.ttsVoice) || 'melania'
+    return localStorage.getItem(localStorageKey.ttsVoice) || 'catherine'
   } catch {
-    return 'melania'
+    return 'sovereign'
   }
 }
 

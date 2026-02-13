@@ -18,14 +18,22 @@ def synthesize(text: str, voice_id: str, output_path: str, rate: int = 150, volu
     try:
         engine = pyttsx3.init()
 
-        # Set voice if specified
+        # Set voice if specified — prefer Desktop/SAPI voices over OneCore stubs
         if voice_id:
             voices = engine.getProperty('voices')
             matched = None
+            vid = voice_id.lower()
+            # First pass: prefer "Desktop" voices (real SAPI, always functional)
             for v in voices:
-                if voice_id.lower() in v.id.lower() or voice_id.lower() in v.name.lower():
+                if vid in v.name.lower() and "desktop" in v.name.lower():
                     matched = v
                     break
+            # Second pass: any voice matching the name (OneCore, speech packs, etc.)
+            if not matched:
+                for v in voices:
+                    if vid in v.id.lower() or vid in v.name.lower():
+                        matched = v
+                        break
             if matched:
                 engine.setProperty('voice', matched.id)
 
@@ -125,10 +133,20 @@ def test_voice(voice_id: str, text: str = "Hello, this is a test of the speech s
         engine = pyttsx3.init()
         if voice_id:
             voices = engine.getProperty('voices')
+            vid = voice_id.lower()
+            # Prefer Desktop voices over OneCore stubs
+            matched = None
             for v in voices:
-                if voice_id.lower() in v.id.lower() or voice_id.lower() in v.name.lower():
-                    engine.setProperty('voice', v.id)
+                if vid in v.name.lower() and "desktop" in v.name.lower():
+                    matched = v
                     break
+            if not matched:
+                for v in voices:
+                    if vid in v.id.lower() or vid in v.name.lower():
+                        matched = v
+                        break
+            if matched:
+                engine.setProperty('voice', matched.id)
         engine.say(text)
         engine.runAndWait()
         engine.stop()
