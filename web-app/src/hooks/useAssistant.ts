@@ -264,7 +264,7 @@ BEHAVIORAL RULES:
   },
   {
     id: 'the-architect',
-    name: 'The Architect',
+    name: 'The Arch⋈tect',
     created_at: 1747029866.542,
     avatar: '∞',
     description:

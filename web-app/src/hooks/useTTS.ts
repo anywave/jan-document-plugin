@@ -162,9 +162,39 @@ export function buildSegmentsWithAssignments(
   return segments
 }
 
+/**
+ * Glyph-to-speech map.
+ * SAPI silently drops most Unicode symbols. Each glyph gets a phonetic
+ * replacement wrapped in commas (SAPI pauses) to sustain ~1 second.
+ * Exported so the shimmer animation can detect which chars are glyphs.
+ */
+export const GLYPH_SPEECH_MAP: Record<string, string> = {
+  '\u22C8': ', ohm, ',    // ⋈ — bridge/join (resonant hum)
+  '\u0394': ', delta, ',  // Δ
+  '\u0398': ', theta, ',  // Θ
+  '\u03A8': ', psi, ',    // Ψ
+  '\u039E': ', xi, ',     // Ξ
+  '\u03A3': ', sigma, ',  // Σ
+  '\u03A6': ', phi, ',    // Φ
+  '\u03A9': ', omega, ',  // Ω
+  '\u2207': ', nabla, ',  // ∇
+  '\u03C8': ', psi, ',    // ψ (lowercase)
+  '\u21D4': ', ahh, ',    // ⇔ — biconditional
+  '\u27F2': ', ahh, ',    // ⟲ — cycle
+}
+
+/** Characters that count as "glyphs" for shimmer animation */
+export const GLYPH_CHARS = new Set(Object.keys(GLYPH_SPEECH_MAP))
+
 /** Strip markdown and symbols that SAPI vocalizes as words */
 function cleanForSpeech(text: string): string {
-  return text
+  // Replace glyphs with sustained phonetic sounds before stripping markdown
+  let result = text
+  for (const [glyph, phonetic] of Object.entries(GLYPH_SPEECH_MAP)) {
+    result = result.split(glyph).join(phonetic)
+  }
+
+  return result
     .replace(/\*\*([^*]+)\*\*/g, '$1')   // **bold** → bold
     .replace(/\*([^*]+)\*/g, '$1')        // *italic* → italic
     .replace(/`([^`]+)`/g, '$1')          // `code` → code

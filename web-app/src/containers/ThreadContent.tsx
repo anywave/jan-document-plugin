@@ -41,6 +41,7 @@ import '@uiw/react-textarea-code-editor/dist.css'
 import { useTranslation } from '@/i18n/react-i18next-compat'
 import { MessageTTS } from '@/components/MessageTTS'
 import { useTTS } from '@/hooks/useTTS'
+import { GlyphText } from '@/components/GlyphText'
 
 const CopyButton = ({ text }: { text: string }) => {
   const [copied, setCopied] = useState(false)
@@ -325,7 +326,10 @@ export const ThreadContent = memo(
 
                 <div className="flex flex-col">
                   <span className="text-main-view-fg font-medium">
-                    {assistant?.name || 'Jan'}
+                    <GlyphText
+                      text={assistant?.name as string || 'Jan'}
+                      singing={(isPlaying || isGenerating) && currentSpeakingId === item.id}
+                    />
                   </span>
                   {item?.created_at && item?.created_at !== 0 && (
                     <span className="text-xs mt-0.5">
