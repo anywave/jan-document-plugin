@@ -52,6 +52,88 @@ export const VOICE_PROFILES: VoiceProfile[] = [
   },
 ]
 
+/**
+ * Speaker-aware text parser.
+ * Detects **Speaker:** patterns and splits text into voiced segments.
+ * Each segment gets assigned a voice based on the speaker identity.
+ */
+export interface VoicedSegment {
+  speaker: string    // 'narrator' or the detected speaker name
+  text: string
+  voice: VoiceProfile
+}
+
+function assignVoice(speaker: string, speakerMap: Map<string, VoiceProfile>, defaultVoice: VoiceProfile): VoiceProfile {
+  const key = speaker.toLowerCase()
+  if (speakerMap.has(key)) return speakerMap.get(key)!
+
+  // Assign voices round-robin, alternating gender when possible
+  const usedIds = new Set([...speakerMap.values()].map(v => v.id))
+  const available = VOICE_PROFILES.filter(v => !usedIds.has(v.id))
+  const pick = available.length > 0 ? available[0] : VOICE_PROFILES[speakerMap.size % VOICE_PROFILES.length]
+  speakerMap.set(key, pick)
+  return pick
+}
+
+export function parseMultiVoiceText(text: string, defaultVoice: VoiceProfile): VoicedSegment[] {
+  const segments: VoicedSegment[] = []
+  const speakerMap = new Map<string, VoiceProfile>()
+  // Reserve the default voice for narrator
+  speakerMap.set('narrator', defaultVoice)
+
+  // Split by **Speaker:** markers
+  const pattern = /\*\*([^*]+?):\*\*\s*/g
+  const parts = text.split(pattern)
+
+  // parts alternates: [before, speaker1, content1, speaker2, content2, ...]
+  if (parts.length <= 1) {
+    // No speaker markers found — single segment
+    return [{ speaker: 'narrator', text: text.trim(), voice: defaultVoice }]
+  }
+
+  // First element is text before any speaker marker (narration)
+  const preamble = parts[0].trim()
+  if (preamble) {
+    segments.push({ speaker: 'narrator', text: preamble, voice: defaultVoice })
+  }
+
+  // Process speaker/content pairs
+  for (let i = 1; i < parts.length; i += 2) {
+    const speakerName = parts[i]?.trim()
+    const content = parts[i + 1]?.trim()
+    if (speakerName && content) {
+      const voice = assignVoice(speakerName, speakerMap, defaultVoice)
+      segments.push({ speaker: speakerName, text: content, voice })
+    }
+  }
+
+  if (segments.length === 0) {
+    segments.push({ speaker: 'narrator', text: text.trim(), voice: defaultVoice })
+  }
+
+  return segments
+}
+
+/** Strip markdown and symbols that SAPI vocalizes as words */
+function cleanForSpeech(text: string): string {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '$1')   // **bold** → bold
+    .replace(/\*([^*]+)\*/g, '$1')        // *italic* → italic
+    .replace(/`([^`]+)`/g, '$1')          // `code` → code
+    .replace(/^#{1,6}\s+/gm, '')          // # headings
+    .replace(/^>\s+/gm, '')               // > blockquotes
+    .replace(/^[-*+]\s+/gm, '')           // - bullet points
+    .replace(/^\d+\.\s+/gm, '')           // 1. numbered lists
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [link](url) → link
+    .replace(/["""]/g, '')                // curly and straight quotes
+    .replace(/\|/g, '')                   // table pipes
+    .replace(/---+/g, '')                 // horizontal rules
+    .replace(/\n{2,}/g, '. ')             // paragraph breaks → pause
+    .replace(/\n/g, ' ')                  // line breaks → space
+    .replace(/\s{2,}/g, ' ')             // collapse whitespace
+    .trim()
+}
+
 /** Sanitize a string for use in filenames */
 function sanitizeFilename(str: string): string {
   return str
@@ -143,8 +225,7 @@ export const useTTS = create<TTSState>((set, get) => ({
       // Check if Tauri is available
       const isTauri = '__TAURI__' in window
       if (!isTauri) {
-        // Fallback: use Web Speech API for non-Tauri environments
-        const utterance = new SpeechSynthesisUtterance(text)
+        const utterance = new SpeechSynthesisUtterance(cleanForSpeech(text))
         utterance.lang = voice.locale
         utterance.onend = () => set({ isPlaying: false, currentText: null })
         window.speechSynthesis.speak(utterance)
@@ -154,44 +235,63 @@ export const useTTS = create<TTSState>((set, get) => ({
 
       const { invoke, convertFileSrc } = await import('@tauri-apps/api/core')
       const { appDataDir } = await import('@tauri-apps/api/path')
-
       const dataDir = await appDataDir()
-      const filename = generateTTSFilename({
-        threadTitle,
-        voiceDisplayName: voice.displayName,
-        textPreview: text,
-      })
-      const outputPath = `${dataDir}tts\\${filename}`
 
-      const result = await invoke<{
-        success: boolean
-        output_path?: string
-        size_bytes?: number
-        error?: string
-      }>('synthesize_speech', {
-        text,
-        voice: voice.sapiVoice,
-        outputPath,
-        rate: voice.rate,
-      })
+      // Parse text for multi-voice segments
+      const segments = parseMultiVoiceText(text, voice)
 
-      if (!result.success) {
-        throw new Error(result.error || 'TTS synthesis failed')
+      // Synthesize all segments
+      const audioPaths: string[] = []
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i]
+        const filename = `tts_seg_${i}_${sanitizeFilename(seg.speaker)}.wav`
+        const outputPath = `${dataDir}tts\\${filename}`
+
+        const result = await invoke<{
+          success: boolean
+          output_path?: string
+          size_bytes?: number
+          error?: string
+        }>('synthesize_speech', {
+          text: cleanForSpeech(seg.text),
+          voice: seg.voice.sapiVoice,
+          outputPath,
+          rate: seg.voice.rate,
+        })
+
+        if (result.success && result.output_path) {
+          audioPaths.push(result.output_path)
+        }
       }
 
-      // Play the generated WAV
-      const audioUrl = convertFileSrc(result.output_path || outputPath)
-      const audio = new Audio(audioUrl)
-      audio.onended = () => set({ isPlaying: false, currentText: null })
-      audio.onerror = () => set({ isPlaying: false, isGenerating: false, currentText: null })
-      await audio.play()
+      if (audioPaths.length === 0) {
+        throw new Error('No audio segments generated')
+      }
 
-      set({
-        isGenerating: false,
-        isPlaying: true,
-        audioElement: audio,
-        lastGeneratedPath: result.output_path || outputPath,
-      })
+      set({ isGenerating: false, isPlaying: true })
+
+      // Chain audio playback: play each segment sequentially
+      let currentIndex = 0
+      const playNext = () => {
+        if (currentIndex >= audioPaths.length) {
+          set({ isPlaying: false, currentText: null, audioElement: null })
+          return
+        }
+        const audioUrl = convertFileSrc(audioPaths[currentIndex])
+        const audio = new Audio(audioUrl)
+        audio.onended = () => {
+          currentIndex++
+          playNext()
+        }
+        audio.onerror = () => {
+          currentIndex++
+          playNext()
+        }
+        set({ audioElement: audio, lastGeneratedPath: audioPaths[currentIndex] })
+        audio.play()
+      }
+      playNext()
+
     } catch (err) {
       console.error('TTS error:', err)
       set({ isGenerating: false, isPlaying: false, currentText: null })

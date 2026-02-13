@@ -1176,7 +1176,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                   </Tooltip>
                 </TooltipProvider>
               </div>
-              <span className="text-[10px] text-main-view-fg/30 italic select-none">Right click for more info...</span>
+              <span className="text-[10px] text-main-view-fg/30 italic select-none ml-[140px]">Right click for more info...</span>
             </div>
 
             {streamingContent ? (

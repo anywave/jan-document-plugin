@@ -225,266 +225,117 @@ PHONE_PAGE_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>MOBIUS Voice Input</title>
+<title>MOBIUS</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     background: #0a0a0f; color: #e0e0e8;
     height: 100dvh; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    overflow: hidden; -webkit-user-select: none; user-select: none;
+    padding: 24px 16px env(safe-area-inset-bottom, 16px);
   }
-  .status { font-size: 14px; padding: 6px 16px; border-radius: 20px; margin-bottom: 40px; font-weight: 500; }
-  .status.connected { background: #0d3320; color: #4ade80; }
-  .status.disconnected { background: #3b1219; color: #f87171; }
-  .status.listening { background: #1a1a3e; color: #818cf8; }
-  .status.sending { background: #1a2a1a; color: #86efac; }
-  .mic-btn {
-    width: 140px; height: 140px; border-radius: 50%; border: 3px solid #333;
-    background: #1a1a2e; display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: all 0.2s ease; -webkit-tap-highlight-color: transparent;
+  .header { text-align: center; padding: 8px 0 16px; }
+  .header h1 { font-size: 18px; font-weight: 600; letter-spacing: 2px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+  .dot.on { background: #4ade80; } .dot.off { background: #f87171; }
+  .messages {
+    flex: 1; overflow-y: auto; padding: 8px 0;
+    display: flex; flex-direction: column; gap: 8px;
   }
-  .mic-btn:active { transform: scale(0.95); }
-  .mic-btn.recording { border-color: #ef4444; background: #2a1a1a; animation: pulse 1.5s ease-in-out infinite; }
-  .mic-btn svg { width: 56px; height: 56px; }
-  .mic-btn.recording svg { color: #ef4444; }
-  .mic-btn:not(.recording) svg { color: #888; }
-  @keyframes pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-    50% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+  .msg {
+    max-width: 85%; padding: 10px 14px; border-radius: 16px;
+    font-size: 15px; line-height: 1.4; word-break: break-word;
   }
-  .transcript-box {
-    margin-top: 32px; width: 90%; max-width: 400px; min-height: 80px; max-height: 200px;
-    overflow-y: auto; padding: 12px 16px; background: #12121a; border: 1px solid #2a2a3a;
-    border-radius: 12px; font-size: 16px; line-height: 1.5; text-align: center;
+  .msg.sent { align-self: flex-end; background: #1a3a5c; color: #c0d8f0; border-bottom-right-radius: 4px; }
+  .msg.ack { align-self: flex-start; background: #1a2a1a; color: #86efac; border-bottom-left-radius: 4px; font-size: 13px; }
+  .input-row {
+    display: flex; gap: 8px; padding-top: 12px;
+    border-top: 1px solid #1a1a2e;
   }
-  #interimSpan { color: #666; font-style: italic; }
-  #finalSpan { color: #e0e0e8; }
-  .send-mode { margin-top: 16px; display: flex; gap: 8px; }
-  .send-mode button {
-    padding: 8px 16px; border-radius: 8px; border: 1px solid #333;
-    background: #1a1a2e; color: #aaa; font-size: 13px; cursor: pointer;
+  .input-row textarea {
+    flex: 1; background: #12121a; border: 1px solid #2a2a3a; border-radius: 12px;
+    color: #e0e0e8; font-size: 16px; padding: 12px 14px; resize: none;
+    font-family: inherit; line-height: 1.4; min-height: 48px; max-height: 120px;
   }
-  .send-mode button.active { border-color: #818cf8; color: #818cf8; background: #1a1a3e; }
-  .info { position: fixed; bottom: 24px; font-size: 12px; color: #555; text-align: center; line-height: 1.6; }
-  .info .ip { color: #818cf8; font-family: monospace; }
+  .input-row textarea::placeholder { color: #555; }
+  .input-row textarea:focus { outline: none; border-color: #818cf8; }
+  .send-btn {
+    width: 48px; height: 48px; border-radius: 50%; border: none;
+    background: #818cf8; color: #fff; font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; align-self: flex-end;
+  }
+  .send-btn:active { transform: scale(0.93); }
+  .send-btn:disabled { background: #333; color: #666; }
 </style>
 </head>
 <body>
 
-<div class="status disconnected" id="status">Ready</div>
-
-<div class="mic-btn" id="micBtn" ontouchstart="">
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-    <line x1="12" x2="12" y1="19" y2="22"/>
-  </svg>
+<div class="header">
+  <h1><span class="dot off" id="dot"></span>MOBIUS</h1>
 </div>
 
-<div class="transcript-box">
-  <span id="finalSpan"></span>
-  <span id="interimSpan">Tap the mic to start</span>
-</div>
+<div class="messages" id="messages"></div>
 
-<div class="send-mode">
-  <button id="autoBtn" class="active" onclick="setSendMode('auto')">Auto-send</button>
-  <button id="manualBtn" onclick="setSendMode('manual')">Manual</button>
+<div class="input-row">
+  <textarea id="input" rows="1" placeholder="Type or use mic on keyboard..." autofocus
+    oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+  <button class="send-btn" id="sendBtn" onclick="send()">&#x2191;</button>
 </div>
-
-<div class="info">MOBIUS Voice Relay<br><span class="ip" id="serverAddr"></span></div>
 
 <script>
-var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (!SpeechRecognition) {
-  document.getElementById('status').textContent = 'Speech API not supported';
-}
+var ws = null, connected = false;
+var input = document.getElementById('input');
+var messages = document.getElementById('messages');
+var dot = document.getElementById('dot');
+var sendBtn = document.getElementById('sendBtn');
 
-var ws = null;
-var recognition = null;
-var isRecording = false;
-var sendMode = 'auto';
-var accumulated = '';
-
-var statusEl = document.getElementById('status');
-var micBtn = document.getElementById('micBtn');
-var finalSpan = document.getElementById('finalSpan');
-var interimSpan = document.getElementById('interimSpan');
-
-document.getElementById('serverAddr').textContent = location.host;
-micBtn.addEventListener('click', toggleRecording);
-
-// Open a fresh WebSocket for each recording session
-function openSession() {
-  // Close any existing stale socket
-  if (ws) {
-    try { ws.close(); } catch(e) {}
-    ws = null;
-  }
-
+function connect() {
   var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(proto + '//' + location.host + '/ws?role=phone');
-
   ws.onopen = function() {
-    statusEl.textContent = 'Connected';
-    statusEl.className = 'status connected';
+    connected = true;
+    dot.className = 'dot on';
+    addMsg('Connected to MOBIUS', 'ack');
   };
-
   ws.onclose = function() {
-    ws = null;
-    if (isRecording) {
-      // Connection lost during recording — stop gracefully
-      if (recognition) recognition.stop();
-    }
+    connected = false; ws = null;
+    dot.className = 'dot off';
+    setTimeout(connect, 3000);
   };
-
-  ws.onerror = function() {
-    statusEl.textContent = 'Connection error';
-    statusEl.className = 'status disconnected';
-    try { ws.close(); } catch(e) {}
-  };
-
+  ws.onerror = function() { try { ws.close(); } catch(e) {} };
   ws.onmessage = function(evt) {
     try {
       var msg = JSON.parse(evt.data);
-      if (msg.type === 'ack') {
-        statusEl.textContent = 'Sent';
-        statusEl.className = 'status sending';
-        setTimeout(function() {
-          if (!isRecording) {
-            statusEl.textContent = 'Ready';
-            statusEl.className = 'status connected';
-          }
-        }, 800);
-      }
+      if (msg.type === 'ack') addMsg('Received', 'ack');
     } catch(e) {}
   };
-
-  return ws;
 }
 
-// Close the session socket cleanly
-function closeSession() {
-  if (ws && ws.readyState === 1) {
-    try {
-      ws.send(JSON.stringify({ type: 'recording_stopped' }));
-    } catch(e) {}
-    // Give server time to ack, then close
-    setTimeout(function() {
-      if (ws) {
-        try { ws.close(1000, 'Recording done'); } catch(e) {}
-        ws = null;
-      }
-    }, 300);
-  } else {
-    ws = null;
-  }
+function send() {
+  var text = input.value.trim();
+  if (!text || !ws || ws.readyState !== 1) return;
+  ws.send(JSON.stringify({ type: 'transcript', text: text }));
+  addMsg(text, 'sent');
+  input.value = '';
+  input.style.height = 'auto';
+  input.focus();
 }
 
-function toggleRecording() {
-  if (!SpeechRecognition) return;
-  if (isRecording) {
-    if (recognition) recognition.stop();
-  } else {
-    // Open fresh socket, then start recognition
-    accumulated = '';
-    finalSpan.textContent = '';
-    interimSpan.textContent = 'Connecting...';
-
-    openSession();
-    // Small delay to let WS connect
-    setTimeout(function() { startRecognition(); }, 200);
-  }
+function addMsg(text, cls) {
+  var el = document.createElement('div');
+  el.className = 'msg ' + cls;
+  el.textContent = text;
+  messages.appendChild(el);
+  messages.scrollTop = messages.scrollHeight;
 }
 
-function startRecognition() {
-  if (recognition) {
-    try { recognition.stop(); } catch(e) {}
-  }
+// Send on Enter (without Shift)
+input.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
 
-  recognition = new SpeechRecognition();
-  recognition.lang = 'en-US';
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.maxAlternatives = 1;
-
-  recognition.onstart = function() {
-    isRecording = true;
-    micBtn.classList.add('recording');
-    statusEl.textContent = 'Listening...';
-    statusEl.className = 'status listening';
-    interimSpan.textContent = '';
-  };
-
-  recognition.onend = function() {
-    isRecording = false;
-    micBtn.classList.remove('recording');
-
-    // Send accumulated text in manual mode
-    if (sendMode === 'manual' && accumulated.trim()) {
-      sendTranscript(accumulated.trim());
-      accumulated = '';
-    }
-
-    // Close the WebSocket session
-    closeSession();
-    statusEl.textContent = 'Ready';
-    statusEl.className = 'status disconnected';
-  };
-
-  recognition.onresult = function(event) {
-    var interim = '';
-    var finalText = '';
-
-    for (var i = event.resultIndex; i < event.results.length; i++) {
-      var t = event.results[i][0].transcript;
-      if (event.results[i].isFinal) {
-        finalText += t + ' ';
-      } else {
-        interim += t;
-      }
-    }
-
-    if (finalText) {
-      if (sendMode === 'auto') {
-        sendTranscript(finalText.trim());
-        finalSpan.textContent = finalText.trim();
-        interimSpan.textContent = '';
-      } else {
-        accumulated += finalText;
-        finalSpan.textContent = accumulated;
-        interimSpan.textContent = '';
-      }
-    } else if (interim) {
-      interimSpan.textContent = interim;
-    }
-  };
-
-  recognition.onerror = function(event) {
-    if (event.error === 'no-speech') return;
-    statusEl.textContent = 'Error: ' + event.error;
-    statusEl.className = 'status disconnected';
-    isRecording = false;
-    micBtn.classList.remove('recording');
-    closeSession();
-  };
-
-  recognition.start();
-}
-
-function sendTranscript(text) {
-  if (ws && ws.readyState === 1) {
-    ws.send(JSON.stringify({ type: 'transcript', text: text }));
-  }
-}
-
-function setSendMode(mode) {
-  sendMode = mode;
-  document.getElementById('autoBtn').className = mode === 'auto' ? 'active' : '';
-  document.getElementById('manualBtn').className = mode === 'manual' ? 'active' : '';
-}
+connect();
 </script>
 </body>
 </html>"""
