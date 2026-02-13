@@ -28,6 +28,7 @@ import {
   IconSparkles,
   IconFolder,
   IconDatabase,
+  IconDeviceMobile,
 } from '@tabler/icons-react'
 import { useTranslation } from '@/i18n/react-i18next-compat'
 import { useGeneralSetting } from '@/hooks/useGeneralSetting'
@@ -58,6 +59,12 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { toast } from 'sonner'
 import { VoiceRecorder } from '@/components/VoiceRecorder'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
+import { useVoiceRelay } from '@/hooks/useVoiceRelay'
+import {
+  startVoiceRelay,
+  stopVoiceRelay,
+  getVoiceRelayStatus,
+} from '@/extensions/document-rag/src/python-bridge'
 
 type ChatInputProps = {
   className?: string
@@ -144,7 +151,19 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
     error: speechError,
   } = useSpeechRecognition()
 
-  // Sync transcript to prompt
+  // Voice relay (phone-as-mic over Wi-Fi)
+  const {
+    transcript: relayTranscript,
+    isConnected: isRelayConnected,
+    setupUrl: relaySetupUrl,
+    connect: connectRelay,
+    disconnect: disconnectRelay,
+    resetTranscript: resetRelayTranscript,
+    error: relayError,
+  } = useVoiceRelay()
+  const [relayActive, setRelayActive] = useState(false)
+
+  // Sync local speech transcript to prompt
   useEffect(() => {
     if (transcript) {
       setPrompt((prev) => {
@@ -154,6 +173,36 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
       resetTranscript()
     }
   }, [transcript, resetTranscript])
+
+  // Sync relay transcript to prompt (same pipeline as local speech)
+  useEffect(() => {
+    if (relayTranscript) {
+      setPrompt((prev) => {
+        const combined = prev ? `${prev} ${relayTranscript}` : relayTranscript
+        return combined
+      })
+      resetRelayTranscript()
+    }
+  }, [relayTranscript, resetRelayTranscript])
+
+  // Toggle voice relay: start server + connect WebSocket
+  const toggleVoiceRelay = useCallback(async () => {
+    if (relayActive) {
+      disconnectRelay()
+      await stopVoiceRelay().catch(() => {})
+      setRelayActive(false)
+    } else {
+      try {
+        const status = await startVoiceRelay()
+        if (status.running) {
+          connectRelay()
+          setRelayActive(true)
+        }
+      } catch (err) {
+        console.error('Failed to start voice relay:', err)
+      }
+    }
+  }, [relayActive, connectRelay, disconnectRelay])
 
   // Keyboard shortcut for voice (Ctrl+M)
   useEffect(() => {
@@ -1060,6 +1109,55 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
                   error={speechError}
                   onContextMenu={openDocs('voice-input')}
                 />
+                {/* Phone Mic (Voice Relay) */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        onClick={toggleVoiceRelay}
+                        onContextMenu={openDocs('voice-relay')}
+                        className={cn(
+                          'h-6 p-1 flex items-center justify-center rounded-sm transition-all duration-200 ease-in-out gap-1 cursor-pointer relative',
+                          relayActive && isRelayConnected
+                            ? 'bg-green-500/20'
+                            : relayActive
+                              ? 'bg-yellow-500/20'
+                              : 'hover:bg-main-view-fg/10'
+                        )}
+                      >
+                        {relayActive && isRelayConnected && (
+                          <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-500" />
+                        )}
+                        <IconDeviceMobile
+                          size={18}
+                          className={cn(
+                            relayActive && isRelayConnected
+                              ? 'text-green-500'
+                              : relayActive
+                                ? 'text-yellow-500'
+                                : 'text-main-view-fg/50'
+                          )}
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold">
+                        {relayActive
+                          ? isRelayConnected
+                            ? 'Phone Mic: Connected'
+                            : 'Phone Mic: Starting...'
+                          : 'Phone Mic (Wi-Fi)'}
+                      </p>
+                      <p className="text-xs mt-1">
+                        {relayActive && relaySetupUrl
+                          ? `Open ${relaySetupUrl} on your phone or scan the QR code to use your phone as a wireless microphone.`
+                          : relayError
+                            ? relayError
+                            : 'Use your phone as a wireless microphone via Wi-Fi. Your phone\'s native speech-to-text transcribes voice, then sends the text to MOBIUS.'}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <span className="text-[10px] text-main-view-fg/30 italic select-none">Right click for more info...</span>
             </div>

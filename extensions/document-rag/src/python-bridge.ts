@@ -378,3 +378,39 @@ export async function onBatchFileResult(
     callback(event.payload)
   })
 }
+
+// --- Voice Relay ---
+
+/**
+ * Voice relay server status
+ */
+export interface VoiceRelayStatus {
+  running: boolean
+  url: string | null
+  setup_url: string | null
+  port: number
+  error: string | null
+}
+
+/**
+ * Start the voice relay server (phone-as-mic over Wi-Fi)
+ */
+export async function startVoiceRelay(
+  port?: number
+): Promise<VoiceRelayStatus> {
+  return invoke<VoiceRelayStatus>('start_voice_relay', { port })
+}
+
+/**
+ * Stop the voice relay server
+ */
+export async function stopVoiceRelay(): Promise<VoiceRelayStatus> {
+  return invoke<VoiceRelayStatus>('stop_voice_relay')
+}
+
+/**
+ * Get voice relay server status
+ */
+export async function getVoiceRelayStatus(): Promise<VoiceRelayStatus> {
+  return invoke<VoiceRelayStatus>('get_voice_relay_status')
+}

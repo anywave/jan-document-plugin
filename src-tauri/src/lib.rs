@@ -72,6 +72,9 @@ pub fn run() {
             core::python_bridge::list_documents_by_source,
             core::python_bridge::synthesize_speech,
             core::python_bridge::list_tts_voices,
+            core::python_bridge::start_voice_relay,
+            core::python_bridge::stop_voice_relay,
+            core::python_bridge::get_voice_relay_status,
             // MCP commands
             core::mcp::get_tools,
             core::mcp::call_tool,

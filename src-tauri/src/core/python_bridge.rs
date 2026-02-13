@@ -1218,3 +1218,232 @@ pub async fn list_tts_voices(
 
     Ok(result)
 }
+
+// --- Voice Relay ---
+
+use std::sync::Mutex as StdMutex;
+
+/// Voice relay server status
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VoiceRelayStatus {
+    pub running: bool,
+    pub url: Option<String>,
+    pub setup_url: Option<String>,
+    pub port: u16,
+    pub error: Option<String>,
+}
+
+/// Stored PID of the running voice relay process
+static VOICE_RELAY_PID: StdMutex<Option<u32>> = StdMutex::new(None);
+
+/// Get local IP address for Wi-Fi network
+fn get_local_ip() -> String {
+    use std::net::UdpSocket;
+    UdpSocket::bind("0.0.0.0:0")
+        .and_then(|s| {
+            s.connect("8.8.8.8:80")?;
+            s.local_addr()
+        })
+        .map(|addr| addr.ip().to_string())
+        .unwrap_or_else(|_| "127.0.0.1".to_string())
+}
+
+/// Find voice_relay.py in bundled scripts or dev source tree
+fn find_voice_relay_script(app_handle: &AppHandle) -> Option<PathBuf> {
+    // 1. Bundled scripts dir (production)
+    let bundled = get_python_scripts_path(app_handle).join("voice_relay.py");
+    if bundled.exists() {
+        return Some(bundled);
+    }
+
+    // 2. Dev mode: relative to CWD (yarn dev:tauri runs from project root)
+    let cwd_relative = Path::new("extensions/document-rag/python/voice_relay.py");
+    if cwd_relative.exists() {
+        return cwd_relative.canonicalize().ok();
+    }
+
+    // 3. Dev mode: relative to resource dir (src-tauri -> project root)
+    if let Ok(resource_dir) = app_handle.path().resource_dir() {
+        for ancestor in resource_dir.ancestors().take(4) {
+            let candidate = ancestor
+                .join("extensions")
+                .join("document-rag")
+                .join("python")
+                .join("voice_relay.py");
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
+    }
+
+    None
+}
+
+/// Check if a process with the given PID is still running
+fn is_pid_alive(pid: u32) -> bool {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Foundation::CloseHandle;
+        use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+        unsafe {
+            let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+            if handle.is_null() {
+                false
+            } else {
+                CloseHandle(handle);
+                true
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+/// Start the voice relay server
+#[tauri::command]
+pub async fn start_voice_relay(
+    app_handle: AppHandle,
+    port: Option<u16>,
+) -> Result<VoiceRelayStatus, String> {
+    let port = port.unwrap_or(8089);
+
+    // Check if already running
+    {
+        let pid_guard = VOICE_RELAY_PID.lock().map_err(|e| e.to_string())?;
+        if let Some(pid) = *pid_guard {
+            if is_pid_alive(pid) {
+                let ip = get_local_ip();
+                return Ok(VoiceRelayStatus {
+                    running: true,
+                    url: Some(format!("http://{}:{}", ip, port)),
+                    setup_url: Some(format!("http://{}:{}/setup", ip, port)),
+                    port,
+                    error: None,
+                });
+            }
+        }
+    }
+
+    // Find voice_relay.py
+    let script_path = find_voice_relay_script(&app_handle)
+        .ok_or_else(|| "voice_relay.py not found in bundled scripts or source tree".to_string())?;
+
+    // Try bundled Python first, then system Python
+    let python_exe = get_python_exe(&app_handle);
+    let python = if python_exe.exists() {
+        python_exe
+    } else {
+        PathBuf::from("python")
+    };
+
+    log::info!(
+        "Starting voice relay: {:?} {:?} --port {}",
+        python,
+        script_path,
+        port
+    );
+
+    // Remove any leftover stop file
+    let stop_file = script_path.parent().unwrap().join(".voice_relay_stop");
+    let _ = std::fs::remove_file(&stop_file);
+
+    // Spawn the process in background
+    let child = std::process::Command::new(&python)
+        .arg(&script_path)
+        .arg("--port")
+        .arg(port.to_string())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|e| format!("Failed to start voice relay: {}", e))?;
+
+    let pid = child.id();
+
+    // Store PID
+    {
+        let mut pid_guard = VOICE_RELAY_PID.lock().map_err(|e| e.to_string())?;
+        *pid_guard = Some(pid);
+    }
+
+    // Brief delay for server to bind
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let ip = get_local_ip();
+    Ok(VoiceRelayStatus {
+        running: true,
+        url: Some(format!("http://{}:{}", ip, port)),
+        setup_url: Some(format!("http://{}:{}/setup", ip, port)),
+        port,
+        error: None,
+    })
+}
+
+/// Stop the voice relay server
+#[tauri::command]
+pub async fn stop_voice_relay() -> Result<VoiceRelayStatus, String> {
+    let pid = {
+        let mut pid_guard = VOICE_RELAY_PID.lock().map_err(|e| e.to_string())?;
+        pid_guard.take()
+    };
+
+    if let Some(pid) = pid {
+        #[cfg(windows)]
+        {
+            let _ = std::process::Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/F"])
+                .output();
+        }
+        #[cfg(not(windows))]
+        {
+            // On non-Windows, we'd use kill signal
+            let _ = std::process::Command::new("kill")
+                .arg(pid.to_string())
+                .output();
+        }
+    }
+
+    Ok(VoiceRelayStatus {
+        running: false,
+        url: None,
+        setup_url: None,
+        port: 8089,
+        error: None,
+    })
+}
+
+/// Get current voice relay status
+#[tauri::command]
+pub async fn get_voice_relay_status() -> Result<VoiceRelayStatus, String> {
+    let pid = {
+        let pid_guard = VOICE_RELAY_PID.lock().map_err(|e| e.to_string())?;
+        *pid_guard
+    };
+
+    match pid {
+        Some(pid) if is_pid_alive(pid) => {
+            let ip = get_local_ip();
+            Ok(VoiceRelayStatus {
+                running: true,
+                url: Some(format!("http://{}:8089", ip)),
+                setup_url: Some(format!("http://{}:8089/setup", ip)),
+                port: 8089,
+                error: None,
+            })
+        }
+        _ => {
+            // Clear stale PID
+            if let Ok(mut guard) = VOICE_RELAY_PID.lock() {
+                *guard = None;
+            }
+            Ok(VoiceRelayStatus {
+                running: false,
+                url: None,
+                setup_url: None,
+                port: 8089,
+                error: None,
+            })
+        }
+    }
+}
