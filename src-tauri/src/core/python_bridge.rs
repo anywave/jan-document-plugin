@@ -1104,7 +1104,8 @@ pub struct TtsVoiceListResult {
     pub error: Option<String>,
 }
 
-/// Synthesize speech to WAV using SAPI (fully offline)
+/// Synthesize speech to WAV using SAPI (fully offline).
+/// Uses stdin to pass text — avoids arg sanitization blocking common chars like & $ |
 #[tauri::command]
 pub async fn synthesize_speech(
     app_handle: AppHandle,
@@ -1127,32 +1128,69 @@ pub async fn synthesize_speech(
         }
     }
 
-    let mut args = vec![
-        "synthesize".to_string(),
-        text,
-        voice,
-        output_path,
-    ];
-    if let Some(r) = rate {
-        args.push(r.to_string());
+    // Ensure Python is extracted
+    ensure_python_extracted(&app_handle)?;
+
+    let python_exe = get_python_exe(&app_handle);
+    let script_path = get_python_scripts_path(&app_handle).join("tts_engine.py");
+
+    if !python_exe.exists() {
+        return Err(format!("Bundled Python not found: {:?}", python_exe));
     }
-    if let Some(v) = volume {
-        // Need rate arg before volume arg (positional)
-        if rate.is_none() {
-            args.push("150".to_string()); // default rate
+    if !script_path.exists() {
+        return Err(format!("TTS script not found: {:?}", script_path));
+    }
+
+    // Build JSON payload for stdin
+    let payload = serde_json::json!({
+        "text": text,
+        "voice": voice,
+        "output_path": output_path,
+        "rate": rate.unwrap_or(150),
+        "volume": volume.unwrap_or(1.0),
+    });
+
+    let mut child = Command::new(&python_exe)
+        .arg(&script_path)
+        .arg("synthesize-stdin")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        .map_err(|e| format!("Failed to spawn TTS process: {}", e))?;
+
+    // Write JSON payload to stdin
+    if let Some(mut stdin) = child.stdin.take() {
+        use tokio::io::AsyncWriteExt;
+        stdin
+            .write_all(payload.to_string().as_bytes())
+            .await
+            .map_err(|e| format!("Failed to write to TTS stdin: {}", e))?;
+        // Drop stdin to signal EOF
+    }
+
+    let result = tokio::time::timeout(PYTHON_COMMAND_TIMEOUT, async {
+        let output = child
+            .wait_with_output()
+            .await
+            .map_err(|e| format!("TTS process error: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("TTS failed (exit {:?}): {}", output.status.code(), stderr));
         }
-        args.push(v.to_string());
-    }
 
-    let output = execute_python_command_with_retry(
-        &app_handle,
-        "tts_engine.py",
-        args,
-        PYTHON_COMMAND_TIMEOUT,
-    )
-    .await?;
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    })
+    .await;
 
-    let result: TtsSynthResult = serde_json::from_str(&output)
+    let stdout = match result {
+        Ok(inner) => inner?,
+        Err(_) => return Err(format!("TTS timed out after {}s", PYTHON_COMMAND_TIMEOUT.as_secs())),
+    };
+
+    let result: TtsSynthResult = serde_json::from_str(&stdout)
         .map_err(|e| format!("Failed to parse TTS output: {}", e))?;
 
     Ok(result)

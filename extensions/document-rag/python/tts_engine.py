@@ -144,7 +144,18 @@ def main():
 
     command = sys.argv[1]
 
-    if command == "synthesize":
+    if command == "synthesize-stdin":
+        # Read JSON payload from stdin — avoids arg sanitization and length limits
+        payload = json.loads(sys.stdin.read())
+        text = payload["text"]
+        voice_id = payload.get("voice", "")
+        output_path = payload["output_path"]
+        rate = payload.get("rate", 150)
+        volume = payload.get("volume", 1.0)
+        result = synthesize(text, voice_id, output_path, rate, volume)
+        print(json.dumps(result))
+
+    elif command == "synthesize":
         if len(sys.argv) < 5:
             print(json.dumps({
                 "success": False,
