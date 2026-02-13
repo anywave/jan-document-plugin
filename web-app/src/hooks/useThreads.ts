@@ -30,8 +30,10 @@ type ThreadState = {
   // Multi-select state
   selectMode: boolean
   selectedIds: Set<string>
+  lastSelectedId: string | null
   setSelectMode: (on: boolean) => void
   toggleSelected: (id: string) => void
+  selectRange: (fromId: string, toId: string, orderedIds: string[]) => void
   selectAll: (ids: string[]) => void
   clearSelection: () => void
   deleteSelected: () => void
@@ -46,6 +48,7 @@ export const useThreads = create<ThreadState>()((set, get) => ({
   searchIndex: null,
   selectMode: false,
   selectedIds: new Set<string>(),
+  lastSelectedId: null,
   setThreads: (threads) => {
     const threadMap = threads.reduce(
       (acc: Record<string, Thread>, thread) => {
@@ -317,7 +320,19 @@ export const useThreads = create<ThreadState>()((set, get) => ({
       const next = new Set(state.selectedIds)
       if (next.has(id)) next.delete(id)
       else next.add(id)
-      return { selectedIds: next }
+      return { selectedIds: next, lastSelectedId: id }
+    })
+  },
+  selectRange: (fromId, toId, orderedIds) => {
+    const fromIdx = orderedIds.indexOf(fromId)
+    const toIdx = orderedIds.indexOf(toId)
+    if (fromIdx === -1 || toIdx === -1) return
+    const [start, end] = fromIdx < toIdx ? [fromIdx, toIdx] : [toIdx, fromIdx]
+    const rangeIds = orderedIds.slice(start, end + 1)
+    set((state) => {
+      const next = new Set(state.selectedIds)
+      rangeIds.forEach((id) => next.add(id))
+      return { selectedIds: next, selectMode: true, lastSelectedId: toId }
     })
   },
   selectAll: (ids) => {

@@ -201,6 +201,13 @@ const LeftPanel = () => {
     }
   }, [isSmallScreen, open])
 
+  // Auto-exit select mode when selection is cleared to 0
+  useEffect(() => {
+    if (selectMode && selectedIds.size === 0) {
+      setSelectMode(false)
+    }
+  }, [selectedIds.size, selectMode, setSelectMode])
+
   const { downloads, localDownloadingModels } = useDownloadStore()
 
   return (
@@ -325,8 +332,8 @@ const LeftPanel = () => {
                 )}
               </div>
             )}
-            {/* Bulk action bar in select mode */}
-            {selectMode && (
+            {/* Bulk action bar in select mode or when items are selected via Ctrl/Shift click */}
+            {(selectMode || selectedIds.size > 0) && (
               <div className="flex items-center gap-1 px-1 py-1.5 mb-2 bg-left-panel-fg/5 rounded-sm mx-1">
                 <span className="text-xs text-left-panel-fg/80 font-medium mr-auto">
                   {selectedIds.size} selected

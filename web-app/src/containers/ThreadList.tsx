@@ -20,6 +20,8 @@ import {
   IconStar,
   IconSquare,
   IconSquareCheckFilled,
+  IconArchive,
+  IconShare,
 } from '@tabler/icons-react'
 import { useThreads } from '@/hooks/useThreads'
 import { useLeftPanel } from '@/hooks/useLeftPanel'
@@ -53,10 +55,19 @@ type SortableItemProps = {
   thread: Thread
   selectMode?: boolean
   isSelected?: boolean
+  selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
+  orderedThreadIds: string[]
 }
 
-const SortableItem = memo(({ thread, selectMode, isSelected, onToggleSelect }: SortableItemProps) => {
+const SortableItem = memo(({
+  thread,
+  selectMode,
+  isSelected,
+  selectedIds,
+  onToggleSelect,
+  orderedThreadIds,
+}: SortableItemProps) => {
   const {
     attributes,
     listeners,
@@ -74,9 +85,15 @@ const SortableItem = memo(({ thread, selectMode, isSelected, onToggleSelect }: S
     transition,
     opacity: isDragging ? 0.5 : 1,
   }
-  const { toggleFavorite, deleteThread, renameThread } = useThreads()
+  const {
+    toggleFavorite, deleteThread, renameThread,
+    lastSelectedId, selectRange, setSelectMode,
+    archiveSelected, deleteSelected, clearSelection,
+  } = useThreads()
   const { t } = useTranslation()
   const [openDropdown, setOpenDropdown] = useState(false)
+  const [showBulkMenu, setShowBulkMenu] = useState(false)
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
   const navigate = useNavigate()
   // Check if current route matches this thread's detail page
   const matches = useMatches()
@@ -87,29 +104,37 @@ const SortableItem = memo(({ thread, selectMode, isSelected, onToggleSelect }: S
       match.params.threadId === thread.id
   )
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    if (e.shiftKey && lastSelectedId) {
+      e.preventDefault()
+      selectRange(lastSelectedId, thread.id, orderedThreadIds)
+      return
+    }
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault()
+      if (!selectMode) setSelectMode(true)
+      onToggleSelect?.(thread.id)
+      return
+    }
     if (selectMode) {
       onToggleSelect?.(thread.id)
       return
     }
-    if (!isDragging) {
-      // Only close panel and navigate if the thread is not already active
-      if (!isActive) {
-        if (isSmallScreen) setLeftPanel(false)
-        navigate({ to: route.threadsDetail, params: { threadId: thread.id } })
-      }
+    if (!isDragging && !isActive) {
+      if (isSmallScreen) setLeftPanel(false)
+      navigate({ to: route.threadsDetail, params: { threadId: thread.id } })
     }
   }
 
   const plainTitleForRename = useMemo(() => {
-    // Basic HTML stripping for simple span tags.
-    // If thread.title is undefined or null, treat as empty string before replace.
     return (thread.title || '').replace(/<span[^>]*>|<\/span>/g, '')
   }, [thread.title])
 
   const [title, setTitle] = useState(
     plainTitleForRename || t('common:newThread')
   )
+
+  const bulkCount = selectedIds?.size ?? 0
 
   return (
     <div
@@ -121,7 +146,17 @@ const SortableItem = memo(({ thread, selectMode, isSelected, onToggleSelect }: S
       onContextMenu={(e) => {
         e.preventDefault()
         e.stopPropagation()
-        setOpenDropdown(true)
+        // If right-clicking a selected thread in multi-select, show bulk menu
+        if (selectedIds && selectedIds.has(thread.id) && selectedIds.size > 1) {
+          setShowBulkMenu(true)
+        } else {
+          // Clear selection if right-clicking an unselected thread while in select mode
+          if (selectMode && selectedIds && !selectedIds.has(thread.id)) {
+            clearSelection()
+            setSelectMode(false)
+          }
+          setOpenDropdown(true)
+        }
       }}
       className={cn(
         'mb-1 rounded hover:bg-left-panel-fg/10 flex items-center justify-between gap-2 px-1.5 group/thread-list transition-all',
@@ -138,6 +173,70 @@ const SortableItem = memo(({ thread, selectMode, isSelected, onToggleSelect }: S
         )}
         <span className="truncate">{thread.title || t('common:newThread')}</span>
       </div>
+
+      {/* Bulk context menu for multi-select right-click */}
+      <DropdownMenu
+        open={showBulkMenu}
+        onOpenChange={(open) => setShowBulkMenu(open)}
+      >
+        <DropdownMenuTrigger asChild>
+          <span className="sr-only">Bulk actions</span>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="bottom" align="end">
+          <Dialog open={bulkDeleteConfirm} onOpenChange={setBulkDeleteConfirm}>
+            <DialogTrigger asChild>
+              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                <IconTrash />
+                <span>Delete {bulkCount} thread{bulkCount !== 1 ? 's' : ''}</span>
+              </DropdownMenuItem>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete {bulkCount} thread{bulkCount !== 1 ? 's' : ''}?</DialogTitle>
+                <DialogDescription>
+                  This action cannot be undone. The selected threads and all their messages will be permanently deleted.
+                </DialogDescription>
+                <DialogFooter className="mt-2">
+                  <DialogClose asChild>
+                    <Button variant="link" size="sm" className="hover:no-underline">
+                      {t('common:cancel')}
+                    </Button>
+                  </DialogClose>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      deleteSelected()
+                      setBulkDeleteConfirm(false)
+                      setShowBulkMenu(false)
+                      toast.success(`${bulkCount} thread${bulkCount !== 1 ? 's' : ''} deleted`, {
+                        id: 'delete-selected',
+                      })
+                      setTimeout(() => navigate({ to: route.home }), 0)
+                    }}
+                  >
+                    {t('common:delete')}
+                  </Button>
+                </DialogFooter>
+              </DialogHeader>
+            </DialogContent>
+          </Dialog>
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation()
+              archiveSelected()
+              setShowBulkMenu(false)
+              toast.success(`${bulkCount} thread${bulkCount !== 1 ? 's' : ''} archived`, {
+                id: 'archive-selected',
+              })
+            }}
+          >
+            <IconArchive />
+            <span>Archive {bulkCount} thread{bulkCount !== 1 ? 's' : ''}</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Single-thread context menu */}
       {!selectMode && <div className="flex items-center">
         <DropdownMenu
           open={openDropdown}
@@ -200,7 +299,6 @@ const SortableItem = memo(({ thread, selectMode, isSelected, onToggleSelect }: S
                     }}
                     className="mt-2"
                     onKeyDown={(e) => {
-                      // Prevent key from being captured by parent components
                       e.stopPropagation()
                     }}
                   />
@@ -307,6 +405,10 @@ function ThreadList({ threads, selectMode, selectedIds, onToggleSelect }: Thread
     })
   }, [threads])
 
+  const orderedThreadIds = useMemo(() => {
+    return sortedThreads.map((t) => t.id)
+  }, [sortedThreads])
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -329,7 +431,9 @@ function ThreadList({ threads, selectMode, selectedIds, onToggleSelect }: Thread
             thread={thread}
             selectMode={selectMode}
             isSelected={selectedIds?.has(thread.id)}
+            selectedIds={selectedIds}
             onToggleSelect={onToggleSelect}
+            orderedThreadIds={orderedThreadIds}
           />
         ))}
       </SortableContext>
