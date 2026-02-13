@@ -33,6 +33,7 @@ import { SelectionContextMenu } from '@/components/SelectionContextMenu'
 import { AnnotationCard } from '@/components/AnnotationCard'
 import { useTTS } from '@/hooks/useTTS'
 import { TTSControls } from '@/components/TTSControls'
+import { VoiceAssignmentDialog } from '@/components/VoiceAssignmentDialog'
 
 // as route.threadsDetail
 export const Route = createFileRoute('/threads/$threadId')({
@@ -517,6 +518,7 @@ function ThreadDetail() {
           onClose={clearSelection}
         />
       )}
+      <VoiceAssignmentDialog />
     </div>
   )
 }
