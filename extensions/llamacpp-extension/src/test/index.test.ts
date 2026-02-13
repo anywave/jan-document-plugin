@@ -159,8 +159,10 @@ describe('llamacpp_extension', () => {
 
   describe('load', () => {
     it('should throw error if model is already loaded', async () => {
-      // Mock that model is already loaded
-      extension['activeSessions'].set(123, {
+      const { invoke } = await import('@tauri-apps/api/core')
+
+      // Mock find_session_by_model to return an existing session
+      vi.mocked(invoke).mockResolvedValueOnce({
         model_id: 'test-model',
         pid: 123,
         port: 3000,
@@ -173,20 +175,20 @@ describe('llamacpp_extension', () => {
     it('should load model successfully', async () => {
       const { getJanDataFolderPath, joinPath, fs } = await import('@janhq/core')
       const { invoke } = await import('@tauri-apps/api/core')
-      
+
       // Mock system info for getBackendExePath
       window.core.api.getSystemInfo = vi.fn().mockResolvedValue({
         os_type: 'linux'
       })
-      
+
       // Mock backend functions to avoid download
       const backendModule = await import('../backend')
       vi.mocked(backendModule.isBackendInstalled).mockResolvedValue(true)
       vi.mocked(backendModule.getBackendExePath).mockResolvedValue('/path/to/backend/executable')
-      
+
       // Mock fs for backend check
       vi.mocked(fs.existsSync).mockResolvedValue(true)
-      
+
       // Mock configuration
       extension['config'] = {
         version_backend: 'v1.0.0/win-avx2-x64',
@@ -213,48 +215,56 @@ describe('llamacpp_extension', () => {
         rope_scale: 1.0,
         rope_freq_base: 10000,
         rope_freq_scale: 1.0,
-        reasoning_budget: 0,
+        override_tensor_buffer_t: '',
+        ctx_shift: true,
         auto_update_engine: false,
         auto_unload: true
       }
-      
+
       // Set up providerPath
       extension['providerPath'] = '/path/to/jan/llamacpp'
-      
+
       vi.mocked(getJanDataFolderPath).mockResolvedValue('/path/to/jan')
       vi.mocked(joinPath).mockImplementation((paths) => Promise.resolve(paths.join('/')))
-      
-      // Mock model config
-      vi.mocked(invoke)
-        .mockResolvedValueOnce({ // read_yaml
-          model_path: 'test-model/model.gguf',
-          name: 'Test Model',
-          size_bytes: 1000000
-        })
-        .mockResolvedValueOnce('test-api-key') // generate_api_key
-        .mockResolvedValueOnce({ // load_llama_model
-          model_id: 'test-model',
-          pid: 123,
-          port: 3000,
-          api_key: 'test-api-key'
-        })
 
-      // Mock successful health check
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue({ status: 'ok' })
+      // Mock invoke calls in order:
+      // 1. find_session_by_model → null (not loaded)
+      // 2. get_loaded_models → [] (nothing loaded, for autoUnload check)
+      // 3. get_random_port → 3000
+      // 4. read_yaml → model config
+      // 5. generate_api_key → api key
+      // 6. load_llama_model → session info
+      vi.mocked(invoke).mockImplementation((cmd: string, args?: any) => {
+        switch (cmd) {
+          case 'find_session_by_model':
+            return Promise.resolve(null)
+          case 'get_loaded_models':
+            return Promise.resolve([])
+          case 'get_random_port':
+            return Promise.resolve(3000)
+          case 'read_yaml':
+            return Promise.resolve({
+              model_path: 'test-model/model.gguf',
+              name: 'Test Model',
+              size_bytes: 1000000
+            })
+          case 'generate_api_key':
+            return Promise.resolve('test-api-key')
+          case 'load_llama_model':
+            return Promise.resolve({
+              model_id: 'test-model',
+              pid: 123,
+              port: 3000,
+              api_key: 'test-api-key'
+            })
+          default:
+            return Promise.resolve(undefined)
+        }
       })
 
       const result = await extension.load('test-model')
-      
+
       expect(result).toEqual({
-        model_id: 'test-model',
-        pid: 123,
-        port: 3000,
-        api_key: 'test-api-key'
-      })
-      
-      expect(extension['activeSessions'].get(123)).toEqual({
         model_id: 'test-model',
         pid: 123,
         port: 3000,
@@ -265,33 +275,43 @@ describe('llamacpp_extension', () => {
 
   describe('unload', () => {
     it('should throw error if no active session found', async () => {
-      await expect(extension.unload('nonexistent-model')).rejects.toThrow('No active session found')
+      const { invoke } = await import('@tauri-apps/api/core')
+
+      // find_session_by_model throws when no session exists
+      vi.mocked(invoke).mockRejectedValueOnce('No session found')
+
+      await expect(extension.unload('nonexistent-model')).rejects.toThrow()
     })
 
     it('should unload model successfully', async () => {
       const { invoke } = await import('@tauri-apps/api/core')
-      
-      // Set up active session
-      extension['activeSessions'].set(123, {
-        model_id: 'test-model',
-        pid: 123,
-        port: 3000,
-        api_key: 'test-key'
-      })
 
-      vi.mocked(invoke).mockResolvedValue({
-        success: true,
-        error: null
+      // Mock invoke: find_session_by_model returns session, then unload succeeds
+      vi.mocked(invoke).mockImplementation((cmd: string, args?: any) => {
+        switch (cmd) {
+          case 'find_session_by_model':
+            return Promise.resolve({
+              model_id: 'test-model',
+              pid: 123,
+              port: 3000,
+              api_key: 'test-key'
+            })
+          case 'unload_llama_model':
+            return Promise.resolve({
+              success: true,
+              error: null
+            })
+          default:
+            return Promise.resolve(undefined)
+        }
       })
 
       const result = await extension.unload('test-model')
-      
+
       expect(result).toEqual({
         success: true,
         error: null
       })
-      
-      expect(extension['activeSessions'].has(123)).toBe(false)
     })
   })
 
@@ -307,16 +327,23 @@ describe('llamacpp_extension', () => {
 
     it('should handle non-streaming chat request', async () => {
       const { invoke } = await import('@tauri-apps/api/core')
-      
-      // Set up active session
-      extension['activeSessions'].set(123, {
-        model_id: 'test-model',
-        pid: 123,
-        port: 3000,
-        api_key: 'test-key'
-      })
 
-      vi.mocked(invoke).mockResolvedValue(true) // is_process_running
+      // Mock invoke: find_session_by_model returns session, is_process_running returns true
+      vi.mocked(invoke).mockImplementation((cmd: string, args?: any) => {
+        switch (cmd) {
+          case 'find_session_by_model':
+            return Promise.resolve({
+              model_id: 'test-model',
+              pid: 123,
+              port: 3000,
+              api_key: 'test-key'
+            })
+          case 'is_process_running':
+            return Promise.resolve(true)
+          default:
+            return Promise.resolve(undefined)
+        }
+      })
 
       const mockResponse = {
         id: 'test-id',
@@ -342,7 +369,7 @@ describe('llamacpp_extension', () => {
       }
 
       const result = await extension.chat(request)
-      
+
       expect(result).toEqual(mockResponse)
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost:3000/v1/chat/completions',
@@ -384,22 +411,13 @@ describe('llamacpp_extension', () => {
 
   describe('getLoadedModels', () => {
     it('should return list of loaded models', async () => {
-      extension['activeSessions'].set(123, {
-        model_id: 'model1',
-        pid: 123,
-        port: 3000,
-        api_key: 'key1'
-      })
-      
-      extension['activeSessions'].set(456, {
-        model_id: 'model2',
-        pid: 456,
-        port: 3001,
-        api_key: 'key2'
-      })
+      const { invoke } = await import('@tauri-apps/api/core')
+
+      // Mock get_loaded_models invoke
+      vi.mocked(invoke).mockResolvedValueOnce(['model1', 'model2'])
 
       const result = await extension.getLoadedModels()
-      
+
       expect(result).toEqual(['model1', 'model2'])
     })
   })

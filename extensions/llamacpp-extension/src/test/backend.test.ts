@@ -87,7 +87,7 @@ describe('Backend functions', () => {
 
       const result = await listSupportedBackends()
 
-      expect(result).toContain({ version: 'v1.0.0', backend: 'win-avx512-cuda-cu12.0-x64' })
+      expect(result).toContainEqual({ version: 'v1.0.0', backend: 'win-avx512-cuda-cu12.0-x64' })
     })
 
     it('should select appropriate CUDA backend based on CPU features - AVX2 only', async () => {
@@ -125,8 +125,8 @@ describe('Backend functions', () => {
 
       const result = await listSupportedBackends()
 
-      expect(result).toContain({ version: 'v1.0.0', backend: 'win-avx2-cuda-cu12.0-x64' })
-      expect(result).not.toContain({ version: 'v1.0.0', backend: 'win-avx512-cuda-cu12.0-x64' })
+      expect(result).toContainEqual({ version: 'v1.0.0', backend: 'win-avx2-cuda-cu12.0-x64' })
+      expect(result).not.toContainEqual({ version: 'v1.0.0', backend: 'win-avx512-cuda-cu12.0-x64' })
     })
 
     it('should select appropriate CUDA backend based on CPU features - no AVX', async () => {
@@ -164,9 +164,9 @@ describe('Backend functions', () => {
 
       const result = await listSupportedBackends()
 
-      expect(result).toContain({ version: 'v1.0.0', backend: 'win-noavx-cuda-cu12.0-x64' })
-      expect(result).not.toContain({ version: 'v1.0.0', backend: 'win-avx2-cuda-cu12.0-x64' })
-      expect(result).not.toContain({ version: 'v1.0.0', backend: 'win-avx512-cuda-cu12.0-x64' })
+      expect(result).toContainEqual({ version: 'v1.0.0', backend: 'win-noavx-cuda-cu12.0-x64' })
+      expect(result).not.toContainEqual({ version: 'v1.0.0', backend: 'win-avx2-cuda-cu12.0-x64' })
+      expect(result).not.toContainEqual({ version: 'v1.0.0', backend: 'win-avx512-cuda-cu12.0-x64' })
     })
 
     it('should return CUDA backends with proper CPU instruction detection for Linux', async () => {
@@ -204,9 +204,9 @@ describe('Backend functions', () => {
 
       const result = await listSupportedBackends()
 
-      expect(result).toContain({ version: 'v1.0.0', backend: 'linux-avx-cuda-cu12.0-x64' })
-      expect(result).not.toContain({ version: 'v1.0.0', backend: 'linux-avx2-cuda-cu12.0-x64' })
-      expect(result).not.toContain({ version: 'v1.0.0', backend: 'linux-avx512-cuda-cu12.0-x64' })
+      expect(result).toContainEqual({ version: 'v1.0.0', backend: 'linux-avx-cuda-cu12.0-x64' })
+      expect(result).not.toContainEqual({ version: 'v1.0.0', backend: 'linux-avx2-cuda-cu12.0-x64' })
+      expect(result).not.toContainEqual({ version: 'v1.0.0', backend: 'linux-avx512-cuda-cu12.0-x64' })
     })
 
     it('should return supported backends for macOS arm64', async () => {

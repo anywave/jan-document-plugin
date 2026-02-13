@@ -36,6 +36,15 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
 
+// Mock Tauri logging plugin (has its own internal invoke that bypasses our mock)
+vi.mock('@tauri-apps/plugin-log', () => ({
+  error: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+  trace: vi.fn(),
+}))
+
 // Mock Tauri path API
 vi.mock('@tauri-apps/api/path', () => ({
   basename: vi.fn(),
