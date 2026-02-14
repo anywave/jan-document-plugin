@@ -50,7 +50,6 @@ import { toast } from 'sonner'
 import { DownloadManagement } from '@/containers/DownloadManegement'
 import { useSmallScreen } from '@/hooks/useMediaQuery'
 import { useClickOutside } from '@/hooks/useClickOutside'
-import { useDownloadStore } from '@/hooks/useDownloadStore'
 
 const mainMenus = [
   {
@@ -208,7 +207,6 @@ const LeftPanel = () => {
     }
   }, [selectedIds.size, selectMode, setSelectMode])
 
-  const { downloads, localDownloadingModels } = useDownloadStore()
 
   return (
     <>
@@ -291,14 +289,9 @@ const LeftPanel = () => {
           )}
         </div>
 
-        <div className="flex flex-col justify-between overflow-hidden mt-0 !h-[calc(100%-42px)]">
+        <div className="flex flex-col overflow-hidden mt-0 !h-[calc(100%-42px)]">
           <div
-            className={cn(
-              'flex flex-col',
-              Object.keys(downloads).length > 0 || localDownloadingModels.size > 0
-                ? 'h-[calc(100%-200px)]'
-                : 'h-[calc(100%-140px)]'
-            )}
+            className="flex flex-col flex-1 min-h-0 overflow-y-auto"
           >
             {IS_MACOS && (
               <div

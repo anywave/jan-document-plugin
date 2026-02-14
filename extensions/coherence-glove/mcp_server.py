@@ -1,27 +1,36 @@
 """
 Coherence Glove — MCP Server
 
-Bridges Silver Pancake's MultiWaveCoherenceEngine into MOBIUS via stdio JSON-RPC.
-Exposes 5 tools for LLM-initiated coherence measurement:
+Bridges the MultiWave Coherence Engine into MOBIUS via stdio JSON-RPC.
+Exposes 5 tools for LLM-initiated coherence measurement, plus an HTTP
+relay for remote bloom injection.
 
+MCP Tools:
   coherence_get_state    — current MultiWaveCoherenceState as dict
   coherence_get_consent  — consent level string
   coherence_push_text    — analyze text, push signal, return updated state
   coherence_push_breath  — convert inhale/exhale ms to breath signal
   coherence_reset        — clear engine state
 
-Usage:
-  Configured in mcp_config.json as a stdio MCP server.
-  PYTHONPATH must include silver-pancake/src for coherence engine imports.
+HTTP Relay (background thread):
+  POST /bloom  — push torsion bloom signal (token-authenticated)
+  GET  /state  — read current coherence state
+
+Environment variables:
+  BLOOM_RELAY_PORT   — HTTP relay port (default: 7777, 0 = disabled)
+  BLOOM_RELAY_TOKEN  — shared secret for authentication (required for relay)
+  PYTHONPATH         — optional path to dev coherence engine source
 """
 
 import sys
 import os
 import json
 import logging
+import threading
 import numpy as np
 from datetime import datetime
 from typing import Any, Dict, Optional
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Bundled Python (._pth) ignores PYTHONPATH — inject it manually
 _extra_path = os.environ.get('PYTHONPATH', '')
@@ -30,12 +39,12 @@ if _extra_path:
         if p and p not in sys.path:
             sys.path.insert(0, p)
 
-# Also add our own directory for text_adapter import
+# Also add our own directory for vendored packages + text_adapter
 _self_dir = os.path.dirname(os.path.abspath(__file__))
 if _self_dir not in sys.path:
     sys.path.insert(0, _self_dir)
 
-# Silver Pancake coherence engine (via PYTHONPATH)
+# Coherence engine (vendored in coherence/ or via PYTHONPATH for dev)
 from coherence.engine import create_coherence_engine, EngineConfig
 from coherence.scalar_reduction import coherence_to_consent_level
 
@@ -51,7 +60,7 @@ log = logging.getLogger('coherence-glove')
 
 PROTOCOL_VERSION = '2024-11-05'
 SERVER_NAME = 'coherence-glove'
-SERVER_VERSION = '0.1.0'
+SERVER_VERSION = '0.2.0'
 
 # Engine config — lightweight for text-only mode
 ENGINE_CONFIG = EngineConfig(
@@ -61,6 +70,10 @@ ENGINE_CONFIG = EngineConfig(
     use_btf=False,  # BTF disabled for text-only mode — no real biometric signals
     adaptive_scheduling=False,
 )
+
+# Relay config
+BLOOM_RELAY_PORT = int(os.environ.get('BLOOM_RELAY_PORT', '7777'))
+BLOOM_RELAY_TOKEN = os.environ.get('BLOOM_RELAY_TOKEN', '')
 
 TOOLS = [
     {
@@ -142,6 +155,76 @@ class CoherenceGloveServer:
             'text_coherence', initial_data, self._text_sample_rate
         )
         log.info('Engine initialized with text_coherence stream')
+
+        # Start HTTP bloom relay if configured
+        self._relay_server = None
+        if BLOOM_RELAY_PORT > 0 and BLOOM_RELAY_TOKEN:
+            self._start_bloom_relay()
+        elif BLOOM_RELAY_PORT > 0 and not BLOOM_RELAY_TOKEN:
+            log.info('Bloom relay disabled: BLOOM_RELAY_TOKEN not set')
+
+    def _start_bloom_relay(self):
+        """Start the HTTP bloom relay in a background thread."""
+        server_ref = self  # Capture for handler closure
+
+        class BloomHandler(BaseHTTPRequestHandler):
+            """HTTP handler for remote bloom injection."""
+
+            def log_message(self, format, *args):
+                log.info(f'[relay] {format % args}')
+
+            def _check_token(self) -> bool:
+                token = self.headers.get('Authorization', '').replace('Bearer ', '')
+                if token != BLOOM_RELAY_TOKEN:
+                    self.send_response(401)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'error': 'unauthorized'}).encode())
+                    return False
+                return True
+
+            def do_GET(self):
+                if self.path == '/state':
+                    if not self._check_token():
+                        return
+                    state = server_ref._get_state()
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(state).encode())
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+
+            def do_POST(self):
+                if self.path == '/bloom':
+                    if not self._check_token():
+                        return
+                    content_len = int(self.headers.get('Content-Length', 0))
+                    body = self.rfile.read(content_len)
+                    try:
+                        data = json.loads(body)
+                        result = server_ref._push_bloom(data)
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps(result).encode())
+                    except Exception as e:
+                        self.send_response(400)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({'error': str(e)}).encode())
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+
+        try:
+            self._relay_server = HTTPServer(('0.0.0.0', BLOOM_RELAY_PORT), BloomHandler)
+            thread = threading.Thread(target=self._relay_server.serve_forever, daemon=True)
+            thread.start()
+            log.info(f'Bloom relay listening on port {BLOOM_RELAY_PORT}')
+        except OSError as e:
+            log.error(f'Failed to start bloom relay: {e}')
 
     def handle_request(self, request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Handle a single JSON-RPC request."""
@@ -255,7 +338,7 @@ class CoherenceGloveServer:
         if not text:
             return {'error': 'Empty text', 'state': self._get_state()}
 
-        # Text → 5-band amplitudes
+        # Text -> 5-band amplitudes
         amplitudes = self.adapter.analyze(text)
         smoothed = self.adapter.get_smoothed()
 
@@ -317,6 +400,41 @@ class CoherenceGloveServer:
             'inhaleMs': inhale_ms,
             'exhaleMs': exhale_ms,
         }
+        return state
+
+    def _push_bloom(self, data: Dict) -> Dict:
+        """Push remote torsion bloom signal into the engine.
+
+        Accepts band amplitudes directly (from RADIX's session) and
+        injects them as a coherence signal, merging with local state.
+
+        Expected data format:
+          bandAmplitudes: [5] floats (ULTRA, SLOW, CORE, FAST, RAPID)
+          intentionality: float 0-1 (optional, defaults to 1.0)
+          source: string identifier (optional)
+        """
+        band_amps = data.get('bandAmplitudes')
+        if not band_amps or len(band_amps) != 5:
+            return {'error': 'bandAmplitudes must be array of 5 floats'}
+
+        amplitudes = np.array(band_amps, dtype=np.float64)
+        amplitudes = np.clip(amplitudes, 0.0, 1.0)
+
+        # Register or push bloom stream
+        try:
+            self.engine.push_samples('bloom_relay', amplitudes)
+        except (KeyError, ValueError):
+            self.engine.register_stream_data(
+                'bloom_relay', amplitudes, 1.0
+            )
+
+        self.engine.process_window()
+
+        state = self._get_state()
+        state['bloomSource'] = data.get('source', 'remote')
+        state['bloomInjected'] = True
+        log.info(f'Bloom injected from {data.get("source", "remote")}: '
+                 f'coherence={state["scalarCoherence"]:.3f}')
         return state
 
     def _reset(self) -> Dict:
