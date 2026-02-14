@@ -29,5 +29,13 @@
   "save": "Save",
   "createNew": "Create New Assistant",
   "personality": "Personality",
-  "capabilities": "Capabilities"
+  "capabilities": "Capabilities",
+  "friendlyMode": "Friendly",
+  "technicalMode": "Technical",
+  "showAdvanced": "Show advanced",
+  "hideAdvanced": "Hide advanced",
+  "paramCategorySampling": "Sampling",
+  "paramCategoryGeneration": "Generation",
+  "paramCategoryPenalties": "Penalties",
+  "paramCategoryAdvanced": "Advanced"
 }

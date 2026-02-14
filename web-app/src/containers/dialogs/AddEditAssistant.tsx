@@ -17,7 +17,15 @@ import {
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react'
 
 import { Textarea } from '@/components/ui/textarea'
-import { paramsSettings } from '@/lib/predefinedParams'
+import {
+  paramsSettings,
+  paramCategories,
+  getParamsByCategory,
+} from '@/lib/predefinedParams'
+import type { ParamSetting } from '@/lib/predefinedParams'
+import ParamChip from '@/components/ParamChip'
+import { Switch } from '@/components/ui/switch'
+import { localStorageKey } from '@/constants/localStorage'
 
 import {
   DropdownMenu,
@@ -62,6 +70,11 @@ export default function AddEditAssistant({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
   const [nameError, setNameError] = useState<string | null>(null)
+  const [friendlyMode, setFriendlyMode] = useState(() => {
+    const stored = localStorage.getItem(localStorageKey.paramFriendlyMode)
+    return stored !== null ? stored === 'true' : true
+  })
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Handle click outside emoji picker
   useEffect(() => {
@@ -192,6 +205,38 @@ export default function AddEditAssistant({
     setParamsKeys(newKeys.length > 0 ? newKeys : [''])
     setParamsValues(newValues.length > 0 ? newValues : [''])
     setParamsTypes(newTypes.length > 0 ? newTypes : ['string'])
+  }
+
+  const handlePredefinedParamClick = (setting: ParamSetting) => {
+    const existingIndex = paramsKeys.findIndex((k) => k === setting.key)
+    if (existingIndex !== -1) return
+
+    const newKeys = [...paramsKeys]
+    const newValues = [...paramsValues]
+    const newTypes = [...paramsTypes]
+
+    const paramType =
+      typeof setting.value === 'boolean'
+        ? 'boolean'
+        : typeof setting.value === 'number'
+          ? 'number'
+          : typeof setting.value === 'object'
+            ? 'json'
+            : 'string'
+
+    if (paramsKeys[paramsKeys.length - 1] === '') {
+      newKeys[newKeys.length - 1] = setting.key
+      newValues[newValues.length - 1] = setting.value
+      newTypes[newTypes.length - 1] = paramType
+    } else {
+      newKeys.push(setting.key)
+      newValues.push(setting.value)
+      newTypes.push(paramType)
+    }
+
+    setParamsKeys(newKeys)
+    setParamsValues(newValues)
+    setParamsTypes(newTypes)
   }
 
   const handleSave = () => {
@@ -328,58 +373,57 @@ export default function AddEditAssistant({
               <label className="text-sm">
                 {t('assistants:predefinedParameters')}
               </label>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(paramsSettings).map(([key, setting]) => (
-                <div
-                  key={key}
-                  onClick={() => {
-                    // Check if parameter already exists
-                    const existingIndex = paramsKeys.findIndex(
-                      (k) => k === setting.key
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-main-view-fg/50">
+                  {friendlyMode
+                    ? t('assistants:friendlyMode')
+                    : t('assistants:technicalMode')}
+                </span>
+                <Switch
+                  checked={friendlyMode}
+                  onCheckedChange={(checked) => {
+                    setFriendlyMode(checked)
+                    localStorage.setItem(
+                      localStorageKey.paramFriendlyMode,
+                      String(checked)
                     )
-                    if (existingIndex === -1) {
-                      // Add new parameter
-                      const newKeys = [...paramsKeys]
-                      const newValues = [...paramsValues]
-                      const newTypes = [...paramsTypes]
-
-                      // If the last param is empty, replace it, otherwise add new
-                      if (paramsKeys[paramsKeys.length - 1] === '') {
-                        newKeys[newKeys.length - 1] = setting.key
-                        newValues[newValues.length - 1] = setting.value
-                        newTypes[newTypes.length - 1] =
-                          typeof setting.value === 'boolean'
-                            ? 'boolean'
-                            : typeof setting.value === 'number'
-                              ? 'number'
-                              : 'string'
-                      } else {
-                        newKeys.push(setting.key)
-                        newValues.push(setting.value)
-                        newTypes.push(
-                          typeof setting.value === 'boolean'
-                            ? 'boolean'
-                            : typeof setting.value === 'number'
-                              ? 'number'
-                              : 'string'
-                        )
-                      }
-
-                      setParamsKeys(newKeys)
-                      setParamsValues(newValues)
-                      setParamsTypes(newTypes)
-                    }
                   }}
-                  className={cn(
-                    'text-xs bg-main-view-fg/10 py-1 px-2 rounded-sm cursor-pointer',
-                    paramsKeys.includes(setting.key) && 'opacity-50'
-                  )}
-                >
-                  {setting.title}
-                </div>
-              ))}
+                />
+              </div>
             </div>
+            <div className="space-y-2">
+              {paramCategories.map((cat) => {
+                const params = getParamsByCategory(cat.key, showAdvanced)
+                if (params.length === 0) return null
+                return (
+                  <div key={cat.key}>
+                    <div className="text-[10px] font-medium tracking-wider text-main-view-fg/40 mb-1">
+                      {t(`assistants:paramCategory${cat.label.charAt(0) + cat.label.slice(1).toLowerCase()}`)}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {params.map((setting) => (
+                        <ParamChip
+                          key={setting.key}
+                          setting={setting}
+                          isActive={paramsKeys.includes(setting.key)}
+                          friendlyMode={friendlyMode}
+                          onClick={() => handlePredefinedParamClick(setting)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-xs text-accent hover:underline"
+            >
+              {showAdvanced
+                ? t('assistants:hideAdvanced')
+                : t('assistants:showAdvanced')}
+            </button>
           </div>
 
           <div className="space-y-2">

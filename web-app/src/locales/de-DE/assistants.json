@@ -29,5 +29,13 @@
   "save": "Speichern",
   "createNew": "Neuen Assistenten anlegen",
   "personality": "Persönlichkeit",
-  "capabilities": "Fähigkeiten"
+  "capabilities": "Fähigkeiten",
+  "friendlyMode": "Einfach",
+  "technicalMode": "Technisch",
+  "showAdvanced": "Erweitert anzeigen",
+  "hideAdvanced": "Erweitert ausblenden",
+  "paramCategorySampling": "Sampling",
+  "paramCategoryGeneration": "Generierung",
+  "paramCategoryPenalties": "Penalties",
+  "paramCategoryAdvanced": "Erweitert"
 }

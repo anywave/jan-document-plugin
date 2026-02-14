@@ -29,5 +29,13 @@
   "save": "保存",
   "createNew": "创建新助手",
   "personality": "个性",
-  "capabilities": "能力"
+  "capabilities": "能力",
+  "friendlyMode": "简单模式",
+  "technicalMode": "技术模式",
+  "showAdvanced": "显示高级",
+  "hideAdvanced": "隐藏高级",
+  "paramCategorySampling": "采样",
+  "paramCategoryGeneration": "生成",
+  "paramCategoryPenalties": "惩罚",
+  "paramCategoryAdvanced": "高级"
 }

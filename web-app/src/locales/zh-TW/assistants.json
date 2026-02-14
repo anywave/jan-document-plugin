@@ -29,5 +29,13 @@
   "save": "儲存",
   "createNew": "建立新助理",
   "personality": "個性",
-  "capabilities": "能力"
+  "capabilities": "能力",
+  "friendlyMode": "簡單模式",
+  "technicalMode": "技術模式",
+  "showAdvanced": "顯示進階",
+  "hideAdvanced": "隱藏進階",
+  "paramCategorySampling": "取樣",
+  "paramCategoryGeneration": "生成",
+  "paramCategoryPenalties": "懲罰",
+  "paramCategoryAdvanced": "進階"
 }

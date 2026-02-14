@@ -23,4 +23,5 @@ export const localStorageKey = {
   ttsVoice: 'tts-voice',
   codexState: 'codex-state',
   breathSync: 'breath-sync',
+  paramFriendlyMode: 'param-friendly-mode',
 }

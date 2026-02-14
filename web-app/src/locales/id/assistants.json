@@ -29,5 +29,13 @@
   "save": "Simpan",
   "createNew": "Buat Asisten Baru",
   "personality": "Kepribadian",
-  "capabilities": "Kemampuan"
+  "capabilities": "Kemampuan",
+  "friendlyMode": "Friendly",
+  "technicalMode": "Technical",
+  "showAdvanced": "Show advanced",
+  "hideAdvanced": "Hide advanced",
+  "paramCategorySampling": "Sampling",
+  "paramCategoryGeneration": "Generation",
+  "paramCategoryPenalties": "Penalties",
+  "paramCategoryAdvanced": "Advanced"
 }

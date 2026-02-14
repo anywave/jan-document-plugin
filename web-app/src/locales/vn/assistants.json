@@ -29,5 +29,13 @@
   "save": "Lưu",
   "createNew": "Tạo Trợ lý Mới",
   "personality": "Tính cách",
-  "capabilities": "Khả năng"
+  "capabilities": "Khả năng",
+  "friendlyMode": "Friendly",
+  "technicalMode": "Technical",
+  "showAdvanced": "Show advanced",
+  "hideAdvanced": "Hide advanced",
+  "paramCategorySampling": "Sampling",
+  "paramCategoryGeneration": "Generation",
+  "paramCategoryPenalties": "Penalties",
+  "paramCategoryAdvanced": "Advanced"
 }
