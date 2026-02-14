@@ -159,7 +159,10 @@ export const ThreadContent = memo(
 
     const handleSpeak = useCallback((messageId: string, text: string) => {
       setCurrentSpeakingId(messageId)
-      play(text).catch((err) => console.error('TTS error:', err))
+      play(text).catch((err) => {
+        console.error('TTS error:', err)
+        setCurrentSpeakingId(null)
+      })
     }, [play])
 
     const handleStop = useCallback(() => {

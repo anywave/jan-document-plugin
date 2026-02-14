@@ -277,6 +277,18 @@ interface TTSState {
 type ZuSet = (partial: Partial<TTSState>) => void
 type ZuGet = () => TTSState
 
+/** Module-level controller for cancelling multi-segment chain playback */
+let chainAbort: AbortController | null = null
+
+/** Clean up an audio element: remove handlers, pause, release resources */
+function cleanupAudio(audio: HTMLAudioElement | null): void {
+  if (!audio) return
+  audio.onended = null
+  audio.onerror = null
+  audio.pause()
+  audio.src = ''
+}
+
 /** Synthesize a single-voice utterance and play it */
 async function synthesizeAndPlay(
   _get: ZuGet,
@@ -327,19 +339,24 @@ async function synthesizeAndPlay(
   audio.onended = () => set({ isPlaying: false, audioElement: null, currentText: null })
   audio.onerror = () => set({ isPlaying: false, audioElement: null, currentText: null })
   set({ audioElement: audio })
-  audio.play()
+  await audio.play().catch((e) => {
+    console.warn('Audio playback blocked:', e)
+    cleanupAudio(audio)
+    set({ isPlaying: false, audioElement: null, currentText: null })
+  })
 }
 
 /** Play a sequence of WAV files back-to-back (for multi-voice segments) */
 function chainPlayback(
   paths: string[],
   convertFileSrc: (path: string) => string,
-  set: ZuSet
+  set: ZuSet,
+  signal: AbortSignal
 ): void {
   let index = 0
 
   function playNext() {
-    if (index >= paths.length) {
+    if (signal.aborted || index >= paths.length) {
       set({ isPlaying: false, audioElement: null, currentText: null })
       return
     }
@@ -352,7 +369,11 @@ function chainPlayback(
       set({ isPlaying: false, audioElement: null, currentText: null })
     }
     set({ audioElement: audio, lastGeneratedPath: paths[index] })
-    audio.play()
+    audio.play().catch((e) => {
+      console.warn('Chain playback blocked:', e)
+      cleanupAudio(audio)
+      set({ isPlaying: false, audioElement: null, currentText: null })
+    })
   }
 
   playNext()
@@ -390,11 +411,12 @@ export const useTTS = create<TTSState>((set, get) => ({
   },
 
   play: async (text, threadTitle) => {
+    if (!text?.trim()) return
+
     const state = get()
-    if (state.audioElement) {
-      state.audioElement.pause()
-      state.audioElement.src = ''
-    }
+    cleanupAudio(state.audioElement)
+    chainAbort?.abort()
+    chainAbort = null
 
     const voice = state.getSelectedVoice()
 
@@ -422,11 +444,12 @@ export const useTTS = create<TTSState>((set, get) => ({
   },
 
   playWithAssignments: async (text, assignments, threadTitle) => {
+    if (!text?.trim()) return
+
     const state = get()
-    if (state.audioElement) {
-      state.audioElement.pause()
-      state.audioElement.src = ''
-    }
+    cleanupAudio(state.audioElement)
+    chainAbort?.abort()
+    chainAbort = null
 
     const defaultVoice = state.getSelectedVoice()
     set({ isGenerating: true, currentText: text, isPlaying: false, pendingAssignment: null })
@@ -474,7 +497,8 @@ export const useTTS = create<TTSState>((set, get) => ({
       if (audioPaths.length === 0) throw new Error('No audio segments generated')
 
       set({ isGenerating: false, isPlaying: true })
-      chainPlayback(audioPaths, convertFileSrc, set)
+      chainAbort = new AbortController()
+      chainPlayback(audioPaths, convertFileSrc, set, chainAbort.signal)
 
     } catch (err) {
       console.error('TTS error:', err)
@@ -488,11 +512,9 @@ export const useTTS = create<TTSState>((set, get) => ({
   },
 
   stop: () => {
-    const { audioElement } = get()
-    if (audioElement) {
-      audioElement.pause()
-      audioElement.src = ''
-    }
+    chainAbort?.abort()
+    chainAbort = null
+    cleanupAudio(get().audioElement)
     window.speechSynthesis?.cancel()
     set({ isPlaying: false, audioElement: null, currentText: null })
   },

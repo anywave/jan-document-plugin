@@ -24,10 +24,11 @@ export function VoiceAssignmentDialog() {
   }, [pendingAssignment])
 
   const handlePlay = () => {
+    if (!pendingAssignment) return
     playWithAssignments(
-      pendingAssignment!.text,
+      pendingAssignment.text,
       assignments,
-      pendingAssignment!.threadTitle
+      pendingAssignment.threadTitle
     )
   }
 
