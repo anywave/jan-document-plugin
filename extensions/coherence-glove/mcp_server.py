@@ -1,20 +1,24 @@
 """
-Coherence Glove — MCP Server
+Coherence Glove — MCP Server (v0.3.0)
 
 Bridges the MultiWave Coherence Engine into MOBIUS via stdio JSON-RPC.
-Exposes 5 tools for LLM-initiated coherence measurement, plus an HTTP
-relay for remote bloom injection.
+Exposes tools for LLM-initiated coherence measurement, biometric sensor
+management, plus an HTTP relay for remote bloom/sensor injection.
 
 MCP Tools:
-  coherence_get_state    — current MultiWaveCoherenceState as dict
-  coherence_get_consent  — consent level string
-  coherence_push_text    — analyze text, push signal, return updated state
-  coherence_push_breath  — convert inhale/exhale ms to breath signal
-  coherence_reset        — clear engine state
+  coherence_get_state      — current MultiWaveCoherenceState as dict
+  coherence_get_consent    — consent level string
+  coherence_push_text      — analyze text, push signal, return updated state
+  coherence_push_breath    — convert inhale/exhale ms to breath signal
+  coherence_start_sensors  — start biometric sensors (microphone, camera)
+  coherence_stop_sensors   — stop biometric sensors
+  coherence_sensor_status  — check which sensors are running
+  coherence_reset          — clear engine state
 
 HTTP Relay (background thread):
-  POST /bloom  — push torsion bloom signal (token-authenticated)
-  GET  /state  — read current coherence state
+  POST /bloom    — push torsion bloom signal (token-authenticated)
+  POST /samples  — push raw biometric samples (from breath/PPG sensors)
+  GET  /state    — read current coherence state
 
 Environment variables:
   BLOOM_RELAY_PORT   — HTTP relay port (default: 7777, 0 = disabled)
@@ -28,9 +32,10 @@ import json
 import logging
 import threading
 import signal
+import subprocess
 import numpy as np
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Force line-buffered stdout for stdio MCP transport — prevents health check
@@ -67,16 +72,19 @@ log = logging.getLogger('coherence-glove')
 
 PROTOCOL_VERSION = '2024-11-05'
 SERVER_NAME = 'coherence-glove'
-SERVER_VERSION = '0.2.0'
+SERVER_VERSION = '0.3.0'
 
-# Engine config — lightweight for text-only mode
+# Engine config — supports real biometric signals at 10 Hz
 ENGINE_CONFIG = EngineConfig(
     window_duration_s=30.0,
     update_interval_s=1.0,
     min_signals=1,
-    use_btf=False,  # BTF disabled for text-only mode — no real biometric signals
+    use_btf=False,  # BTF disabled — direct coherence computation
     adaptive_scheduling=False,
 )
+
+# Biometric sensor config
+BIOMETRIC_SAMPLE_RATE = 10.0  # Sensors push at 10 Hz (Nyquist for RAPID φ-band at 3.33 Hz)
 
 # Relay config
 BLOOM_RELAY_PORT = int(os.environ.get('BLOOM_RELAY_PORT', '7777'))
@@ -132,8 +140,45 @@ TOOLS = [
         },
     },
     {
+        'name': 'coherence_start_sensors',
+        'description': 'Start biometric sensors for real coherence measurement. Sensors push live data (breath from microphone, pulse from camera) into the coherence engine.',
+        'inputSchema': {
+            'type': 'object',
+            'properties': {
+                'sensors': {
+                    'type': 'array',
+                    'items': {'type': 'string', 'enum': ['breath', 'ppg']},
+                    'description': 'Which sensors to start. "breath" = microphone breath detection, "ppg" = camera heart rate.',
+                },
+            },
+            'required': ['sensors'],
+        },
+    },
+    {
+        'name': 'coherence_stop_sensors',
+        'description': 'Stop biometric sensors.',
+        'inputSchema': {
+            'type': 'object',
+            'properties': {
+                'sensors': {
+                    'type': 'array',
+                    'items': {'type': 'string', 'enum': ['breath', 'ppg']},
+                    'description': 'Which sensors to stop. Omit to stop all.',
+                },
+            },
+        },
+    },
+    {
+        'name': 'coherence_sensor_status',
+        'description': 'Check which biometric sensors are currently running.',
+        'inputSchema': {
+            'type': 'object',
+            'properties': {},
+        },
+    },
+    {
         'name': 'coherence_reset',
-        'description': 'Reset the coherence engine, clearing all accumulated state.',
+        'description': 'Reset the coherence engine, clearing all accumulated state and stopping sensors.',
         'inputSchema': {
             'type': 'object',
             'properties': {},
@@ -143,7 +188,7 @@ TOOLS = [
 
 
 class CoherenceGloveServer:
-    """MCP server bridging text/breath signals to MultiWaveCoherenceEngine."""
+    """MCP server bridging text/breath/biometric signals to MultiWaveCoherenceEngine."""
 
     def __init__(self):
         self.engine = create_coherence_engine(
@@ -155,7 +200,14 @@ class CoherenceGloveServer:
         self._initialized = False
         self._text_sample_rate = 1.0  # 1 sample per push
         self._breath_sample_rate = 10.0  # synthetic breath signal rate
-        self._lock = threading.Lock()  # Protects engine access from bloom relay thread
+        self._lock = threading.Lock()  # Protects engine access from relay threads
+
+        # Sensor subprocess management
+        self._sensors: Dict[str, subprocess.Popen] = {}
+        self._sensor_scripts = {
+            'breath': os.path.join(_self_dir, 'breath_sensor.py'),
+            'ppg': os.path.join(_self_dir, 'ppg_sensor.py'),
+        }
 
         # Register a synthetic text stream
         initial_data = np.zeros(5)
@@ -213,6 +265,23 @@ class CoherenceGloveServer:
                     try:
                         data = json.loads(body)
                         result = server_ref._push_bloom(data)
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps(result).encode())
+                    except Exception as e:
+                        self.send_response(400)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({'error': str(e)}).encode())
+                elif self.path == '/samples':
+                    if not self._check_token():
+                        return
+                    content_len = int(self.headers.get('Content-Length', 0))
+                    body = self.rfile.read(content_len)
+                    try:
+                        data = json.loads(body)
+                        result = server_ref._push_biometric_samples(data)
                         self.send_response(200)
                         self.send_header('Content-Type', 'application/json')
                         self.end_headers()
@@ -289,6 +358,12 @@ class CoherenceGloveServer:
                     arguments.get('inhale_ms', 0),
                     arguments.get('exhale_ms', 0),
                 )
+            elif tool_name == 'coherence_start_sensors':
+                result = self._start_sensors(arguments.get('sensors', []))
+            elif tool_name == 'coherence_stop_sensors':
+                result = self._stop_sensors(arguments.get('sensors'))
+            elif tool_name == 'coherence_sensor_status':
+                result = self._sensor_status()
             elif tool_name == 'coherence_reset':
                 result = self._reset()
             else:
@@ -442,8 +517,148 @@ class CoherenceGloveServer:
                  f'coherence={state["scalarCoherence"]:.3f}')
         return state
 
+    def _push_biometric_samples(self, data: Dict) -> Dict:
+        """Push raw biometric samples from sensors into the engine.
+
+        Expected data format:
+          stream: string — stream name (breath, ppg_finger, ppg_face)
+          samples: [float, ...] — time-series values
+          sample_rate: float — samples per second (typically 10.0)
+          source: string — identifier (optional)
+        """
+        stream_name = data.get('stream')
+        samples = data.get('samples')
+        sample_rate = data.get('sample_rate', BIOMETRIC_SAMPLE_RATE)
+
+        if not stream_name or not samples:
+            return {'error': 'stream and samples are required'}
+
+        samples_arr = np.array(samples, dtype=np.float64)
+
+        with self._lock:
+            try:
+                self.engine.push_samples(stream_name, samples_arr)
+            except (KeyError, ValueError):
+                # First push for this stream — register it
+                self.engine.register_stream_data(
+                    stream_name, samples_arr, sample_rate
+                )
+            self.engine.process_window()
+
+        state = self._get_state()
+        state['biometricSource'] = {
+            'stream': stream_name,
+            'samplesReceived': len(samples),
+            'sampleRate': sample_rate,
+            'source': data.get('source', 'unknown'),
+        }
+        return state
+
+    def _start_sensors(self, sensors: List[str]) -> Dict:
+        """Start biometric sensor subprocesses."""
+        results = {}
+        python_exe = sys.executable  # Use same Python that runs MCP server
+
+        for sensor_name in sensors:
+            if sensor_name not in self._sensor_scripts:
+                results[sensor_name] = {'error': f'Unknown sensor: {sensor_name}'}
+                continue
+
+            # Check if already running
+            if sensor_name in self._sensors:
+                proc = self._sensors[sensor_name]
+                if proc.poll() is None:
+                    results[sensor_name] = {'status': 'already_running', 'pid': proc.pid}
+                    continue
+                # Dead process — clean up
+                del self._sensors[sensor_name]
+
+            script = self._sensor_scripts[sensor_name]
+            if not os.path.exists(script):
+                results[sensor_name] = {'error': f'Script not found: {script}'}
+                continue
+
+            cmd = [
+                python_exe, script,
+                '--port', str(BLOOM_RELAY_PORT),
+                '--token', BLOOM_RELAY_TOKEN,
+            ]
+
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+                )
+                self._sensors[sensor_name] = proc
+                results[sensor_name] = {'status': 'started', 'pid': proc.pid}
+                log.info(f'Sensor {sensor_name} started (PID {proc.pid})')
+            except Exception as e:
+                results[sensor_name] = {'error': str(e)}
+                log.error(f'Failed to start sensor {sensor_name}: {e}')
+
+        return {'sensors': results}
+
+    def _stop_sensors(self, sensors: Optional[List[str]] = None) -> Dict:
+        """Stop biometric sensor subprocesses."""
+        targets = sensors if sensors else list(self._sensors.keys())
+        results = {}
+
+        for sensor_name in targets:
+            if sensor_name not in self._sensors:
+                results[sensor_name] = {'status': 'not_running'}
+                continue
+
+            proc = self._sensors[sensor_name]
+            if proc.poll() is not None:
+                del self._sensors[sensor_name]
+                results[sensor_name] = {'status': 'already_stopped'}
+                continue
+
+            try:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=2)
+                del self._sensors[sensor_name]
+                results[sensor_name] = {'status': 'stopped'}
+                log.info(f'Sensor {sensor_name} stopped')
+            except Exception as e:
+                results[sensor_name] = {'error': str(e)}
+                log.error(f'Failed to stop sensor {sensor_name}: {e}')
+
+        return {'sensors': results}
+
+    def _sensor_status(self) -> Dict:
+        """Check which sensors are running."""
+        status = {}
+        for name, proc in list(self._sensors.items()):
+            if proc.poll() is None:
+                status[name] = {'running': True, 'pid': proc.pid}
+            else:
+                status[name] = {'running': False, 'exitCode': proc.returncode}
+                del self._sensors[name]
+
+        # List available sensors
+        available = []
+        for name, script in self._sensor_scripts.items():
+            available.append({
+                'name': name,
+                'script': script,
+                'exists': os.path.exists(script),
+                'running': name in self._sensors,
+            })
+
+        return {'active': status, 'available': available}
+
     def _reset(self) -> Dict:
-        """Reset engine and adapter."""
+        """Reset engine, adapter, and stop sensors."""
+        # Stop all sensors first
+        self._stop_sensors()
+
         with self._lock:
             self.engine.reset()
             self.adapter.reset()
@@ -452,7 +667,7 @@ class CoherenceGloveServer:
                 'text_coherence', initial_data, self._text_sample_rate
             )
 
-        log.info('Engine and adapter reset')
+        log.info('Engine, adapter, and sensors reset')
         return {'reset': True, 'state': self._get_state()}
 
     @staticmethod
