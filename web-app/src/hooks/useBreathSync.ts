@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { localStorageKey } from '@/constants/localStorage'
 import { useCodexState, BLOOM_CYCLES_REQUIRED } from './useCodexState'
 import type { GearState } from './useCodexState'
+import { callTool } from '@/services/mcp'
 
 /**
  * Breath synchronization engine for the Codex Operator Panel.
@@ -270,6 +271,16 @@ function completeCycle(inhaleMs: number, exhaleMs: number) {
   else if (phiSync && sustainedPhiCycles >= 2) gear = 'A' // Active
   else if (phiSync) gear = 'N' // Neutral (just achieved sync)
   codex.setGear(gear)
+
+  // Push breath data to coherence MCP server (silent if offline)
+  try {
+    callTool({
+      toolName: 'coherence_push_breath',
+      arguments: { inhale_ms: inhaleMs, exhale_ms: exhaleMs },
+    }).catch(() => {})
+  } catch {
+    // Server offline — no-op
+  }
 
   useBreathSync.setState({
     phiSyncActive: phiSync,

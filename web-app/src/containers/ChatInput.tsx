@@ -72,6 +72,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
+import { CoherenceBar } from '@/components/CoherenceBar'
 
 type ChatInputProps = {
   className?: string
@@ -1206,6 +1207,7 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
             )}
           </div>
         </div>
+        <CoherenceBar />
       </div>
       {message && (
         <div className="bg-main-view-fg/2 -mt-0.5 mx-2 pb-2 px-3 pt-1.5 rounded-b-lg text-xs text-destructive transition-all duration-200 ease-in-out">

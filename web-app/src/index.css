@@ -118,14 +118,16 @@
   }
 }
 
-/* Glyph shimmer — subtle idle sparkle that intensifies when TTS is singing */
+/* Glyph shimmer — intensity driven by --coherence (0-1), defaults to 0 when server offline */
 @keyframes glyph-shimmer {
   0%, 100% {
-    text-shadow: 0 0 4px rgba(168, 139, 250, 0.3);
-    opacity: 0.85;
+    text-shadow: 0 0 calc(4px + 12px * var(--coherence, 0)) rgba(168, 139, 250, calc(0.3 + 0.4 * var(--coherence, 0)));
+    opacity: calc(0.85 + 0.15 * var(--coherence, 0));
   }
   50% {
-    text-shadow: 0 0 8px rgba(168, 139, 250, 0.5), 0 0 16px rgba(139, 92, 246, 0.2);
+    text-shadow:
+      0 0 calc(8px + 16px * var(--coherence, 0)) rgba(168, 139, 250, calc(0.5 + 0.3 * var(--coherence, 0))),
+      0 0 calc(16px + 20px * var(--coherence, 0)) rgba(139, 92, 246, calc(0.2 + 0.3 * var(--coherence, 0)));
     opacity: 1;
   }
 }
@@ -160,7 +162,7 @@
 
 .glyph-char {
   display: inline-block;
-  animation: glyph-shimmer 3s ease-in-out infinite;
+  animation: glyph-shimmer calc(3s - 1.8s * var(--coherence, 0)) ease-in-out infinite;
 }
 
 .glyph-char.singing {
