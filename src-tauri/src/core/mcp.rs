@@ -381,12 +381,30 @@ async fn start_restart_loop<R: Runtime>(
         );
         sleep(Duration::from_millis(delay_ms)).await;
 
-        // Attempt to restart the server
+        // Re-read config from disk so env vars and other changes are picked up
+        let current_config = {
+            let config_path = get_jan_data_folder_path(app.clone()).join("mcp_config.json");
+            match fs::read_to_string(&config_path) {
+                Ok(content) => {
+                    match serde_json::from_str::<Value>(&content) {
+                        Ok(parsed) => parsed
+                            .get("mcpServers")
+                            .and_then(|s| s.get(&name))
+                            .cloned()
+                            .unwrap_or_else(|| config.clone()),
+                        Err(_) => config.clone(),
+                    }
+                }
+                Err(_) => config.clone(),
+            }
+        };
+
+        // Attempt to restart the server with fresh config
         let start_result = schedule_mcp_start_task(
             app.clone(),
             servers_state.clone(),
             name.clone(),
-            config.clone(),
+            current_config,
         ).await;
 
         match start_result {
@@ -870,7 +888,7 @@ pub async fn call_tool(
             continue; // Tool not found in this server, try next
         }
 
-        println!("Found tool {} in server", tool_name);
+        log::trace!("Found tool {} in server", tool_name);
 
         // Call the tool with timeout
         let tool_call = service.call_tool(CallToolRequestParam {

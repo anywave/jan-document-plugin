@@ -27,10 +27,17 @@ import os
 import json
 import logging
 import threading
+import signal
 import numpy as np
 from datetime import datetime
 from typing import Any, Dict, Optional
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+# Force line-buffered stdout for stdio MCP transport — prevents health check
+# timeouts caused by Python's default block-buffering on pipes.
+# (stdin is fine because we use readline() which bypasses the iterator buffer.)
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
 
 # Bundled Python (._pth) ignores PYTHONPATH — inject it manually
 _extra_path = os.environ.get('PYTHONPATH', '')
@@ -148,6 +155,7 @@ class CoherenceGloveServer:
         self._initialized = False
         self._text_sample_rate = 1.0  # 1 sample per push
         self._breath_sample_rate = 10.0  # synthetic breath signal rate
+        self._lock = threading.Lock()  # Protects engine access from bloom relay thread
 
         # Register a synthetic text stream
         initial_data = np.zeros(5)
@@ -298,55 +306,55 @@ class CoherenceGloveServer:
 
     def _get_state(self) -> Dict:
         """Return current coherence state as dict."""
-        state = self.engine.get_current_state()
-        if state is None:
-            return {
-                'active': False,
-                'scalarCoherence': 0.0,
-                'intentionality': 0.0,
-                'breathEntrained': False,
-                'consentLevel': 'SUSPENDED',
-                'bandAmplitudes': [0.0] * 5,
-                'dominantBand': 'CORE',
-                'lastUpdate': None,
-            }
+        with self._lock:
+            state = self.engine.get_current_state()
+            if state is None:
+                return {
+                    'active': False,
+                    'scalarCoherence': 0.0,
+                    'intentionality': 0.0,
+                    'breathEntrained': False,
+                    'consentLevel': 'SUSPENDED',
+                    'bandAmplitudes': [0.0] * 5,
+                    'dominantBand': 'CORE',
+                    'lastUpdate': None,
+                }
 
-        return {
-            'active': True,
-            'scalarCoherence': float(state.scalar_coherence),
-            'intentionality': float(state.intentionality),
-            'breathEntrained': bool(state.breath_entrained),
-            'consentLevel': self.engine.get_consent_level(),
-            'bandAmplitudes': [float(a) for a in state.band_amplitudes],
-            'dominantBand': state.dominant_band,
-            'lastUpdate': state.timestamp.isoformat(),
-        }
+            return {
+                'active': True,
+                'scalarCoherence': float(state.scalar_coherence),
+                'intentionality': float(state.intentionality),
+                'breathEntrained': bool(state.breath_entrained),
+                'consentLevel': self.engine.get_consent_level(),
+                'bandAmplitudes': [float(a) for a in state.band_amplitudes],
+                'dominantBand': state.dominant_band,
+                'lastUpdate': state.timestamp.isoformat(),
+            }
 
     def _get_consent(self) -> Dict:
         """Return current consent level."""
-        state = self.engine.get_current_state()
-        if state is None:
-            return {'consentLevel': 'SUSPENDED', 'scalarCoherence': 0.0}
+        with self._lock:
+            state = self.engine.get_current_state()
+            if state is None:
+                return {'consentLevel': 'SUSPENDED', 'scalarCoherence': 0.0}
 
-        return {
-            'consentLevel': self.engine.get_consent_level(),
-            'scalarCoherence': float(state.scalar_coherence),
-        }
+            return {
+                'consentLevel': self.engine.get_consent_level(),
+                'scalarCoherence': float(state.scalar_coherence),
+            }
 
     def _push_text(self, text: str) -> Dict:
         """Analyze text and push derived signal to engine."""
         if not text:
             return {'error': 'Empty text', 'state': self._get_state()}
 
-        # Text -> 5-band amplitudes
+        # Text -> 5-band amplitudes (adapter is main-thread only, no lock needed)
         amplitudes = self.adapter.analyze(text)
         smoothed = self.adapter.get_smoothed()
 
-        # Push smoothed amplitudes as a new sample to the text stream
-        self.engine.push_samples('text_coherence', smoothed)
-
-        # Process window to update state
-        self.engine.process_window()
+        with self._lock:
+            self.engine.push_samples('text_coherence', smoothed)
+            self.engine.process_window()
 
         state = self._get_state()
         state['textBands'] = {
@@ -382,16 +390,14 @@ class CoherenceGloveServer:
         exhale_wave = np.linspace(symmetry, 0, n_exhale)
         breath_signal = np.concatenate([inhale_wave, exhale_wave])
 
-        # Register or push breath stream
-        try:
-            self.engine.push_samples('breath', breath_signal)
-        except (KeyError, ValueError):
-            # First breath push — register the stream
-            self.engine.register_stream_data(
-                'breath', breath_signal, self._breath_sample_rate
-            )
-
-        self.engine.process_window()
+        with self._lock:
+            try:
+                self.engine.push_samples('breath', breath_signal)
+            except (KeyError, ValueError):
+                self.engine.register_stream_data(
+                    'breath', breath_signal, self._breath_sample_rate
+                )
+            self.engine.process_window()
 
         state = self._get_state()
         state['breathMetrics'] = {
@@ -420,15 +426,14 @@ class CoherenceGloveServer:
         amplitudes = np.array(band_amps, dtype=np.float64)
         amplitudes = np.clip(amplitudes, 0.0, 1.0)
 
-        # Register or push bloom stream
-        try:
-            self.engine.push_samples('bloom_relay', amplitudes)
-        except (KeyError, ValueError):
-            self.engine.register_stream_data(
-                'bloom_relay', amplitudes, 1.0
-            )
-
-        self.engine.process_window()
+        with self._lock:
+            try:
+                self.engine.push_samples('bloom_relay', amplitudes)
+            except (KeyError, ValueError):
+                self.engine.register_stream_data(
+                    'bloom_relay', amplitudes, 1.0
+                )
+            self.engine.process_window()
 
         state = self._get_state()
         state['bloomSource'] = data.get('source', 'remote')
@@ -439,14 +444,13 @@ class CoherenceGloveServer:
 
     def _reset(self) -> Dict:
         """Reset engine and adapter."""
-        self.engine.reset()
-        self.adapter.reset()
-
-        # Re-register text stream after reset
-        initial_data = np.zeros(5)
-        self.engine.register_stream_data(
-            'text_coherence', initial_data, self._text_sample_rate
-        )
+        with self._lock:
+            self.engine.reset()
+            self.adapter.reset()
+            initial_data = np.zeros(5)
+            self.engine.register_stream_data(
+                'text_coherence', initial_data, self._text_sample_rate
+            )
 
         log.info('Engine and adapter reset')
         return {'reset': True, 'state': self._get_state()}
@@ -461,11 +465,30 @@ class CoherenceGloveServer:
 
 
 def main():
-    """Run MCP server on stdio."""
+    """Run MCP server on stdio.
+
+    Uses readline() instead of `for line in sys.stdin:` to avoid Python's
+    read-ahead buffering on pipes, which can cause the process to appear
+    unresponsive to MCP health checks (list_all_tools with 2s timeout).
+    """
+    # Ignore SIGPIPE/broken pipe — let the read loop detect EOF instead
+    if hasattr(signal, 'SIGPIPE'):
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
     server = CoherenceGloveServer()
     log.info('Coherence Glove MCP server started')
 
-    for line in sys.stdin:
+    while True:
+        try:
+            line = sys.stdin.readline()
+        except (IOError, OSError):
+            # Broken pipe or stdin closed
+            break
+
+        if not line:
+            # EOF — parent process closed stdin
+            break
+
         line = line.strip()
         if not line:
             continue
@@ -478,14 +501,21 @@ def main():
                 'id': None,
                 'error': {'code': -32700, 'message': f'Parse error: {e}'},
             }
-            sys.stdout.write(json.dumps(response) + '\n')
-            sys.stdout.flush()
+            try:
+                sys.stdout.write(json.dumps(response) + '\n')
+                sys.stdout.flush()
+            except (IOError, OSError):
+                break
             continue
 
         response = server.handle_request(request)
         if response is not None:
-            sys.stdout.write(json.dumps(response) + '\n')
-            sys.stdout.flush()
+            try:
+                sys.stdout.write(json.dumps(response) + '\n')
+                sys.stdout.flush()
+            except (IOError, OSError):
+                # stdout closed — parent process gone
+                break
 
     log.info('Coherence Glove MCP server stopped')
 
