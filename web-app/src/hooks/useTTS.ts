@@ -477,20 +477,25 @@ export const useTTS = create<TTSState>((set, get) => ({
         const filename = `tts_seg_${i}_${sanitizeFilename(seg.speaker)}.wav`
         const outputPath = `${dataDir}tts\\${filename}`
 
-        const result = await invoke<{
-          success: boolean
-          output_path?: string
-          size_bytes?: number
-          error?: string
-        }>('synthesize_speech', {
-          text: cleanForSpeech(seg.text),
-          voice: seg.voice.sapiVoice,
-          outputPath,
-          rate: seg.voice.rate,
-        })
+        try {
+          const result = await invoke<{
+            success: boolean
+            output_path?: string
+            size_bytes?: number
+            error?: string
+          }>('synthesize_speech', {
+            text: cleanForSpeech(seg.text),
+            voice: seg.voice.sapiVoice,
+            outputPath,
+            rate: seg.voice.rate,
+          })
 
-        if (result.success && result.output_path) {
-          audioPaths.push(result.output_path)
+          if (result.success && result.output_path) {
+            audioPaths.push(result.output_path)
+          }
+        } catch (segErr) {
+          console.warn(`TTS segment ${i} (${seg.speaker}) failed:`, segErr)
+          // Continue — play what we can
         }
       }
 
@@ -502,7 +507,8 @@ export const useTTS = create<TTSState>((set, get) => ({
 
     } catch (err) {
       console.error('TTS error:', err)
-      set({ isGenerating: false, isPlaying: false, currentText: null })
+      cleanupAudio(get().audioElement)
+      set({ isGenerating: false, isPlaying: false, audioElement: null, currentText: null })
       throw err
     }
   },

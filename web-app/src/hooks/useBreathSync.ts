@@ -58,7 +58,12 @@ function loadFromStorage(): PersistedBreathState {
 }
 
 function saveToStorage(state: PersistedBreathState) {
-  localStorage.setItem(localStorageKey.breathSync, JSON.stringify(state))
+  try {
+    localStorage.setItem(localStorageKey.breathSync, JSON.stringify(state))
+  } catch {
+    // Quota exceeded — breath stats are tiny, so this likely means
+    // other stores filled the space. Nothing to trim here.
+  }
 }
 
 // --- Store ---

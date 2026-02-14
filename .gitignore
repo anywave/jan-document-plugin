@@ -29,11 +29,16 @@ src-tauri/resources/python312.zip
 OpenCode.md
 archive/
 .cache/
+Obsolete/
+
+# Python cache (global)
+**/__pycache__/
+*.pyc
+*.pyo
 
 # auto qa
 autoqa/trajectories
 autoqa/recordings
-autoqa/__pycache__
 
 # Astro / Starlight specific
 website/dist/
@@ -58,7 +63,6 @@ target
 
 ## test
 test-data
-extensions/document-rag/python/__pycache__/
 extensions/document-rag/python/chroma_db/
 extensions/document-rag/python/test_chroma_db/
 src-tauri/chroma_db/

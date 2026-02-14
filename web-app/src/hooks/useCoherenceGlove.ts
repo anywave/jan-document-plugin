@@ -54,22 +54,30 @@ const useCoherenceGlove = create<CoherenceGloveState>((set, get) => ({
         return
       }
 
-      const state = JSON.parse(result.content[0].text)
+      let state: Record<string, unknown>
+      try {
+        state = JSON.parse(result.content[0].text)
+      } catch {
+        set({ connected: false })
+        document.documentElement.style.setProperty('--coherence', '0')
+        return
+      }
+
       if (state.error) {
         set({ connected: false })
         document.documentElement.style.setProperty('--coherence', '0')
         return
       }
 
-      const scalar = state.scalarCoherence ?? 0
+      const scalar = (state.scalarCoherence as number) ?? 0
       set({
         connected: true,
         scalarCoherence: scalar,
-        intentionality: state.intentionality ?? 0,
-        breathEntrained: state.breathEntrained ?? false,
-        consentLevel: state.consentLevel ?? 'SUSPENDED',
-        bandAmplitudes: state.bandAmplitudes ?? [0, 0, 0, 0, 0],
-        dominantBand: state.dominantBand ?? 'CORE',
+        intentionality: (state.intentionality as number) ?? 0,
+        breathEntrained: (state.breathEntrained as boolean) ?? false,
+        consentLevel: (state.consentLevel as string) ?? 'SUSPENDED',
+        bandAmplitudes: (state.bandAmplitudes as number[]) ?? [0, 0, 0, 0, 0],
+        dominantBand: (state.dominantBand as string) ?? 'CORE',
         lastUpdate: Date.now(),
       })
 
@@ -81,12 +89,14 @@ const useCoherenceGlove = create<CoherenceGloveState>((set, get) => ({
 
       // Wire to Codex operator chain
       const codex = useCodexState.getState()
-      // CORE band → xi operator (bridge equation)
-      codex.updateCoherence('xi', state.bandAmplitudes?.[2] ?? 0)
-      // Scalar coherence → psiLoop (overall fidelity)
-      codex.updateCoherence('psiLoop', scalar)
-      // Intentionality → radix (breath-driven awareness)
-      codex.updateCoherence('radix', state.intentionality ?? 0)
+      if (codex?.updateCoherence) {
+        // CORE band → xi operator (bridge equation)
+        codex.updateCoherence('xi', (state.bandAmplitudes as number[])?.[2] ?? 0)
+        // Scalar coherence → psiLoop (overall fidelity)
+        codex.updateCoherence('psiLoop', scalar)
+        // Intentionality → radix (breath-driven awareness)
+        codex.updateCoherence('radix', (state.intentionality as number) ?? 0)
+      }
     } catch {
       // Server offline — degrade silently
       if (get().connected) {
@@ -104,17 +114,22 @@ const useCoherenceGlove = create<CoherenceGloveState>((set, get) => ({
       })
 
       if (result?.content?.[0]?.text) {
-        const state = JSON.parse(result.content[0].text)
+        let state: Record<string, unknown>
+        try {
+          state = JSON.parse(result.content[0].text)
+        } catch {
+          return // Malformed JSON — silent
+        }
         if (!state.error) {
-          const scalar = state.scalarCoherence ?? 0
+          const scalar = (state.scalarCoherence as number) ?? 0
           set({
             connected: true,
             scalarCoherence: scalar,
-            intentionality: state.intentionality ?? 0,
-            breathEntrained: state.breathEntrained ?? false,
-            consentLevel: state.consentLevel ?? 'SUSPENDED',
-            bandAmplitudes: state.bandAmplitudes ?? [0, 0, 0, 0, 0],
-            dominantBand: state.dominantBand ?? 'CORE',
+            intentionality: (state.intentionality as number) ?? 0,
+            breathEntrained: (state.breathEntrained as boolean) ?? false,
+            consentLevel: (state.consentLevel as string) ?? 'SUSPENDED',
+            bandAmplitudes: (state.bandAmplitudes as number[]) ?? [0, 0, 0, 0, 0],
+            dominantBand: (state.dominantBand as string) ?? 'CORE',
             lastUpdate: Date.now(),
           })
           document.documentElement.style.setProperty(

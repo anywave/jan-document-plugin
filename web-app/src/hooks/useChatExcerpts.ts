@@ -48,7 +48,28 @@ function loadFromStorage(): PersistedState {
 }
 
 function saveToStorage(state: PersistedState) {
-  localStorage.setItem(localStorageKey.chatExcerpts, JSON.stringify(state))
+  try {
+    localStorage.setItem(localStorageKey.chatExcerpts, JSON.stringify(state))
+  } catch {
+    // Quota exceeded — trim oldest excerpts and retry
+    const trimmed: PersistedState = {
+      excerpts: state.excerpts.slice(0, Math.floor(state.excerpts.length / 2)),
+      annotations: state.annotations,
+    }
+    try {
+      localStorage.setItem(localStorageKey.chatExcerpts, JSON.stringify(trimmed))
+    } catch {
+      // Still failing — clear excerpts entirely to recover
+      try {
+        localStorage.setItem(
+          localStorageKey.chatExcerpts,
+          JSON.stringify({ excerpts: [], annotations: state.annotations })
+        )
+      } catch {
+        // Storage completely full — nothing we can do
+      }
+    }
+  }
 }
 
 interface ChatExcerptsState {
