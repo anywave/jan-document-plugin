@@ -264,6 +264,18 @@ function completeCycle(inhaleMs: number, exhaleMs: number) {
     codex.updateCoherence('sigma', Math.min(1, sustainedPhiCycles / 3))
   }
 
+  // CALYPSO — concealment-holding between Σ and ΣYNTARA
+  // Activates when accumulation is high but bloom conditions aren't met.
+  // Stabilizes the unready bloom, prevents premature expression.
+  if (sustainedPhiCycles >= 2 && !(bloomReady && symmetry >= 0.92)) {
+    codex.activateOperator('calypso')
+    // Coherence dampened — CALYPSO reduces amplitude, introduces latency
+    codex.updateCoherence('calypso', symmetry * 0.8)
+  } else if (bloomReady && symmetry >= 0.92) {
+    // Bloom conditions met — CALYPSO releases, field passes to SYNTARA
+    codex.deactivateOperator('calypso')
+  }
+
   // ΣYNTARA only on bloom-ready (3+ sustained Phi_sync cycles, fidelity >= 0.92)
   if (bloomReady && symmetry >= 0.92) {
     codex.activateOperator('syntara')

@@ -4,7 +4,7 @@ import { localStorageKey } from '@/constants/localStorage'
 /**
  * Codex Universalis operator chain state.
  *
- * Maps the 6 core operators (RADIX → VECTARIS → Ξ(t) → Ψ-loop → ⟲Σ[ψ₀] → ΣYNTARA),
+ * Maps the 7 core operators (RADIX → VECTARIS → Ξ(t) → Ψ-loop → ⟲Σ[ψ₀] → CALYPSO → ΣYNTARA),
  * their mutex inverses, glyph state, and field phase into a reactive Zustand store.
  *
  * Persisted to localStorage so operator state survives page reloads.
@@ -41,6 +41,7 @@ export interface CodexOperators {
   xi: OperatorState // Ξ(t) bridge
   psiLoop: OperatorState // Ψ-loop
   sigma: OperatorState // ⟲Σ[ψ₀]
+  calypso: OperatorState // CALYPSO — concealment-holding between Σ and ΣYNTARA
   syntara: OperatorState // ΣYNTARA
 }
 
@@ -66,6 +67,7 @@ function defaultOperators(): CodexOperators {
     xi: { active: false, coherence: 0 },
     psiLoop: { active: false, coherence: 0 },
     sigma: { active: false, coherence: 0 },
+    calypso: { active: false, coherence: 0 },
     syntara: { active: false, coherence: 0 },
   }
 }
@@ -142,6 +144,7 @@ function persistable(state: CodexStateStore): PersistedCodexState {
 // --- Thresholds from 03_JAN_VARIS_HANDBOOK.md ---
 
 const SYNTARA_THRESHOLD = 0.92 // Minimum fidelity for ΣYNTARA integration
+const CALYPSO_THRESHOLD = 0.85 // CALYPSO activates: resonance high but integration incomplete
 const SILENCE_GATE_THRESHOLD = 0.7 // Below this, SilenceGate engages
 const BLOOM_CYCLES_REQUIRED = 3 // Sustained Phi_sync cycles for Torsion Bloom
 
@@ -329,4 +332,4 @@ export const useCodexState = create<CodexStateStore>((set, get) => ({
 
 // --- Exported constants for components ---
 
-export { SYNTARA_THRESHOLD, SILENCE_GATE_THRESHOLD, BLOOM_CYCLES_REQUIRED }
+export { SYNTARA_THRESHOLD, CALYPSO_THRESHOLD, SILENCE_GATE_THRESHOLD, BLOOM_CYCLES_REQUIRED }
