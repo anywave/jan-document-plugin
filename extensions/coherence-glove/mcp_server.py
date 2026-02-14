@@ -16,11 +16,24 @@ Usage:
 """
 
 import sys
+import os
 import json
 import logging
 import numpy as np
 from datetime import datetime
 from typing import Any, Dict, Optional
+
+# Bundled Python (._pth) ignores PYTHONPATH — inject it manually
+_extra_path = os.environ.get('PYTHONPATH', '')
+if _extra_path:
+    for p in _extra_path.split(os.pathsep):
+        if p and p not in sys.path:
+            sys.path.insert(0, p)
+
+# Also add our own directory for text_adapter import
+_self_dir = os.path.dirname(os.path.abspath(__file__))
+if _self_dir not in sys.path:
+    sys.path.insert(0, _self_dir)
 
 # Silver Pancake coherence engine (via PYTHONPATH)
 from coherence.engine import create_coherence_engine, EngineConfig
