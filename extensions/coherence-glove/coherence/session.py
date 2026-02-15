@@ -357,6 +357,27 @@ class ArcSession:
         """
         return self.completed_sessions < 3
 
+    def is_stale(self, max_inactive_days: int = 7) -> bool:
+        """Check if the arc has been inactive too long.
+
+        An arc is stale if it is still 'active' but its updated_at
+        timestamp is older than max_inactive_days.
+
+        Args:
+            max_inactive_days: Days of inactivity before auto-interruption.
+
+        Returns:
+            True if the arc should be auto-interrupted.
+        """
+        if self.arc_status != 'active':
+            return False
+        try:
+            updated = datetime.fromisoformat(self.updated_at)
+            elapsed = (datetime.now() - updated).total_seconds()
+            return elapsed > max_inactive_days * 86400
+        except (ValueError, TypeError):
+            return False
+
     def ccs_threshold_for_session(self, session_index: int) -> float:
         """Calculate the CCS threshold for a given session index.
 
@@ -422,6 +443,7 @@ class SessionManager:
         """Start a new coherence session.
 
         If there is an active session, ends it first (persisting to disk).
+        Also checks for stale arcs and auto-interrupts them.
 
         Args:
             metadata: Optional metadata to attach to the session.
@@ -431,6 +453,9 @@ class SessionManager:
         """
         if self.active_session is not None:
             self.end_session()
+
+        # Auto-interrupt stale arcs (7+ days inactive)
+        self._check_arc_staleness()
 
         self.active_session = CoherenceSession.create(metadata=metadata)
         return self.active_session
@@ -496,11 +521,20 @@ class SessionManager:
                 'phase': None,
             }
 
+        # Compute duration in seconds from started_at ISO string
+        duration_s = 0.0
+        try:
+            started = datetime.fromisoformat(self.active_session.started_at)
+            duration_s = (datetime.now() - started).total_seconds()
+        except (ValueError, TypeError):
+            pass
+
         return {
             'active': True,
             'session_id': self.active_session.session_id,
             'phase': self.active_session.phase.value,
             'started_at': self.active_session.started_at,
+            'duration_s': round(duration_s, 1),
             'prompt_count': self.active_session.prompt_count,
             'peak_ccs': self.active_session.peak_ccs,
             'ccs_readings': len(self.active_session.ccs_history),
@@ -549,12 +583,23 @@ class SessionManager:
         self._active_arc = None
         return ended
 
+    def _check_arc_staleness(self) -> None:
+        """Auto-interrupt any active arc that has been inactive for 7+ days."""
+        if self._active_arc is not None and self._active_arc.is_stale():
+            self._active_arc.arc_status = 'interrupted'
+            self._active_arc.updated_at = datetime.now().isoformat()
+            self._persist_arcs()
+            self._active_arc = None
+
     def get_arc_status(self) -> Dict[str, Any]:
         """Get current arc status.
 
         Returns:
             Dict with arc info, or minimal dict if no active arc.
         """
+        # Auto-interrupt stale arcs on status check
+        self._check_arc_staleness()
+
         if self._active_arc is None:
             return {
                 'active': False,

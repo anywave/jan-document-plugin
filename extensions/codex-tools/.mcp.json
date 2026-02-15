@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "codex-tools": {
+      "command": "C:/Users/abc/AppData/Roaming/com.anywave.mobius/python312/python.exe",
+      "args": [
+        "C:/ANYWAVEREPO/jan-ai-fork/extensions/codex-tools/mcp_server.py"
+      ],
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "COHERENCE_RELAY": "http://127.0.0.1:7777"
+      }
+    }
+  }
+}

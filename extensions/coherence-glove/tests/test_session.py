@@ -301,3 +301,79 @@ class TestSessionManager:
         """end_session returns None when no session active."""
         mgr = SessionManager(str(tmp_path / "sessions"))
         assert mgr.end_session() is None
+
+    def test_get_status_includes_duration_s(self, tmp_path):
+        """get_status includes duration_s when session is active."""
+        mgr = SessionManager(str(tmp_path / "sessions"))
+        mgr.start_session()
+
+        status = mgr.get_status()
+        assert 'duration_s' in status
+        assert isinstance(status['duration_s'], float)
+        assert status['duration_s'] >= 0.0
+
+    def test_get_status_no_session_no_duration(self, tmp_path):
+        """get_status omits duration_s when no session is active."""
+        mgr = SessionManager(str(tmp_path / "sessions"))
+        status = mgr.get_status()
+        assert 'duration_s' not in status
+
+
+# ── ArcSession staleness + auto-interruption tests ──────────────────
+
+from coherence.session import ArcSession
+from datetime import datetime, timedelta
+
+
+class TestArcAutoInterruption:
+    """Tests for arc auto-interruption after 7 days inactivity."""
+
+    def test_fresh_arc_not_stale(self):
+        arc = ArcSession.create(arc_length=9, name="test")
+        assert arc.is_stale() is False
+
+    def test_stale_arc_detected(self):
+        arc = ArcSession.create(arc_length=9, name="test")
+        # Backdate updated_at by 8 days
+        old_time = (datetime.now() - timedelta(days=8)).isoformat()
+        arc.updated_at = old_time
+        assert arc.is_stale() is True
+
+    def test_stale_check_respects_threshold(self):
+        arc = ArcSession.create(arc_length=9, name="test")
+        # 6 days ago — not stale yet
+        old_time = (datetime.now() - timedelta(days=6)).isoformat()
+        arc.updated_at = old_time
+        assert arc.is_stale() is False
+
+    def test_completed_arc_not_stale(self):
+        arc = ArcSession.create(arc_length=9, name="test")
+        arc.arc_status = 'complete'
+        old_time = (datetime.now() - timedelta(days=30)).isoformat()
+        arc.updated_at = old_time
+        assert arc.is_stale() is False
+
+    def test_auto_interrupt_on_session_start(self, tmp_path):
+        mgr = SessionManager(str(tmp_path / "sessions"))
+        arc = mgr.start_arc(arc_length=9, name="old-arc")
+
+        # Backdate the arc
+        arc.updated_at = (datetime.now() - timedelta(days=10)).isoformat()
+        mgr._persist_arcs()
+
+        # Starting a new session should auto-interrupt the stale arc
+        mgr.start_session()
+        assert mgr.active_arc is None
+
+    def test_auto_interrupt_on_arc_status_check(self, tmp_path):
+        mgr = SessionManager(str(tmp_path / "sessions"))
+        arc = mgr.start_arc(arc_length=9, name="stale-arc")
+        arc_id = arc.arc_id
+
+        # Backdate
+        arc.updated_at = (datetime.now() - timedelta(days=8)).isoformat()
+
+        # Checking status should trigger auto-interruption
+        status = mgr.get_arc_status()
+        assert status['active'] is False
+        assert mgr.active_arc is None
