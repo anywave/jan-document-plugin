@@ -75,7 +75,7 @@ const VRAM_TIERS = [
   { name: 'Very High', min: 8192, max: Infinity },
 ] as const
 
-function getVramTier(vramMiB: number): string {
+export function getVramTier(vramMiB: number): string {
   if (vramMiB === 0) return 'No GPU'
   for (const tier of VRAM_TIERS) {
     if (vramMiB >= tier.min && vramMiB < tier.max) return tier.name
@@ -86,7 +86,7 @@ function getVramTier(vramMiB: number): string {
 /**
  * Calculate optimal thread count: 75% of physical cores, minimum 1.
  */
-function calculateThreads(cpuCores: number): number {
+export function calculateThreads(cpuCores: number): number {
   return Math.max(1, Math.floor(cpuCores * 0.75))
 }
 
@@ -149,6 +149,152 @@ export function optimizeModel(
     batchSize,
     flashAttn,
     tier,
+  }
+}
+
+/**
+ * Optimize settings for ANY model based on hardware profile.
+ * Uses specific logic for known models (jan-nano, qwen), falls back to
+ * tier-based generic defaults for unknown models.
+ */
+export function optimizeAnyModel(
+  modelId: string,
+  profile: HardwareProfile
+): ModelOptimization {
+  const isKnown = modelId.includes('jan-nano') || modelId.includes('qwen')
+  if (isKnown) {
+    return optimizeModel(modelId, profile)
+  }
+
+  const tier = getVramTier(profile.gpuVramMiB)
+  const threads = calculateThreads(profile.cpuCores)
+
+  switch (tier) {
+    case 'No GPU':
+      return { modelId, ngl: 0, ctxSize: 2048, threads, batchSize: 512, flashAttn: false, tier }
+    case 'Low':
+      return { modelId, ngl: 10, ctxSize: 2048, threads, batchSize: 512, flashAttn: false, tier }
+    case 'Medium':
+      return { modelId, ngl: 25, ctxSize: 4096, threads, batchSize: 1024, flashAttn: true, tier }
+    case 'High':
+      return { modelId, ngl: 33, ctxSize: 4096, threads, batchSize: 2048, flashAttn: true, tier }
+    case 'Very High':
+    default:
+      return { modelId, ngl: 100, ctxSize: 8192, threads, batchSize: 2048, flashAttn: true, tier }
+  }
+}
+
+// ─── System Calibration ────────────────────────────────────────────────────
+
+export type SystemTier = 'Entry' | 'Standard' | 'Performance' | 'Ultra'
+
+export interface CalibrationResult {
+  tier: SystemTier
+  summary: string
+  recommendations: {
+    modelSize: string
+    maxContext: number
+    maxContextLabel: string
+    gpuAcceleration: string
+    quantization: string
+    batchSize: number
+  }
+  capabilities: {
+    avx2: boolean
+    flashAttention: boolean
+    largeContext: boolean
+    multiGpu: boolean
+    vulkan: boolean
+  }
+}
+
+const TIER_RECOMMENDATIONS: Record<
+  SystemTier,
+  Omit<CalibrationResult['recommendations'], 'gpuAcceleration'>
+> = {
+  Entry: {
+    modelSize: 'Up to 3B parameters',
+    maxContext: 2048,
+    maxContextLabel: '2,048 tokens',
+    quantization: 'Q4_K_M',
+    batchSize: 512,
+  },
+  Standard: {
+    modelSize: 'Up to 7B parameters',
+    maxContext: 4096,
+    maxContextLabel: '4,096 tokens',
+    quantization: 'Q4_K_M',
+    batchSize: 512,
+  },
+  Performance: {
+    modelSize: 'Up to 13B parameters (Q4) or 7B (Q8)',
+    maxContext: 16384,
+    maxContextLabel: '16,384 tokens',
+    quantization: 'Q8_0 / Q4_K_M',
+    batchSize: 2048,
+  },
+  Ultra: {
+    modelSize: '13B+ parameters (Q8)',
+    maxContext: 32768,
+    maxContextLabel: '32,768 tokens',
+    quantization: 'Q8_0',
+    batchSize: 2048,
+  },
+}
+
+function classifyTier(vramMiB: number, ramMiB: number): SystemTier {
+  if (vramMiB >= 8192 && ramMiB >= 16384) return 'Ultra'
+  if (vramMiB >= 4096 && ramMiB >= 16384) return 'Performance'
+  if (vramMiB >= 1 && ramMiB >= 8192) return 'Standard'
+  return 'Entry'
+}
+
+function buildSummary(profile: HardwareProfile): string {
+  const gpu =
+    profile.gpuVendor !== 'None'
+      ? `${profile.gpuVendor} (${Math.round(profile.gpuVramMiB / 1024)} GB VRAM)`
+      : 'No dedicated GPU'
+  return `${gpu}, ${profile.cpuCores} cores, ${Math.round(profile.systemRamMiB / 1024)} GB RAM${profile.hasAvx2 ? ', AVX2' : ''}`
+}
+
+function gpuAccelerationLabel(tier: SystemTier, profile: HardwareProfile): string {
+  switch (tier) {
+    case 'Entry':
+      return 'CPU only'
+    case 'Standard':
+      return 'Partial GPU offload'
+    case 'Performance':
+    case 'Ultra':
+      return `Full GPU offload, Flash Attention enabled`
+  }
+}
+
+/**
+ * Instantly classify the system into a tier and produce concrete recommendations.
+ * No benchmarks — uses the already-detected hardware data.
+ */
+export function calibrateSystem(
+  profile: HardwareProfile,
+  gpuCount: number,
+  hasVulkan: boolean
+): CalibrationResult {
+  const tier = classifyTier(profile.gpuVramMiB, profile.systemRamMiB)
+  const recs = TIER_RECOMMENDATIONS[tier]
+
+  return {
+    tier,
+    summary: buildSummary(profile),
+    recommendations: {
+      ...recs,
+      gpuAcceleration: gpuAccelerationLabel(tier, profile),
+    },
+    capabilities: {
+      avx2: profile.hasAvx2,
+      flashAttention: profile.gpuVramMiB >= 4096,
+      largeContext: (tier === 'Performance' || tier === 'Ultra'),
+      multiGpu: gpuCount > 1,
+      vulkan: hasVulkan,
+    },
   }
 }
 

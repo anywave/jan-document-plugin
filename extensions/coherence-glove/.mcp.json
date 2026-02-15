@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "coherence-glove": {
+      "command": "C:/Users/abc/AppData/Roaming/com.anywave.mobius/python312/python.exe",
+      "args": [
+        "C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove/mcp_server.py"
+      ],
+      "env": {
+        "BLOOM_RELAY_PORT": "7777",
+        "BLOOM_RELAY_TOKEN": "radix-bloom-2026",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}
