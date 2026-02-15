@@ -120,6 +120,7 @@ pub struct ScanDirectoryResult {
 }
 
 /// Per-file result emitted during batch processing (from stderr)
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BatchFileResult {
     pub file_path: String,
@@ -405,7 +406,6 @@ async fn execute_python_command(
     let app_for_stderr = app_handle.clone();
     let result = tokio::time::timeout(timeout, async {
         let mut stdout_buf = String::new();
-        let mut stderr_buf = String::new();
 
         // Read stderr line-by-line and emit progress events in real-time
         let stderr_task = tokio::spawn(async move {
@@ -437,7 +437,7 @@ async fn execute_python_command(
         let stdout_result = stdout.read_to_string(&mut stdout_buf).await;
         stdout_result.map_err(|e| format!("Failed to read stdout: {}", e))?;
 
-        stderr_buf = stderr_task
+        let stderr_buf = stderr_task
             .await
             .map_err(|e| format!("stderr task failed: {}", e))?;
 

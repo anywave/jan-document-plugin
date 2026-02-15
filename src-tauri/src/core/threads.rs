@@ -32,6 +32,7 @@ use super::utils::{
     get_thread_metadata_path, THREADS_FILE,
 };
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Thread {
     pub id: String,
@@ -43,6 +44,7 @@ pub struct Thread {
     pub metadata: Option<serde_json::Value>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ThreadMessage {
     pub id: String,
@@ -61,12 +63,14 @@ pub struct ThreadMessage {
     pub tool_call_id: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Attachment {
     pub file_id: Option<String>,
     pub tools: Option<Vec<Tool>>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum Tool {
@@ -76,6 +80,7 @@ pub enum Tool {
     CodeInterpreter,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ThreadContent {
     pub type_: String,
@@ -83,18 +88,21 @@ pub struct ThreadContent {
     pub image_url: Option<ImageContentValue>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ContentValue {
     pub value: String,
     pub annotations: Vec<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImageContentValue {
     pub detail: Option<String>,
     pub url: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ThreadAssistantInfo {
     pub id: String,
@@ -104,6 +112,7 @@ pub struct ThreadAssistantInfo {
     pub tools: Option<Vec<AssistantTool>>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModelInfo {
     pub id: String,
@@ -111,6 +120,7 @@ pub struct ModelInfo {
     pub settings: serde_json::Value,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum AssistantTool {
@@ -126,6 +136,7 @@ pub enum AssistantTool {
     },
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ThreadState {
     pub has_more: bool,

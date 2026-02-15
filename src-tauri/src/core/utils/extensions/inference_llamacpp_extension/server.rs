@@ -322,6 +322,7 @@ pub async fn load_llama_model(
     command.stderr(Stdio::piped());
     #[cfg(all(windows, target_arch = "x86_64"))]
     {
+        #[allow(unused_imports)]
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
@@ -620,6 +621,7 @@ pub async fn get_devices(
 
     #[cfg(all(windows, target_arch = "x86_64"))]
     {
+        #[allow(unused_imports)]
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;

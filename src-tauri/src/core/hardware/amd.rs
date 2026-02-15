@@ -126,12 +126,19 @@ mod windows_impl {
         pub iOSDisplayIndex: c_int,
     }
 
+    #[allow(non_camel_case_types)]
     type ADL_MAIN_MALLOC_CALLBACK = Option<unsafe extern "C" fn(i32) -> *mut c_void>;
+    #[allow(non_camel_case_types)]
     type ADL_MAIN_CONTROL_CREATE = unsafe extern "C" fn(ADL_MAIN_MALLOC_CALLBACK, c_int) -> c_int;
+    #[allow(non_camel_case_types)]
     type ADL_MAIN_CONTROL_DESTROY = unsafe extern "C" fn() -> c_int;
+    #[allow(non_camel_case_types)]
     type ADL_ADAPTER_NUMBEROFADAPTERS_GET = unsafe extern "C" fn(*mut c_int) -> c_int;
+    #[allow(non_camel_case_types)]
     type ADL_ADAPTER_ADAPTERINFO_GET = unsafe extern "C" fn(*mut AdapterInfo, c_int) -> c_int;
+    #[allow(non_camel_case_types)]
     type ADL_ADAPTER_ACTIVE_GET = unsafe extern "C" fn(c_int, *mut c_int) -> c_int;
+    #[allow(non_camel_case_types)]
     type ADL_GET_DEDICATED_VRAM_USAGE =
         unsafe extern "C" fn(*mut c_void, c_int, *mut c_int) -> c_int;
 
