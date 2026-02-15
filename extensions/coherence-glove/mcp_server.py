@@ -298,7 +298,9 @@ class CoherenceGloveServer:
         from coherence.scouter import Scouter
         from coherence.network import KuramotoNetwork, NetworkNode
 
-        self.session_mgr = SessionManager()
+        import os
+        sessions_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sessions')
+        self.session_mgr = SessionManager(sessions_dir)
         self.subjective = SubjectiveTracker()
         self.scouter = Scouter()
         self.network = KuramotoNetwork()
@@ -557,9 +559,10 @@ class CoherenceGloveServer:
         with self._lock:
             current = self.engine.get_current_state()
             if current:
-                self.scouter.classify(current)
+                classification = self.scouter.classify(current)
                 self.session_mgr.record_ccs(current.scalar_coherence)
-                if (self.scouter._last_classification.value != 'stable' and
+                from coherence.scouter import DestabilizationClass
+                if (classification != DestabilizationClass.STABLE and
                         self.session_mgr.active_session):
                     scouter_events = self.session_mgr.active_session.metadata.setdefault(
                         'scouter_events', []
