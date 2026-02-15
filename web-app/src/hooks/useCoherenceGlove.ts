@@ -35,6 +35,14 @@ interface CoherenceGloveState {
   sensors: SensorInfo[]
   sensorLoading: boolean
 
+  // Session state
+  sessionActive: boolean
+  sessionPhase: string
+  promptCount: number
+  tokenEstimate: number
+  showSubjectivePrompt: boolean
+  subjectivePromptSource: 'mid_session' | 'end_session'
+
   // Actions
   pollState: () => Promise<void>
   pushText: (text: string) => Promise<void>
@@ -43,6 +51,11 @@ interface CoherenceGloveState {
   startSensor: (name: string) => Promise<void>
   stopSensor: (name: string) => Promise<void>
   refreshSensors: () => Promise<void>
+
+  // Session actions
+  startSession: () => Promise<void>
+  endSession: () => Promise<void>
+  dismissSubjectivePrompt: () => void
 }
 
 let pollInterval: ReturnType<typeof setInterval> | null = null
@@ -59,6 +72,13 @@ const useCoherenceGlove = create<CoherenceGloveState>((set, get) => ({
 
   sensors: [],
   sensorLoading: false,
+
+  sessionActive: false,
+  sessionPhase: 'dissolve',
+  promptCount: 0,
+  tokenEstimate: 0,
+  showSubjectivePrompt: false,
+  subjectivePromptSource: 'mid_session' as const,
 
   pollState: async () => {
     try {
@@ -155,6 +175,27 @@ const useCoherenceGlove = create<CoherenceGloveState>((set, get) => ({
             '--coherence',
             String(scalar)
           )
+
+          // Track prompt in session
+          const newPromptCount = get().promptCount + 1
+          const newTokenEstimate = get().tokenEstimate + text.split(/\s+/).length * 2
+          const sessionUpdates: Partial<CoherenceGloveState> = {
+            promptCount: newPromptCount,
+            tokenEstimate: newTokenEstimate,
+          }
+
+          // Check mid-session subjective prompt trigger
+          const settings = JSON.parse(localStorage.getItem('coherenceGloveSettings') || '{}')
+          const minPrompts = settings.midSessionMinPrompts ?? 3
+          const minTokens = settings.midSessionMinTokens ?? 1000
+          const enableMid = settings.enableMidSessionPrompt !== false
+
+          if (enableMid && newPromptCount >= minPrompts && newTokenEstimate >= minTokens && !get().showSubjectivePrompt) {
+            sessionUpdates.showSubjectivePrompt = true
+            sessionUpdates.subjectivePromptSource = 'mid_session'
+          }
+
+          set(sessionUpdates)
         }
       }
     } catch {
@@ -234,6 +275,24 @@ const useCoherenceGlove = create<CoherenceGloveState>((set, get) => ({
     } finally {
       set({ sensorLoading: false })
     }
+  },
+
+  startSession: async () => {
+    try {
+      await callTool({ toolName: 'coherence_session_start', arguments: {} })
+      set({ sessionActive: true, sessionPhase: 'dissolve', promptCount: 0, tokenEstimate: 0 })
+    } catch { /* silent */ }
+  },
+
+  endSession: async () => {
+    try {
+      await callTool({ toolName: 'coherence_session_end', arguments: {} })
+      set({ sessionActive: false, showSubjectivePrompt: true, subjectivePromptSource: 'end_session' })
+    } catch { /* silent */ }
+  },
+
+  dismissSubjectivePrompt: () => {
+    set({ showSubjectivePrompt: false })
   },
 }))
 
