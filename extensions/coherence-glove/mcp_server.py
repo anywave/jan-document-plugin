@@ -184,6 +184,77 @@ TOOLS = [
             'properties': {},
         },
     },
+    {
+        'name': 'coherence_session_start',
+        'description': 'Start a new coherence session. Auto-ends any active session. Returns session_id.',
+        'inputSchema': {'type': 'object', 'properties': {}},
+    },
+    {
+        'name': 'coherence_session_end',
+        'description': 'End the active coherence session. Persists session data.',
+        'inputSchema': {'type': 'object', 'properties': {}},
+    },
+    {
+        'name': 'coherence_session_status',
+        'description': 'Get current session status: phase, prompt count, CCS trend, model confidence.',
+        'inputSchema': {'type': 'object', 'properties': {}},
+    },
+    {
+        'name': 'coherence_push_subjective',
+        'description': 'Record user subjective coherence score (0-10). Computes divergence from CCS.',
+        'inputSchema': {
+            'type': 'object',
+            'properties': {
+                'score': {'type': 'number', 'description': 'Subjective coherence score 0-10.', 'minimum': 0, 'maximum': 10},
+                'source': {'type': 'string', 'enum': ['mid_session', 'end_session'], 'description': 'When captured.'},
+            },
+            'required': ['score', 'source'],
+        },
+    },
+    {
+        'name': 'coherence_get_scouter_class',
+        'description': 'Get SCOUTER destabilization classification: stable, noise, shadow, or trauma.',
+        'inputSchema': {'type': 'object', 'properties': {}},
+    },
+    {
+        'name': 'coherence_arc_start',
+        'description': 'Start a multi-session arc. Bloom suppressed until session 3.',
+        'inputSchema': {
+            'type': 'object',
+            'properties': {
+                'arc_length': {'type': 'integer', 'description': 'Target sessions in arc.', 'minimum': 2},
+                'name': {'type': 'string', 'description': 'Optional arc name.'},
+            },
+            'required': ['arc_length'],
+        },
+    },
+    {
+        'name': 'coherence_arc_status',
+        'description': 'Get arc status: completed sessions, CCS/entropy trends, bloom suppression.',
+        'inputSchema': {'type': 'object', 'properties': {}},
+    },
+    {
+        'name': 'coherence_arc_end',
+        'description': 'Manually end the active arc.',
+        'inputSchema': {'type': 'object', 'properties': {}},
+    },
+    {
+        'name': 'coherence_network_join',
+        'description': 'Register this instance as a Kuramoto network node.',
+        'inputSchema': {
+            'type': 'object',
+            'properties': {
+                'node_id': {'type': 'string', 'description': 'Unique node ID.'},
+                'natural_freq': {'type': 'number', 'description': 'Natural oscillation frequency (rad/s).'},
+            },
+            'required': ['node_id'],
+        },
+    },
+    {
+        'name': 'coherence_network_status',
+        'description': 'Get network phase coupling status: connected nodes, phase lock score.',
+        'inputSchema': {'type': 'object', 'properties': {}},
+    },
 ]
 
 
@@ -220,6 +291,17 @@ class CoherenceGloveServer:
             'text_coherence', initial_data, self._text_sample_rate
         )
         log.info('Engine initialized with text_coherence stream (breath target=phi^-2=0.382Hz)')
+
+        # Session Intelligence components
+        from coherence.session import SessionManager
+        from coherence.subjective import SubjectiveTracker
+        from coherence.scouter import Scouter
+        from coherence.network import KuramotoNetwork, NetworkNode
+
+        self.session_mgr = SessionManager()
+        self.subjective = SubjectiveTracker()
+        self.scouter = Scouter()
+        self.network = KuramotoNetwork()
 
         # Start HTTP relay for biometric sensors (and optionally bloom injection)
         self._relay_server = None
@@ -374,6 +456,35 @@ class CoherenceGloveServer:
                 result = self._sensor_status()
             elif tool_name == 'coherence_reset':
                 result = self._reset()
+            elif tool_name == 'coherence_session_start':
+                result = self._session_start()
+            elif tool_name == 'coherence_session_end':
+                result = self._session_end()
+            elif tool_name == 'coherence_session_status':
+                result = self.session_mgr.get_status()
+            elif tool_name == 'coherence_push_subjective':
+                result = self._push_subjective(
+                    arguments.get('score', 5.0),
+                    arguments.get('source', 'mid_session'),
+                )
+            elif tool_name == 'coherence_get_scouter_class':
+                result = self.scouter.get_status()
+            elif tool_name == 'coherence_arc_start':
+                result = self._arc_start(
+                    arguments.get('arc_length', 9),
+                    arguments.get('name'),
+                )
+            elif tool_name == 'coherence_arc_status':
+                result = self.session_mgr.get_arc_status()
+            elif tool_name == 'coherence_arc_end':
+                result = self._arc_end()
+            elif tool_name == 'coherence_network_join':
+                result = self._network_join(
+                    arguments.get('node_id', ''),
+                    arguments.get('natural_freq'),
+                )
+            elif tool_name == 'coherence_network_status':
+                result = self.network.get_status()
             else:
                 return self._error(req_id, -32602, f'Unknown tool: {tool_name}')
 
@@ -438,6 +549,22 @@ class CoherenceGloveServer:
         with self._lock:
             self.engine.push_samples('text_coherence', smoothed)
             self.engine.process_window()
+
+        # Track prompt in session
+        self.session_mgr.record_prompt(token_count=len(text.split()) * 2)
+
+        # Update SCOUTER and session CCS
+        with self._lock:
+            current = self.engine.get_current_state()
+            if current:
+                self.scouter.classify(current)
+                self.session_mgr.record_ccs(current.scalar_coherence)
+                if (self.scouter._last_classification.value != 'stable' and
+                        self.session_mgr.active_session):
+                    scouter_events = self.session_mgr.active_session.metadata.setdefault(
+                        'scouter_events', []
+                    )
+                    scouter_events.append(self.scouter.get_status())
 
         state = self._get_state()
         state['textBands'] = {
@@ -677,6 +804,51 @@ class CoherenceGloveServer:
 
         log.info('Engine, adapter, and sensors reset')
         return {'reset': True, 'state': self._get_state()}
+
+    def _session_start(self) -> Dict:
+        session = self.session_mgr.start_session()
+        self.subjective.reset_session()
+        log.info(f'Session started: {session.session_id}')
+        return {'session_id': session.session_id, 'phase': session.phase.value}
+
+    def _session_end(self) -> Dict:
+        session = self.session_mgr.end_session()
+        if session is None:
+            return {'error': 'No active session'}
+        log.info(f'Session ended: {session.session_id}')
+        return session.to_dict()
+
+    def _push_subjective(self, score: float, source: str) -> Dict:
+        session = self.session_mgr.active_session
+        if session is None:
+            return {'error': 'No active session'}
+        with self._lock:
+            ccs_state = self.engine.get_current_state()
+            ccs_val = ccs_state.scalar_coherence if ccs_state else 0.0
+        entry = self.subjective.record(session.session_id, score, source, ccs_val)
+        session.metadata['subjective_score'] = score
+        session.metadata['model_confidence'] = self.subjective.model_confidence()
+        return entry.to_dict()
+
+    def _arc_start(self, arc_length: int, name: Optional[str] = None) -> Dict:
+        arc = self.session_mgr.start_arc(arc_length, name)
+        log.info(f'Arc started: {arc.arc_id} (length={arc_length})')
+        return arc.to_dict()
+
+    def _arc_end(self) -> Dict:
+        arc = self.session_mgr.end_arc()
+        if arc is None:
+            return {'error': 'No active arc'}
+        return arc.to_dict()
+
+    def _network_join(self, node_id: str, natural_freq: Optional[float] = None) -> Dict:
+        if not node_id:
+            return {'error': 'node_id is required'}
+        from coherence.network import NetworkNode
+        node = NetworkNode(node_id=node_id, phase=0.0, natural_freq=natural_freq or 0.1, ccs=0.0)
+        self.network.add_node(node)
+        log.info(f'Network node joined: {node_id}')
+        return self.network.get_status()
 
     @staticmethod
     def _result(req_id, result: Any) -> Dict:

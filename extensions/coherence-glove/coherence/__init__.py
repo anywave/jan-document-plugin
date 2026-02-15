@@ -66,6 +66,29 @@ from .crisis_detection import (
     create_crisis_detector,
 )
 
+from .session import (
+    SessionPhase,
+    CoherenceSession,
+    SessionManager,
+    ArcSession,
+    ArcMetrics,
+)
+
+from .subjective import (
+    SubjectiveEntry,
+    SubjectiveTracker,
+)
+
+from .scouter import (
+    DestabilizationClass,
+    Scouter,
+)
+
+from .network import (
+    NetworkNode,
+    KuramotoNetwork,
+)
+
 __all__ = [
     # State
     'MultiWaveCoherenceState',
@@ -109,6 +132,21 @@ __all__ = [
     'CrisisHistory',
     'CrisisDetector',
     'create_crisis_detector',
+    # Session
+    'SessionPhase',
+    'CoherenceSession',
+    'SessionManager',
+    'ArcSession',
+    'ArcMetrics',
+    # Subjective
+    'SubjectiveEntry',
+    'SubjectiveTracker',
+    # SCOUTER
+    'DestabilizationClass',
+    'Scouter',
+    # Network
+    'NetworkNode',
+    'KuramotoNetwork',
 ]
 
 __version__ = '0.1.0'
