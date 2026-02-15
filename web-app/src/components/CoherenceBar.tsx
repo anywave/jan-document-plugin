@@ -1,6 +1,7 @@
 import { useCoherenceGlove } from '@/hooks/useCoherenceGlove'
 import type { SensorInfo } from '@/hooks/useCoherenceGlove'
 import { Switch } from '@/components/ui/switch'
+import { useTranslation } from '@/i18n/react-i18next-compat'
 import { useEffect, useRef, useState } from 'react'
 
 /**
@@ -30,27 +31,31 @@ function getBarColor(coherence: number): string {
   return 'transparent'
 }
 
-function getConsentLabel(level: string): string {
-  switch (level) {
-    case 'STABILIZED': return 'Stabilized'
-    case 'FULL_CONSENT': return 'Full Consent'
-    case 'DIMINISHED': return 'Diminished'
-    case 'SUSPENDED': return 'Suspended'
-    case 'EMERGENCY': return 'Emergency'
-    default: return level
-  }
+const CONSENT_KEYS: Record<string, string> = {
+  STABILIZED: 'mobius:coherence.stabilized',
+  FULL_CONSENT: 'mobius:coherence.fullConsent',
+  DIMINISHED: 'mobius:coherence.diminished',
+  SUSPENDED: 'mobius:coherence.suspended',
+  EMERGENCY: 'mobius:coherence.emergency',
+}
+
+const SENSOR_LABEL_KEYS: Record<string, string> = {
+  breath: 'mobius:coherence.breathMic',
+  ppg: 'mobius:coherence.cameraPpg',
 }
 
 function SensorRow({
   sensor,
   loading,
   onToggle,
+  t,
 }: {
   sensor: SensorInfo
   loading: boolean
   onToggle: (name: string, running: boolean) => void
+  t: (key: string) => string
 }) {
-  const label = sensor.name === 'breath' ? 'Breath Mic' : sensor.name === 'ppg' ? 'Camera PPG' : sensor.name
+  const label = SENSOR_LABEL_KEYS[sensor.name] ? t(SENSOR_LABEL_KEYS[sensor.name]) : sensor.name
 
   return (
     <div className="flex items-center justify-between py-1">
@@ -63,7 +68,7 @@ function SensorRow({
           onCheckedChange={() => onToggle(sensor.name, sensor.running)}
         />
       ) : (
-        <span className="text-xs text-main-view-fg/30 italic">not found</span>
+        <span className="text-xs text-main-view-fg/30 italic">{t('mobius:coherence.notFound')}</span>
       )}
     </div>
   )
@@ -83,6 +88,7 @@ export function CoherenceBar() {
     stopSensor,
   } = useCoherenceGlove()
 
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -134,12 +140,12 @@ export function CoherenceBar() {
                 {(scalarCoherence * 100).toFixed(0)}%
               </span>
               <span className="text-xs text-main-view-fg/50">
-                {getConsentLabel(consentLevel)}
+                {CONSENT_KEYS[consentLevel] ? t(CONSENT_KEYS[consentLevel]) : consentLevel}
               </span>
             </div>
             {breathEntrained && (
               <span className="text-xs text-main-view-fg/50">
-                breath entrained
+                {t('mobius:coherence.breathEntrained')}
               </span>
             )}
           </div>
@@ -148,7 +154,7 @@ export function CoherenceBar() {
           {sensors.length > 0 && (
             <div className="border-t border-main-view-fg/10 mt-2 pt-2">
               <span className="text-[10px] uppercase tracking-wider text-main-view-fg/40 mb-1 block">
-                Sensors
+                {t('mobius:coherence.sensors')}
               </span>
               {sensors.map((s) => (
                 <SensorRow
@@ -156,6 +162,7 @@ export function CoherenceBar() {
                   sensor={s}
                   loading={sensorLoading}
                   onToggle={handleToggle}
+                  t={t}
                 />
               ))}
             </div>
@@ -174,7 +181,7 @@ export function CoherenceBar() {
           borderRadius: 1,
           cursor: 'pointer',
         }}
-        title="Click to toggle sensor controls"
+        title={t('mobius:coherence.toggleSensors')}
       />
     </div>
   )

@@ -1,0 +1,30 @@
+{
+  "coherence": {
+    "stabilized": "Stabilized",
+    "fullConsent": "Full Consent",
+    "diminished": "Diminished",
+    "suspended": "Suspended",
+    "emergency": "Emergency",
+    "breathEntrained": "breath entrained",
+    "sensors": "Sensors",
+    "breathMic": "Breath Mic",
+    "cameraPpg": "Camera PPG",
+    "notFound": "not found",
+    "toggleSensors": "Click to toggle sensor controls"
+  },
+  "tts": {
+    "stop": "Stop",
+    "readAloud": "Read Aloud",
+    "selectVoice": "Select voice",
+    "saveAsMp3": "Save as MP3",
+    "failedToGenerate": "Failed to generate speech",
+    "audioSaved": "Audio saved",
+    "failedToSave": "Failed to save audio"
+  },
+  "voiceAssignment": {
+    "title": "Assign Voices",
+    "description": "Multiple speakers detected. Choose a voice for each.",
+    "cancel": "Cancel",
+    "play": "Play"
+  }
+}

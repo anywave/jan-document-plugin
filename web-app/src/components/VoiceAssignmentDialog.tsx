@@ -9,12 +9,14 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useTTS, VOICE_PROFILES } from '@/hooks/useTTS'
+import { useTranslation } from '@/i18n/react-i18next-compat'
 
 export function VoiceAssignmentDialog() {
   const pendingAssignment = useTTS((s) => s.pendingAssignment)
   const playWithAssignments = useTTS((s) => s.playWithAssignments)
   const dismissAssignment = useTTS((s) => s.dismissAssignment)
 
+  const { t } = useTranslation()
   const [assignments, setAssignments] = useState<Record<string, string>>({})
 
   useEffect(() => {
@@ -41,9 +43,9 @@ export function VoiceAssignmentDialog() {
     >
       <DialogContent aria-describedby="voice-assignment-desc">
         <DialogHeader>
-          <DialogTitle>Assign Voices</DialogTitle>
+          <DialogTitle>{t('mobius:voiceAssignment.title')}</DialogTitle>
           <DialogDescription id="voice-assignment-desc">
-            Multiple speakers detected. Choose a voice for each.
+            {t('mobius:voiceAssignment.description')}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">
@@ -81,9 +83,9 @@ export function VoiceAssignmentDialog() {
             className="hover:no-underline"
             onClick={dismissAssignment}
           >
-            Cancel
+            {t('mobius:voiceAssignment.cancel')}
           </Button>
-          <Button onClick={handlePlay}>Play</Button>
+          <Button onClick={handlePlay}>{t('mobius:voiceAssignment.play')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
