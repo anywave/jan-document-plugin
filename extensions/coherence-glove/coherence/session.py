@@ -199,6 +199,208 @@ class CoherenceSession:
         )
 
 
+@dataclass
+class ArcMetrics:
+    """Aggregate metrics across sessions in an arc.
+
+    Tracks trends for CCS, entropy, RTC, and subjective scores
+    across multiple sessions to detect multi-session coherence patterns.
+
+    Attributes:
+        avg_ccs: Average CCS across all completed sessions in the arc.
+        ccs_trend: CCS final values per session, in order.
+        entropy_trend: Entropy values per session, in order.
+        rtc_trend: Return-to-coherence values per session, in order.
+        subjective_trend: Subjective scores per session, in order.
+        model_mismatch_count: How many sessions had model confidence
+                              diverging significantly from CCS.
+    """
+    avg_ccs: float = 0.0
+    ccs_trend: List[float] = field(default_factory=list)
+    entropy_trend: List[float] = field(default_factory=list)
+    rtc_trend: List[float] = field(default_factory=list)
+    subjective_trend: List[float] = field(default_factory=list)
+    model_mismatch_count: int = 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to dictionary."""
+        return {
+            'avg_ccs': self.avg_ccs,
+            'ccs_trend': self.ccs_trend,
+            'entropy_trend': self.entropy_trend,
+            'rtc_trend': self.rtc_trend,
+            'subjective_trend': self.subjective_trend,
+            'model_mismatch_count': self.model_mismatch_count,
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> 'ArcMetrics':
+        """Deserialize from dictionary."""
+        return cls(
+            avg_ccs=d.get('avg_ccs', 0.0),
+            ccs_trend=d.get('ccs_trend', []),
+            entropy_trend=d.get('entropy_trend', []),
+            rtc_trend=d.get('rtc_trend', []),
+            subjective_trend=d.get('subjective_trend', []),
+            model_mismatch_count=d.get('model_mismatch_count', 0),
+        )
+
+
+@dataclass
+class ArcSession:
+    """A multi-session arc tracking coherence across session boundaries.
+
+    An arc groups consecutive sessions into a coherent work unit,
+    tracking how coherence evolves across session boundaries. Arcs
+    auto-complete when enough sessions have been recorded, and
+    suppress bloom events during the early warmup phase.
+
+    Attributes:
+        arc_id: Unique identifier (UUID).
+        arc_name: Optional human-readable name for the arc.
+        arc_length: Target number of sessions for this arc.
+        completed_sessions: How many sessions have been added so far.
+        session_ids: Ordered list of session IDs in this arc.
+        metrics: Aggregate metrics across sessions.
+        arc_status: 'active', 'complete', or 'interrupted'.
+        created_at: When the arc was created (ISO format).
+        updated_at: When the arc was last modified (ISO format).
+    """
+    arc_id: str
+    arc_name: Optional[str]
+    arc_length: int
+    completed_sessions: int
+    session_ids: List[str]
+    metrics: ArcMetrics
+    arc_status: str  # 'active' | 'complete' | 'interrupted'
+    created_at: str  # ISO format
+    updated_at: str  # ISO format
+
+    @classmethod
+    def create(cls, arc_length: int, name: Optional[str] = None) -> 'ArcSession':
+        """Factory method to create a new active arc.
+
+        Args:
+            arc_length: Target number of sessions for the arc.
+            name: Optional human-readable name.
+
+        Returns:
+            A new ArcSession in 'active' status.
+        """
+        now = datetime.now().isoformat()
+        return cls(
+            arc_id=str(uuid.uuid4()),
+            arc_name=name,
+            arc_length=arc_length,
+            completed_sessions=0,
+            session_ids=[],
+            metrics=ArcMetrics(),
+            arc_status='active',
+            created_at=now,
+            updated_at=now,
+        )
+
+    def add_session(self, session: CoherenceSession) -> None:
+        """Add a completed session to this arc.
+
+        Updates metrics from the session data. If completed_sessions
+        reaches arc_length, the arc auto-completes.
+
+        Args:
+            session: A CoherenceSession that has been ended.
+        """
+        self.session_ids.append(session.session_id)
+        self.completed_sessions += 1
+
+        # Update CCS trend
+        final_ccs = session.final_ccs if session.final_ccs is not None else 0.0
+        self.metrics.ccs_trend.append(final_ccs)
+
+        # Recalculate average CCS
+        if self.metrics.ccs_trend:
+            self.metrics.avg_ccs = sum(self.metrics.ccs_trend) / len(self.metrics.ccs_trend)
+
+        # Extract subjective score from metadata if present
+        subjective = session.metadata.get('subjective_score')
+        if subjective is not None:
+            self.metrics.subjective_trend.append(float(subjective))
+
+        # Extract entropy from metadata if present
+        entropy = session.metadata.get('entropy')
+        if entropy is not None:
+            self.metrics.entropy_trend.append(float(entropy))
+
+        # Extract RTC from metadata if present
+        rtc = session.metadata.get('rtc')
+        if rtc is not None:
+            self.metrics.rtc_trend.append(float(rtc))
+
+        # Detect model mismatch: model_confidence in metadata vs final_ccs
+        model_conf = session.metadata.get('model_confidence')
+        if model_conf is not None and abs(float(model_conf) - final_ccs) > 0.2:
+            self.metrics.model_mismatch_count += 1
+
+        self.updated_at = datetime.now().isoformat()
+
+        # Auto-complete when target reached
+        if self.completed_sessions >= self.arc_length:
+            self.arc_status = 'complete'
+
+    def should_suppress_bloom(self) -> bool:
+        """Whether bloom events should be suppressed.
+
+        Bloom is suppressed during the first 3 sessions of an arc
+        while the system is still establishing a multi-session baseline.
+
+        Returns:
+            True if completed_sessions < 3, meaning bloom should be suppressed.
+        """
+        return self.completed_sessions < 3
+
+    def ccs_threshold_for_session(self, session_index: int) -> float:
+        """Calculate the CCS threshold for a given session index.
+
+        Threshold increases progressively as the arc advances,
+        reflecting that later sessions should achieve higher coherence.
+
+        Args:
+            session_index: Zero-based index of the session in the arc.
+
+        Returns:
+            CCS threshold value (starts at 0.3, increases by 0.05 per session).
+        """
+        return 0.3 + 0.05 * session_index
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to dictionary."""
+        return {
+            'arc_id': self.arc_id,
+            'arc_name': self.arc_name,
+            'arc_length': self.arc_length,
+            'completed_sessions': self.completed_sessions,
+            'session_ids': self.session_ids,
+            'metrics': self.metrics.to_dict(),
+            'arc_status': self.arc_status,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> 'ArcSession':
+        """Deserialize from dictionary."""
+        return cls(
+            arc_id=d['arc_id'],
+            arc_name=d.get('arc_name'),
+            arc_length=d['arc_length'],
+            completed_sessions=d.get('completed_sessions', 0),
+            session_ids=d.get('session_ids', []),
+            metrics=ArcMetrics.from_dict(d.get('metrics', {})),
+            arc_status=d.get('arc_status', 'active'),
+            created_at=d['created_at'],
+            updated_at=d['updated_at'],
+        )
+
+
 class SessionManager:
     """Manages coherence session lifecycle and persistence.
 
@@ -214,6 +416,7 @@ class SessionManager:
         self.sessions_dir = Path(sessions_dir)
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
         self.active_session: Optional[CoherenceSession] = None
+        self._active_arc: Optional[ArcSession] = None
 
     def start_session(self, metadata: Optional[Dict[str, Any]] = None) -> CoherenceSession:
         """Start a new coherence session.
@@ -235,6 +438,8 @@ class SessionManager:
     def end_session(self) -> Optional[CoherenceSession]:
         """End the active session and persist it.
 
+        If an arc is active, the ended session is automatically attached to it.
+
         Returns:
             The ended session, or None if no session was active.
         """
@@ -244,6 +449,12 @@ class SessionManager:
         self.active_session.end()
         self._persist_session(self.active_session)
         ended = self.active_session
+
+        # Auto-attach to active arc
+        if self._active_arc is not None and self._active_arc.arc_status == 'active':
+            self._active_arc.add_session(ended)
+            self._persist_arcs()
+
         self.active_session = None
         return ended
 
@@ -294,6 +505,109 @@ class SessionManager:
             'peak_ccs': self.active_session.peak_ccs,
             'ccs_readings': len(self.active_session.ccs_history),
         }
+
+    @property
+    def active_arc(self) -> Optional[ArcSession]:
+        """The currently active arc, if any."""
+        return self._active_arc
+
+    def start_arc(self, arc_length: int, name: Optional[str] = None) -> ArcSession:
+        """Start a new multi-session arc.
+
+        If there is an existing active arc, it is interrupted first.
+
+        Args:
+            arc_length: Target number of sessions for the arc.
+            name: Optional human-readable name.
+
+        Returns:
+            The newly created ArcSession.
+        """
+        if self._active_arc is not None and self._active_arc.arc_status == 'active':
+            self._active_arc.arc_status = 'interrupted'
+            self._active_arc.updated_at = datetime.now().isoformat()
+
+        self._active_arc = ArcSession.create(arc_length, name)
+        self._persist_arcs()
+        return self._active_arc
+
+    def end_arc(self) -> Optional[ArcSession]:
+        """Manually close the active arc.
+
+        Sets status to 'complete' regardless of completed_sessions count.
+
+        Returns:
+            The ended arc, or None if no arc was active.
+        """
+        if self._active_arc is None:
+            return None
+
+        self._active_arc.arc_status = 'complete'
+        self._active_arc.updated_at = datetime.now().isoformat()
+        self._persist_arcs()
+        ended = self._active_arc
+        self._active_arc = None
+        return ended
+
+    def get_arc_status(self) -> Dict[str, Any]:
+        """Get current arc status.
+
+        Returns:
+            Dict with arc info, or minimal dict if no active arc.
+        """
+        if self._active_arc is None:
+            return {
+                'active': False,
+                'arc_id': None,
+            }
+
+        return {
+            'active': self._active_arc.arc_status == 'active',
+            'arc_id': self._active_arc.arc_id,
+            'arc_name': self._active_arc.arc_name,
+            'arc_status': self._active_arc.arc_status,
+            'arc_length': self._active_arc.arc_length,
+            'completed_sessions': self._active_arc.completed_sessions,
+            'avg_ccs': self._active_arc.metrics.avg_ccs,
+            'suppress_bloom': self._active_arc.should_suppress_bloom(),
+        }
+
+    def _persist_arcs(self) -> Path:
+        """Write arc data to arcs.json in sessions_dir.
+
+        Loads existing arcs from disk, updates/adds the current arc,
+        and writes back.
+
+        Returns:
+            Path to the written JSON file.
+        """
+        filepath = self.sessions_dir / "arcs.json"
+        arcs_data: List[Dict[str, Any]] = []
+
+        # Load existing arcs
+        if filepath.exists():
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    arcs_data = json.load(f)
+            except (json.JSONDecodeError, ValueError):
+                arcs_data = []
+
+        if self._active_arc is not None:
+            arc_dict = self._active_arc.to_dict()
+            # Update existing or append
+            found = False
+            for i, existing in enumerate(arcs_data):
+                if existing.get('arc_id') == self._active_arc.arc_id:
+                    arcs_data[i] = arc_dict
+                    found = True
+                    break
+            if not found:
+                arcs_data.append(arc_dict)
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(arcs_data, f, indent=2)
+
+        return filepath
 
     def _persist_session(self, session: CoherenceSession) -> Path:
         """Write session data to a JSON file.
