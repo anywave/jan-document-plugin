@@ -44,7 +44,7 @@ pub fn get_app_configurations<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Ap
 
         if let Err(err) = fs::write(
             &configuration_file,
-            serde_json::to_string(&app_default_configuration).unwrap(),
+            serde_json::to_string(&app_default_configuration).unwrap_or_default(),
         ) {
             log::error!("Failed to create default config: {}", err);
         }
@@ -160,7 +160,7 @@ pub fn get_configuration_file_path<R: Runtime>(app_handle: tauri::AppHandle<R>) 
         } else {
             "HOME"
         })
-        .expect("Failed to determine the home directory");
+        .unwrap_or_else(|_| ".".to_string());
 
         PathBuf::from(home_dir)
     });
@@ -194,16 +194,16 @@ pub fn get_configuration_file_path<R: Runtime>(app_handle: tauri::AppHandle<R>) 
 
 #[tauri::command]
 pub fn default_data_folder_path<R: Runtime>(app_handle: tauri::AppHandle<R>) -> String {
-    let mut path = app_handle.path().data_dir().unwrap();
+    let mut path = app_handle.path().data_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     let app_name = std::env::var("APP_NAME")
         .unwrap_or_else(|_| String::from("jan"));
     path.push(app_name);
     path.push("data");
 
-    let mut path_str = path.to_str().unwrap().to_string();
+    let mut path_str = path.to_string_lossy().to_string();
 
-    if let Some(stripped) = path.to_str().unwrap().to_string().strip_suffix(".ai.app") {
+    if let Some(stripped) = path_str.strip_suffix(".ai.app") {
         path_str = stripped.to_string();
     }
 
@@ -217,43 +217,37 @@ pub fn relaunch(app: AppHandle) {
 
 #[tauri::command]
 pub fn open_app_directory(app: AppHandle) {
-    let app_path = app.path().app_data_dir().unwrap();
-    if cfg!(target_os = "windows") {
-        std::process::Command::new("explorer")
-            .arg(app_path)
-            .spawn()
-            .expect("Failed to open app directory");
+    let app_path = match app.path().app_data_dir() {
+        Ok(p) => p,
+        Err(e) => {
+            log::error!("Failed to get app data dir: {}", e);
+            return;
+        }
+    };
+    let cmd = if cfg!(target_os = "windows") {
+        "explorer"
     } else if cfg!(target_os = "macos") {
-        std::process::Command::new("open")
-            .arg(app_path)
-            .spawn()
-            .expect("Failed to open app directory");
+        "open"
     } else {
-        std::process::Command::new("xdg-open")
-            .arg(app_path)
-            .spawn()
-            .expect("Failed to open app directory");
+        "xdg-open"
+    };
+    if let Err(e) = std::process::Command::new(cmd).arg(app_path).spawn() {
+        log::error!("Failed to open app directory: {}", e);
     }
 }
 
 #[tauri::command]
 pub fn open_file_explorer(path: String) {
     let path = PathBuf::from(path);
-    if cfg!(target_os = "windows") {
-        std::process::Command::new("explorer")
-            .arg(path)
-            .spawn()
-            .expect("Failed to open file explorer");
+    let cmd = if cfg!(target_os = "windows") {
+        "explorer"
     } else if cfg!(target_os = "macos") {
-        std::process::Command::new("open")
-            .arg(path)
-            .spawn()
-            .expect("Failed to open file explorer");
+        "open"
     } else {
-        std::process::Command::new("xdg-open")
-            .arg(path)
-            .spawn()
-            .expect("Failed to open file explorer");
+        "xdg-open"
+    };
+    if let Err(e) = std::process::Command::new(cmd).arg(path).spawn() {
+        log::error!("Failed to open file explorer: {}", e);
     }
 }
 

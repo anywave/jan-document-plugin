@@ -166,45 +166,45 @@ pub struct DocumentsBySourceResult {
 }
 
 /// Get path to the extracted Python 3.12 directory (in app data)
-fn get_python_dir(app_handle: &AppHandle) -> PathBuf {
-    app_handle
+fn get_python_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app_handle
         .path()
         .app_data_dir()
-        .expect("Failed to get app data dir")
-        .join("python312")
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?
+        .join("python312"))
 }
 
 /// Get path to the bundled Python zip archive (in resources)
-fn get_python_zip_path(app_handle: &AppHandle) -> PathBuf {
+fn get_python_zip_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
     let resource_dir = app_handle
         .path()
         .resource_dir()
-        .expect("Failed to get resource dir");
+        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
     let direct = resource_dir.join("python312.zip");
     if direct.exists() {
-        return direct;
+        return Ok(direct);
     }
     // In dev mode, resources are nested under a resources/ subdirectory
-    resource_dir.join("resources").join("python312.zip")
+    Ok(resource_dir.join("resources").join("python312.zip"))
 }
 
 /// Get path to the bundled Python executable
-fn get_python_exe(app_handle: &AppHandle) -> PathBuf {
-    get_python_dir(app_handle).join("python.exe")
+fn get_python_exe(app_handle: &AppHandle) -> Result<PathBuf, String> {
+    Ok(get_python_dir(app_handle)?.join("python.exe"))
 }
 
 /// Get path to the bundled Python scripts directory
-fn get_python_scripts_path(app_handle: &AppHandle) -> PathBuf {
-    get_python_dir(app_handle).join("scripts")
+fn get_python_scripts_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
+    Ok(get_python_dir(app_handle)?.join("scripts"))
 }
 
 /// Get path to the ChromaDB persistence directory (in app data, not source tree)
-fn get_chromadb_dir(app_handle: &AppHandle) -> PathBuf {
-    app_handle
+fn get_chromadb_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app_handle
         .path()
         .app_data_dir()
-        .expect("Failed to get app data dir")
-        .join("chroma_db")
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?
+        .join("chroma_db"))
 }
 
 // --- Input Validation (Phase 1B) ---
@@ -296,7 +296,7 @@ fn calculate_python_backoff_delay(attempt: u32) -> u64 {
 /// Ensure Python is extracted from the bundled zip archive.
 /// Extracts only on first run or if python.exe is missing.
 fn ensure_python_extracted(app_handle: &AppHandle) -> Result<(), String> {
-    let python_dir = get_python_dir(app_handle);
+    let python_dir = get_python_dir(app_handle)?;
     let python_exe = python_dir.join("python.exe");
 
     // Already extracted
@@ -304,7 +304,7 @@ fn ensure_python_extracted(app_handle: &AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
-    let zip_path = get_python_zip_path(app_handle);
+    let zip_path = get_python_zip_path(app_handle)?;
     if !zip_path.exists() {
         return Err(format!(
             "Python archive not found at: {:?}. Reinstall MOBIUS.",
@@ -363,8 +363,8 @@ async fn execute_python_command(
     // Sanitize all args
     sanitize_python_args(&args)?;
 
-    let python_exe = get_python_exe(app_handle);
-    let script_path = get_python_scripts_path(app_handle).join(script_name);
+    let python_exe = get_python_exe(app_handle)?;
+    let script_path = get_python_scripts_path(app_handle)?.join(script_name);
 
     if !python_exe.exists() {
         return Err(format!("Bundled Python not found: {:?}", python_exe));
@@ -535,7 +535,7 @@ pub async fn check_python_status(app_handle: AppHandle) -> Result<PythonStatus, 
         });
     }
 
-    let python_exe = get_python_exe(&app_handle);
+    let python_exe = get_python_exe(&app_handle)?;
 
     // Check if bundled Python exists
     if !python_exe.exists() {
@@ -561,7 +561,7 @@ pub async fn check_python_status(app_handle: AppHandle) -> Result<PythonStatus, 
     };
 
     // Check if scripts exist
-    let script_path = get_python_scripts_path(&app_handle);
+    let script_path = get_python_scripts_path(&app_handle)?;
     let main_script = script_path.join("document_processor.py");
 
     if !main_script.exists() {
@@ -603,7 +603,7 @@ pub async fn process_document(
     );
 
     // Build command args — pass app data dir for ChromaDB so it doesn't write to source tree
-    let db_path = get_chromadb_dir(&app_handle);
+    let db_path = get_chromadb_dir(&app_handle)?;
     let mut args = vec![
         "--json".to_string(),
         "--db-path".to_string(),
@@ -666,7 +666,7 @@ pub async fn query_documents(
     log::info!("Querying documents: {}", query);
 
     // Build command args
-    let db_path = get_chromadb_dir(&app_handle);
+    let db_path = get_chromadb_dir(&app_handle)?;
     let args = vec![
         "--json".to_string(),
         "--db-path".to_string(),
@@ -704,7 +704,7 @@ pub async fn get_collection_stats(
     log::info!("Getting collection stats");
 
     // Build command args
-    let db_path = get_chromadb_dir(&app_handle);
+    let db_path = get_chromadb_dir(&app_handle)?;
     let args = vec![
         "--json".to_string(),
         "--db-path".to_string(),
@@ -739,7 +739,7 @@ pub async fn check_chromadb_health(
 ) -> Result<ChromaDbHealth, String> {
     log::info!("Checking ChromaDB health");
 
-    let db_path = get_chromadb_dir(&app_handle);
+    let db_path = get_chromadb_dir(&app_handle)?;
     let mut args = vec![
         "--json".to_string(),
         "--db-path".to_string(),
@@ -1004,7 +1004,7 @@ pub async fn process_document_batch(
     );
 
     // Build command args
-    let db_path = get_chromadb_dir(&app_handle);
+    let db_path = get_chromadb_dir(&app_handle)?;
     let mut args = vec![
         "--json".to_string(),
         "--db-path".to_string(),
@@ -1055,7 +1055,7 @@ pub async fn list_documents_by_source(
 ) -> Result<DocumentsBySourceResult, String> {
     log::info!("Listing documents by source");
 
-    let db_path = get_chromadb_dir(&app_handle);
+    let db_path = get_chromadb_dir(&app_handle)?;
     let args = vec![
         "--json".to_string(),
         "--db-path".to_string(),
@@ -1131,8 +1131,8 @@ pub async fn synthesize_speech(
     // Ensure Python is extracted
     ensure_python_extracted(&app_handle)?;
 
-    let python_exe = get_python_exe(&app_handle);
-    let script_path = get_python_scripts_path(&app_handle).join("tts_engine.py");
+    let python_exe = get_python_exe(&app_handle)?;
+    let script_path = get_python_scripts_path(&app_handle)?.join("tts_engine.py");
 
     if !python_exe.exists() {
         return Err(format!("Bundled Python not found: {:?}", python_exe));
@@ -1251,9 +1251,11 @@ fn get_local_ip() -> String {
 /// Find voice_relay.py in bundled scripts or dev source tree
 fn find_voice_relay_script(app_handle: &AppHandle) -> Option<PathBuf> {
     // 1. Bundled scripts dir (production)
-    let bundled = get_python_scripts_path(app_handle).join("voice_relay.py");
-    if bundled.exists() {
-        return Some(bundled);
+    if let Ok(scripts_dir) = get_python_scripts_path(app_handle) {
+        let bundled = scripts_dir.join("voice_relay.py");
+        if bundled.exists() {
+            return Some(bundled);
+        }
     }
 
     // 2. Dev mode: relative to CWD (yarn dev:tauri runs from project root)
@@ -1331,11 +1333,9 @@ pub async fn start_voice_relay(
         .ok_or_else(|| "voice_relay.py not found in bundled scripts or source tree".to_string())?;
 
     // Try bundled Python first, then system Python
-    let python_exe = get_python_exe(&app_handle);
-    let python = if python_exe.exists() {
-        python_exe
-    } else {
-        PathBuf::from("python")
+    let python = match get_python_exe(&app_handle) {
+        Ok(exe) if exe.exists() => exe,
+        _ => PathBuf::from("python"),
     };
 
     log::info!(
@@ -1346,8 +1346,10 @@ pub async fn start_voice_relay(
     );
 
     // Remove any leftover stop file
-    let stop_file = script_path.parent().unwrap().join(".voice_relay_stop");
-    let _ = std::fs::remove_file(&stop_file);
+    if let Some(parent) = script_path.parent() {
+        let stop_file = parent.join(".voice_relay_stop");
+        let _ = std::fs::remove_file(&stop_file);
+    }
 
     // Spawn the process in background
     let child = std::process::Command::new(&python)
