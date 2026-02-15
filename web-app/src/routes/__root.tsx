@@ -27,6 +27,7 @@ import { useCallback } from 'react'
 import GlobalError from '@/containers/GlobalError'
 import { GlobalEventHandler } from '@/providers/GlobalEventHandler'
 import { useModelOptimizer } from '@/hooks/useModelOptimizer'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -160,7 +161,9 @@ function RootLayout() {
           <DataProvider />
           <GlobalEventHandler />
         </ExtensionProvider>
-        {isLocalAPIServerLogsRoute ? <LogsLayout /> : <AppLayout />}
+        <ErrorBoundary>
+          {isLocalAPIServerLogsRoute ? <LogsLayout /> : <AppLayout />}
+        </ErrorBoundary>
         {/* <TanStackRouterDevtools position="bottom-right" /> */}
         <ToolApproval />
         <LoadModelErrorDialog />

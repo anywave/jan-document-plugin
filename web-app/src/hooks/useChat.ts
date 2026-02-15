@@ -81,19 +81,28 @@ export const useChat = () => {
     assistants.find((a) => a.id === currentAssistant.id) || assistants[0]
 
   useEffect(() => {
+    let mounted = true
+    let unsubscribe = () => {}
+
     function setTools() {
       getTools().then((data: MCPTool[]) => {
-        updateTools(data)
+        if (mounted) updateTools(data)
       }).catch((err) => console.error('Failed to load MCP tools:', err))
     }
     setTools()
 
-    let unsubscribe = () => {}
     listen(SystemEvent.MCP_UPDATE, setTools).then((unsub) => {
-      // Unsubscribe from the event when the component unmounts
-      unsubscribe = unsub
+      if (mounted) {
+        unsubscribe = unsub
+      } else {
+        unsub() // already unmounted, clean up immediately
+      }
     }).catch((err) => console.error('Failed to subscribe to MCP updates:', err))
-    return unsubscribe
+
+    return () => {
+      mounted = false
+      unsubscribe()
+    }
   }, [updateTools])
 
   const getCurrentThread = useCallback(async () => {

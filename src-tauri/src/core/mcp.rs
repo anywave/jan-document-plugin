@@ -125,7 +125,7 @@ pub async fn run_mcp_commands<R: Runtime>(
     servers_state: Arc<Mutex<HashMap<String, RunningService<RoleClient, ()>>>>,
 ) -> Result<(), String> {
     let app_path = get_jan_data_folder_path(app.clone());
-    let app_path_str = app_path.to_str().unwrap().to_string();
+    let app_path_str = app_path.to_string_lossy().to_string();
     log::trace!(
         "Load MCP configs from {}",
         app_path_str.clone() + "/mcp_config.json"
@@ -524,10 +524,11 @@ async fn schedule_mcp_start_task<R: Runtime>(
     config: Value,
 ) -> Result<(), String> {
     let app_path = get_jan_data_folder_path(app.clone());
-    let exe_path = env::current_exe().expect("Failed to get current exe path");
+    let exe_path = env::current_exe()
+        .map_err(|e| format!("Failed to get current exe path: {e}"))?;
     let exe_parent_path = exe_path
         .parent()
-        .expect("Executable must have a parent directory");
+        .ok_or_else(|| "Executable has no parent directory".to_string())?;
     let bin_path = exe_parent_path.to_path_buf();
     
     let (command, args, envs) = extract_command_args(&config)
@@ -541,7 +542,7 @@ async fn schedule_mcp_start_task<R: Runtime>(
         let bun_x_path = format!("{}/bun", bin_path.display());
         cmd = Command::new(bun_x_path);
         cmd.arg("x");
-        cmd.env("BUN_INSTALL", cache_dir.to_str().unwrap().to_string());
+        cmd.env("BUN_INSTALL", cache_dir.to_string_lossy().to_string());
     }
 
     if command == "uvx" {
@@ -551,7 +552,7 @@ async fn schedule_mcp_start_task<R: Runtime>(
         cmd = Command::new(bun_x_path);
         cmd.arg("tool");
         cmd.arg("run");
-        cmd.env("UV_CACHE_DIR", cache_dir.to_str().unwrap().to_string());
+        cmd.env("UV_CACHE_DIR", cache_dir.to_string_lossy().to_string());
     }
     
     #[cfg(windows)]
@@ -559,7 +560,7 @@ async fn schedule_mcp_start_task<R: Runtime>(
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW: prevents shell window on Windows
     }
     
-    let app_path_str = app_path.to_str().unwrap().to_string();
+    let app_path_str = app_path.to_string_lossy().to_string();
     let log_file_path = format!("{}/logs/app.log", app_path_str);
     match std::fs::OpenOptions::new()
         .create(true)
@@ -599,10 +600,10 @@ async fn schedule_mcp_start_task<R: Runtime>(
     let (server_name, server_version) = {
         let server_info = service.peer_info();
         log::trace!("Connected to server: {server_info:#?}");
-        (
-            server_info.unwrap().server_info.name.clone(),
-            server_info.unwrap().server_info.version.clone(),
-        )
+        match server_info {
+            Some(info) => (info.server_info.name.clone(), info.server_info.version.clone()),
+            None => (name.clone(), "unknown".to_string()),
+        }
     };
 
     // Now move the service into the HashMap

@@ -88,7 +88,7 @@ function Hardware() {
 
 
   useEffect(() => {
-    if (pollingPaused) return
+    if (pollingPaused) return undefined
     const intervalId = setInterval(() => {
       getSystemUsage()
         .then((data) => {
@@ -100,7 +100,8 @@ function Hardware() {
     }, 5000)
 
     return () => clearInterval(intervalId)
-  }, [updateSystemUsage, pollingPaused])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pollingPaused])
 
   const handleClickSystemMonitor = async () => {
     try {

@@ -381,12 +381,12 @@ async fn _download_files_internal(
         while let Some(chunk) = stream.next().await {
             if cancel_token.is_cancelled() {
                 if !should_resume {
-                    tokio::fs::remove_dir_all(&save_path.parent().unwrap())
-                        .await
-                        .ok();
+                    if let Some(parent) = save_path.parent() {
+                        tokio::fs::remove_dir_all(parent).await.ok();
+                    }
                 }
                 log::info!("Download cancelled for task: {}", task_id);
-                app.emit(&evt_name, evt.clone()).unwrap();
+                let _ = app.emit(&evt_name, evt.clone());
                 return Ok(());
             }
 
@@ -397,7 +397,7 @@ async fn _download_files_internal(
             // only update every 10 MB
             if download_delta >= 10 * 1024 * 1024 {
                 evt.transferred += download_delta;
-                app.emit(&evt_name, evt.clone()).unwrap();
+                let _ = app.emit(&evt_name, evt.clone());
                 download_delta = 0u64;
             }
         }
@@ -415,7 +415,7 @@ async fn _download_files_internal(
         log::info!("Finished downloading: {}", item.url);
     }
 
-    app.emit(&evt_name, evt.clone()).unwrap();
+    let _ = app.emit(&evt_name, evt.clone());
     Ok(())
 }
 

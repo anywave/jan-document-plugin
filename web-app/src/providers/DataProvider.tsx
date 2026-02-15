@@ -76,10 +76,15 @@ export function DataProvider() {
 
   const handleDeepLink = (urls: string[] | null) => {
     if (!urls) return
-    console.log('Received deeplink:', urls)
     const deeplink = urls[0]
     if (deeplink) {
-      const url = new URL(deeplink)
+      let url: URL
+      try {
+        url = new URL(deeplink)
+      } catch {
+        console.error('Malformed deep link:', deeplink)
+        return
+      }
       const params = url.pathname.split('/').filter((str) => str.length > 0)
 
       if (params.length < 3) return undefined
