@@ -1,5 +1,7 @@
 import { useCoherenceGlove } from '@/hooks/useCoherenceGlove'
-import { useEffect } from 'react'
+import type { SensorInfo } from '@/hooks/useCoherenceGlove'
+import { Switch } from '@/components/ui/switch'
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * CoherenceBar — 2px indicator at bottom of chat input.
@@ -11,6 +13,7 @@ import { useEffect } from 'react'
  *   0.618-0.92  (phi^0) : gold         (FULL_CONSENT)
  *   >= 0.92 (SYNTARA)   : white        (STABILIZED)
  *
+ * Click to expand sensor toggle panel.
  * Returns null when disconnected — no trace in the DOM.
  */
 
@@ -27,28 +30,152 @@ function getBarColor(coherence: number): string {
   return 'transparent'
 }
 
+function getConsentLabel(level: string): string {
+  switch (level) {
+    case 'STABILIZED': return 'Stabilized'
+    case 'FULL_CONSENT': return 'Full Consent'
+    case 'DIMINISHED': return 'Diminished'
+    case 'SUSPENDED': return 'Suspended'
+    case 'EMERGENCY': return 'Emergency'
+    default: return level
+  }
+}
+
+function SensorRow({
+  sensor,
+  loading,
+  onToggle,
+}: {
+  sensor: SensorInfo
+  loading: boolean
+  onToggle: (name: string, running: boolean) => void
+}) {
+  const label = sensor.name === 'breath' ? 'Breath Mic' : sensor.name === 'ppg' ? 'Camera PPG' : sensor.name
+
+  return (
+    <div className="flex items-center justify-between py-1">
+      <span className="text-xs text-main-view-fg/70">{label}</span>
+      {sensor.exists ? (
+        <Switch
+          checked={sensor.running}
+          loading={loading}
+          disabled={loading}
+          onCheckedChange={() => onToggle(sensor.name, sensor.running)}
+        />
+      ) : (
+        <span className="text-xs text-main-view-fg/30 italic">not found</span>
+      )}
+    </div>
+  )
+}
+
 export function CoherenceBar() {
-  const { connected, scalarCoherence, startPolling, stopPolling } =
-    useCoherenceGlove()
+  const {
+    connected,
+    scalarCoherence,
+    consentLevel,
+    breathEntrained,
+    sensors,
+    sensorLoading,
+    startPolling,
+    stopPolling,
+    startSensor,
+    stopSensor,
+  } = useCoherenceGlove()
+
+  const [expanded, setExpanded] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     startPolling()
     return () => stopPolling()
   }, [startPolling, stopPolling])
 
+  // Close panel on outside click
+  useEffect(() => {
+    if (!expanded) return
+    function handleClick(e: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setExpanded(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [expanded])
+
   if (!connected) return null
 
   const color = getBarColor(scalarCoherence)
 
+  const handleToggle = (name: string, running: boolean) => {
+    if (running) {
+      stopSensor(name)
+    } else {
+      startSensor(name)
+    }
+  }
+
   return (
-    <div
-      style={{
-        height: 2,
-        width: '100%',
-        backgroundColor: color,
-        transition: 'background-color 1s ease-in-out',
-        borderRadius: 1,
-      }}
-    />
+    <div ref={panelRef} className="relative w-full">
+      {/* Expanded sensor panel */}
+      {expanded && (
+        <div
+          className="absolute bottom-1 left-0 right-0 mx-2 rounded-lg border border-main-view-fg/10 bg-main-view p-3 shadow-lg"
+          style={{ zIndex: 50 }}
+        >
+          {/* Coherence info row */}
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <div
+                className="size-2 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+              <span className="text-xs font-medium text-main-view-fg/90">
+                {(scalarCoherence * 100).toFixed(0)}%
+              </span>
+              <span className="text-xs text-main-view-fg/50">
+                {getConsentLabel(consentLevel)}
+              </span>
+            </div>
+            {breathEntrained && (
+              <span className="text-xs text-main-view-fg/50">
+                breath entrained
+              </span>
+            )}
+          </div>
+
+          {/* Sensor toggles */}
+          {sensors.length > 0 && (
+            <div className="border-t border-main-view-fg/10 mt-2 pt-2">
+              <span className="text-[10px] uppercase tracking-wider text-main-view-fg/40 mb-1 block">
+                Sensors
+              </span>
+              {sensors.map((s) => (
+                <SensorRow
+                  key={s.name}
+                  sensor={s}
+                  loading={sensorLoading}
+                  onToggle={handleToggle}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* The bar itself — clickable */}
+      <div
+        onClick={() => setExpanded((v) => !v)}
+        style={{
+          height: 2,
+          width: '100%',
+          backgroundColor: color,
+          transition: 'background-color 1s ease-in-out',
+          borderRadius: 1,
+          cursor: 'pointer',
+        }}
+        title="Click to toggle sensor controls"
+      />
+    </div>
   )
 }

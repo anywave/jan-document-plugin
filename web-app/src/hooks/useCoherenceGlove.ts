@@ -9,8 +9,17 @@ import { useCodexState } from './useCodexState'
  * custom property (--coherence) on the document root to drive glyph
  * shimmer intensity, and optionally feeds Codex operator chain.
  *
+ * Manages biometric sensor subprocesses (breath mic, camera PPG)
+ * via MCP tool calls.
+ *
  * Completely silent when the MCP server is offline — no errors, no UI trace.
  */
+
+interface SensorInfo {
+  name: string
+  exists: boolean
+  running: boolean
+}
 
 interface CoherenceGloveState {
   connected: boolean
@@ -22,11 +31,18 @@ interface CoherenceGloveState {
   dominantBand: string
   lastUpdate: number | null
 
+  // Sensor state
+  sensors: SensorInfo[]
+  sensorLoading: boolean
+
   // Actions
   pollState: () => Promise<void>
   pushText: (text: string) => Promise<void>
   startPolling: () => void
   stopPolling: () => void
+  startSensor: (name: string) => Promise<void>
+  stopSensor: (name: string) => Promise<void>
+  refreshSensors: () => Promise<void>
 }
 
 let pollInterval: ReturnType<typeof setInterval> | null = null
@@ -40,6 +56,9 @@ const useCoherenceGlove = create<CoherenceGloveState>((set, get) => ({
   bandAmplitudes: [0, 0, 0, 0, 0],
   dominantBand: 'CORE',
   lastUpdate: null,
+
+  sensors: [],
+  sensorLoading: false,
 
   pollState: async () => {
     try {
@@ -145,8 +164,9 @@ const useCoherenceGlove = create<CoherenceGloveState>((set, get) => ({
 
   startPolling: () => {
     if (pollInterval) return
-    // Initial poll
+    // Initial poll + sensor status
     get().pollState()
+    get().refreshSensors()
     // Then every 5 seconds
     pollInterval = setInterval(() => {
       get().pollState()
@@ -161,6 +181,61 @@ const useCoherenceGlove = create<CoherenceGloveState>((set, get) => ({
     set({ connected: false })
     document.documentElement.style.setProperty('--coherence', '0')
   },
+
+  refreshSensors: async () => {
+    try {
+      const result = await callTool({
+        toolName: 'coherence_sensor_status',
+        arguments: {},
+      })
+      if (result?.content?.[0]?.text) {
+        let data: Record<string, unknown>
+        try {
+          data = JSON.parse(result.content[0].text)
+        } catch {
+          return
+        }
+        const available = data.available as SensorInfo[] | undefined
+        if (available) {
+          set({ sensors: available })
+        }
+      }
+    } catch {
+      // Silent — sensors are optional
+    }
+  },
+
+  startSensor: async (name: string) => {
+    set({ sensorLoading: true })
+    try {
+      await callTool({
+        toolName: 'coherence_start_sensors',
+        arguments: { sensors: [name] },
+      })
+      // Refresh sensor status after a short delay for subprocess to start
+      setTimeout(() => get().refreshSensors(), 1500)
+    } catch {
+      console.error(`Failed to start sensor: ${name}`)
+    } finally {
+      set({ sensorLoading: false })
+    }
+  },
+
+  stopSensor: async (name: string) => {
+    set({ sensorLoading: true })
+    try {
+      await callTool({
+        toolName: 'coherence_stop_sensors',
+        arguments: { sensors: [name] },
+      })
+      await get().refreshSensors()
+    } catch {
+      console.error(`Failed to stop sensor: ${name}`)
+    } finally {
+      set({ sensorLoading: false })
+    }
+  },
 }))
 
 export { useCoherenceGlove }
+export type { SensorInfo }
