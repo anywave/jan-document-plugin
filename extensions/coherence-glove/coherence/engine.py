@@ -274,7 +274,13 @@ class MultiWaveCoherenceEngine:
         return self._breath_detector
 
     def _detect_breath(self, windows: Dict) -> Optional[BreathState]:
-        """Detect breath state from available signals."""
+        """Detect breath state from available signals.
+
+        Note: Raw PPG data is NOT fed as HRV because PPG oscillates at
+        cardiac frequency (~1Hz), while HRV requires peak-detection → IBI
+        extraction. Feeding raw PPG kills hrv_coupling (0.5 default → ~0).
+        Proper HRV extraction can be added as a future enhancement.
+        """
         # Check for explicit breath signal
         if 'breath' in windows or 'resp' in windows:
             breath_key = 'breath' if 'breath' in windows else 'resp'

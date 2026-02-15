@@ -209,12 +209,17 @@ class CoherenceGloveServer:
             'ppg': os.path.join(_self_dir, 'ppg_sensor.py'),
         }
 
+        # Set breath target to φ^-2 (0.382 Hz ≈ 23 BPM) — deep breathing
+        # rather than the theoretical φ^-1 (0.618 Hz = 37 BPM) which is
+        # faster than any natural human breath rate.
+        self.engine.set_breath_target(0.381966)  # φ^-2 = 1/φ²
+
         # Register a synthetic text stream
         initial_data = np.zeros(5)
         self.engine.register_stream_data(
             'text_coherence', initial_data, self._text_sample_rate
         )
-        log.info('Engine initialized with text_coherence stream')
+        log.info('Engine initialized with text_coherence stream (breath target=phi^-2=0.382Hz)')
 
         # Start HTTP bloom relay if configured
         self._relay_server = None

@@ -314,7 +314,11 @@ def compute_intentionality_score(regularity: float,
                                   entrainment_error: float) -> float:
     """Compute intentionality score from breath metrics.
 
-    Intentionality = regularity × HRV coupling × (1 - normalized_error)
+    Intentionality = regularity × HRV coupling × error_factor
+
+    Uses Gaussian decay for error_factor instead of linear cutoff.
+    This ensures any regular breathing produces some intentionality,
+    while strongly rewarding proximity to the φ-target.
 
     High intentionality indicates:
     - User is breathing regularly (not chaotic)
@@ -329,8 +333,10 @@ def compute_intentionality_score(regularity: float,
     Returns:
         Intentionality score 0-1
     """
-    # Normalize entrainment error (error of 0.3 Hz → ~0)
-    error_factor = max(0.0, 1.0 - entrainment_error / 0.3)
+    # Gaussian decay — σ²=0.08 gives smooth falloff:
+    #   0 Hz error → 1.0, 0.1 Hz → 0.88, 0.2 Hz → 0.61, 0.4 Hz → 0.14
+    # Much more forgiving than the old linear cutoff (which zeroed at 0.3 Hz)
+    error_factor = float(np.exp(-(entrainment_error ** 2) / 0.08))
 
     # Combined intentionality
     intentionality = regularity * hrv_coupling * error_factor
