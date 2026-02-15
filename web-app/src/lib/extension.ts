@@ -167,8 +167,8 @@ export class ExtensionManager {
   async activateExtension(extension: Extension) {
     // Import class
     const extensionUrl = extension.url
-    await import(/* @vite-ignore */ convertFileSrc(extensionUrl)).then(
-      (extensionClass) => {
+    await import(/* @vite-ignore */ convertFileSrc(extensionUrl))
+      .then((extensionClass) => {
         // Register class if it has a default export
         if (
           typeof extensionClass.default === 'function' &&
@@ -186,8 +186,10 @@ export class ExtensionManager {
             )
           )
         }
-      }
-    )
+      })
+      .catch((err) => {
+        console.error(`Failed to activate extension "${extension.name}":`, err)
+      })
   }
 
   /**
@@ -216,7 +218,7 @@ export class ExtensionManager {
       extensions,
     })) as ExtensionManifest[]
     return res.map(async (ext: ExtensionManifest) => {
-      const extension = new Extension(ext.name, ext.url)
+      const extension = new Extension(ext.url, ext.name)
       await this.activateExtension(extension)
       return extension
     })

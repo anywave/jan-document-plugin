@@ -84,7 +84,7 @@ export const createThread = async (thread: Thread): Promise<Thread> => {
  * @param thread - The thread object to update.
  */
 export const updateThread = (thread: Thread) => {
-  return ExtensionManager.getInstance()
+  const result = ExtensionManager.getInstance()
     .get<ConversationalExtension>(ExtensionTypeEnum.Conversational)
     ?.modifyThread({
       ...thread,
@@ -117,6 +117,12 @@ export const updateThread = (thread: Thread) => {
       created: Date.now() / 1000,
       updated: Date.now() / 1000,
     })
+  if (result && typeof result.catch === 'function') {
+    result.catch((e: unknown) => {
+      console.error('Error updating thread:', e)
+    })
+  }
+  return result
 }
 
 /**
@@ -125,7 +131,13 @@ export const updateThread = (thread: Thread) => {
  * @returns
  */
 export const deleteThread = (threadId: string) => {
-  return ExtensionManager.getInstance()
+  const result = ExtensionManager.getInstance()
     .get<ConversationalExtension>(ExtensionTypeEnum.Conversational)
     ?.deleteThread(threadId)
+  if (result && typeof result.catch === 'function') {
+    result.catch((e: unknown) => {
+      console.error('Error deleting thread:', e)
+    })
+  }
+  return result
 }

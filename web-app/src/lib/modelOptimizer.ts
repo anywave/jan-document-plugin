@@ -325,3 +325,36 @@ export function formatOptimizationSummary(
 
   return `MOBIUS Auto-Optimization Complete\n\n${gpuLine}\n\n${modelLines}\nThreads: ${threads} | Tier: ${tier}\n\nAdjust in Jan AI Settings > llamacpp if needed.`
 }
+
+// ─── UI Integration ────────────────────────────────────────────────────
+
+export interface OptimalSettingsForUI {
+  /** Optimal values keyed by model settings key name */
+  values: Record<string, number | boolean>
+  /** Hardware tier used for computation */
+  tier: string
+  /** Human-readable summary */
+  summary: string
+}
+
+/**
+ * Get optimal settings for a model in the shape expected by ModelSetting.tsx.
+ * Maps ModelOptimization fields to the settings keys used in the UI
+ * (model.settings[key].controller_props.value).
+ */
+export function getOptimalSettingsForUI(
+  modelId: string,
+  hardware: HardwareData
+): OptimalSettingsForUI {
+  const profile = buildHardwareProfile(hardware)
+  const opt = optimizeAnyModel(modelId, profile)
+
+  return {
+    values: {
+      ctx_len: opt.ctxSize,
+      ngl: opt.ngl,
+    },
+    tier: opt.tier,
+    summary: `${opt.tier} tier: ${opt.ngl} GPU layers, ${opt.ctxSize} context`,
+  }
+}
