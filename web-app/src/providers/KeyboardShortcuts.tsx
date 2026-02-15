@@ -26,15 +26,6 @@ export function KeyboardShortcutsProvider() {
     },
   })
 
-  // Go to Settings (⌘/Ctrl ,)
-  useKeyboardShortcut({
-    key: ',',
-    usePlatformMetaKey: true,
-    callback: () => {
-      router.navigate({ to: route.settings.general })
-    },
-  })
-
   // This component doesn't render anything
   return null
 }
