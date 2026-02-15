@@ -294,14 +294,169 @@ fn calculate_python_backoff_delay(attempt: u32) -> u64 {
     )
 }
 
+/// Sync critical scripts into an existing extraction.
+/// Copies tts_engine.py and voice_relay.py from Tauri resources if they're missing
+/// from the extracted scripts dir. This is the fallback for builds that predate
+/// the bundle fix — new builds already have these scripts in the zip.
+fn sync_python_scripts(app_handle: &AppHandle) -> Result<(), String> {
+    let scripts_dir = get_python_scripts_path(app_handle)?;
+    let resource_dir = app_handle
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+
+    for script_name in &["tts_engine.py", "voice_relay.py"] {
+        let dest = scripts_dir.join(script_name);
+        if dest.exists() {
+            continue;
+        }
+
+        // Try both resource layouts: flat and nested resources/ subdir
+        let candidates = [
+            resource_dir.join("resources").join("python312").join("scripts").join(script_name),
+            resource_dir.join("python312").join("scripts").join(script_name),
+        ];
+
+        let mut copied = false;
+        for src in &candidates {
+            if src.exists() {
+                std::fs::create_dir_all(&scripts_dir)
+                    .map_err(|e| format!("Failed to create scripts dir: {}", e))?;
+                std::fs::copy(src, &dest).map_err(|e| {
+                    format!("Failed to copy {} from resources: {}", script_name, e)
+                })?;
+                log::info!("Synced missing script {} from resources", script_name);
+                copied = true;
+                break;
+            }
+        }
+
+        if !copied {
+            log::warn!(
+                "Could not sync {} — not found in resources (TTS/relay may not work)",
+                script_name
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Ensure Python dependencies for TTS and voice relay are installed.
+/// Uses a marker file for idempotency — only runs pip once.
+fn ensure_python_deps(app_handle: &AppHandle) -> Result<(), String> {
+    let python_dir = get_python_dir(app_handle)?;
+    let marker = python_dir.join(".deps_installed");
+
+    // Already verified
+    if marker.exists() {
+        return Ok(());
+    }
+
+    let python_exe = get_python_exe(app_handle)?;
+    if !python_exe.exists() {
+        return Err("Bundled Python not available for dep check".to_string());
+    }
+
+    log::info!("Checking Python dependencies (first run)...");
+
+    // Emit progress so the frontend can show a status indicator
+    let _ = app_handle.emit(
+        "python-bootstrap-progress",
+        serde_json::json!({"status": "checking", "message": "Verifying Python packages..."}),
+    );
+
+    // Test if critical packages are importable
+    let import_check = std::process::Command::new(&python_exe)
+        .args(["-c", "import pyttsx3; import websockets"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .output();
+
+    let needs_install = match import_check {
+        Ok(output) => !output.status.success(),
+        Err(_) => true,
+    };
+
+    if needs_install {
+        log::info!("Installing missing Python dependencies via pip...");
+
+        let _ = app_handle.emit(
+            "python-bootstrap-progress",
+            serde_json::json!({"status": "installing", "message": "Installing TTS/relay packages..."}),
+        );
+
+        let site_packages = python_dir.join("Lib").join("site-packages");
+        let install_result = std::process::Command::new(&python_exe)
+            .args([
+                "-m",
+                "pip",
+                "install",
+                "--no-input",
+                "--target",
+                &site_packages.to_string_lossy(),
+                "pyttsx3",
+                "websockets",
+                "qrcode[pil]",
+            ])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .output();
+
+        match install_result {
+            Ok(output) if output.status.success() => {
+                log::info!("Python dependency install succeeded");
+            }
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                log::error!("pip install failed: {}", stderr);
+                let _ = app_handle.emit(
+                    "python-bootstrap-progress",
+                    serde_json::json!({"status": "error", "message": format!("pip install failed: {}", stderr)}),
+                );
+                // Don't write marker — will retry next launch
+                return Err(format!("Failed to install Python dependencies: {}", stderr));
+            }
+            Err(e) => {
+                log::error!("Failed to run pip: {}", e);
+                let _ = app_handle.emit(
+                    "python-bootstrap-progress",
+                    serde_json::json!({"status": "error", "message": format!("Failed to run pip: {}", e)}),
+                );
+                return Err(format!("Failed to run pip: {}", e));
+            }
+        }
+    } else {
+        log::info!("All Python dependencies already present");
+    }
+
+    // Write marker file
+    if let Err(e) = std::fs::write(&marker, "ok") {
+        log::warn!("Failed to write deps marker file: {}", e);
+    }
+
+    let _ = app_handle.emit(
+        "python-bootstrap-progress",
+        serde_json::json!({"status": "ready", "message": "Python environment ready"}),
+    );
+
+    Ok(())
+}
+
 /// Ensure Python is extracted from the bundled zip archive.
 /// Extracts only on first run or if python.exe is missing.
+/// After extraction (or if already extracted), syncs missing scripts
+/// and verifies pip dependencies are installed.
 fn ensure_python_extracted(app_handle: &AppHandle) -> Result<(), String> {
     let python_dir = get_python_dir(app_handle)?;
     let python_exe = python_dir.join("python.exe");
 
-    // Already extracted
+    // Already extracted — still sync scripts and check deps
     if python_exe.exists() {
+        sync_python_scripts(app_handle)?;
+        ensure_python_deps(app_handle)?;
         return Ok(());
     }
 
@@ -348,6 +503,11 @@ fn ensure_python_extracted(app_handle: &AppHandle) -> Result<(), String> {
     }
 
     log::info!("Python extraction complete ({} entries)", archive.len());
+
+    // Sync any scripts that might be missing from the zip and install deps
+    sync_python_scripts(app_handle)?;
+    ensure_python_deps(app_handle)?;
+
     Ok(())
 }
 
@@ -1327,6 +1487,9 @@ pub async fn start_voice_relay(
             }
         }
     }
+
+    // Ensure deps are installed (idempotent — marker file skips if already done)
+    ensure_python_deps(&app_handle)?;
 
     // Find voice_relay.py
     let script_path = find_voice_relay_script(&app_handle)

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   Dialog,
   DialogClose,
@@ -9,13 +10,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { IconFolder } from '@tabler/icons-react'
+import { Input } from '@/components/ui/input'
+import { IconFolder, IconAlertTriangle } from '@tabler/icons-react'
 import { useTranslation } from '@/i18n/react-i18next-compat'
 
 interface ChangeDataFolderLocationProps {
   children: React.ReactNode
   currentPath: string
-  newPath: string
   onConfirm: () => void
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -24,14 +25,28 @@ interface ChangeDataFolderLocationProps {
 export default function ChangeDataFolderLocation({
   children,
   currentPath,
-  newPath,
   onConfirm,
   open,
   onOpenChange,
 }: ChangeDataFolderLocationProps) {
   const { t } = useTranslation()
+  const [confirmInput, setConfirmInput] = useState('')
+
+  const isConfirmed = confirmInput === 'I agree'
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) setConfirmInput('')
+    onOpenChange(nextOpen)
+  }
+
+  const handleConfirm = () => {
+    if (!isConfirmed) return
+    setConfirmInput('')
+    onConfirm()
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
@@ -45,6 +60,17 @@ export default function ChangeDataFolderLocation({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Warning block */}
+          <div className="flex gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+            <IconAlertTriangle
+              size={20}
+              className="shrink-0 text-amber-500 mt-0.5"
+            />
+            <p className="text-sm text-main-view-fg/80 leading-relaxed">
+              {t('settings:dialogs.changeDataFolder.warning')}
+            </p>
+          </div>
+
           <div>
             <h4 className="text-sm font-medium text-main-view-fg/80 mb-2">
               {t('settings:dialogs.changeDataFolder.currentLocation')}
@@ -56,13 +82,19 @@ export default function ChangeDataFolderLocation({
             </div>
           </div>
 
+          {/* "I agree" confirmation input */}
           <div>
-            <h4 className="text-sm font-medium text-main-view-fg/80 mb-2">
-              {t('settings:dialogs.changeDataFolder.newLocation')}
-            </h4>
-            <div className="bg-accent/10 border border-accent/20 rounded">
-              <code className="text-xs text-accent break-all">{newPath}</code>
-            </div>
+            <label className="text-sm text-main-view-fg/70 mb-2 block">
+              {t('settings:dialogs.changeDataFolder.confirmPrompt')}
+            </label>
+            <Input
+              value={confirmInput}
+              onChange={(e) => setConfirmInput(e.target.value)}
+              placeholder={t(
+                'settings:dialogs.changeDataFolder.confirmPlaceholder'
+              )}
+              className="text-sm"
+            />
           </div>
         </div>
 
@@ -72,11 +104,9 @@ export default function ChangeDataFolderLocation({
               {t('settings:dialogs.changeDataFolder.cancel')}
             </Button>
           </DialogClose>
-          <DialogClose asChild>
-            <Button onClick={onConfirm}>
-              {t('settings:dialogs.changeDataFolder.changeLocation')}
-            </Button>
-          </DialogClose>
+          <Button onClick={handleConfirm} disabled={!isConfirmed}>
+            {t('settings:dialogs.changeDataFolder.changeLocation')}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOBIUS Release Notes</title>
+<style>
+  :root {
+    --bg: #0e0e10;
+    --bg-surface: #18181b;
+    --bg-elevated: #222225;
+    --fg: #e4e4e7;
+    --fg-muted: #a1a1aa;
+    --accent: #8b5cf6;
+    --accent-muted: #7c3aed;
+    --border: #27272a;
+    --amber: #f59e0b;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --red: #ef4444;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+  }
+
+  header {
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  header h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  header h1 span { color: var(--accent); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .search-box {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg);
+    font-size: 14px;
+    outline: none;
+  }
+
+  .search-box:focus { border-color: var(--accent); }
+  .search-box::placeholder { color: var(--fg-muted); }
+
+  .tier-tabs {
+    display: flex;
+    gap: 4px;
+  }
+
+  .tier-tab {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fg-muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .tier-tab:hover { background: var(--bg-elevated); color: var(--fg); }
+  .tier-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+  main { max-width: 900px; margin: 0 auto; padding: 24px; }
+
+  .release {
+    margin-bottom: 32px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .release-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .release-header h2 { font-size: 16px; font-weight: 600; }
+
+  .release-date {
+    font-size: 12px;
+    color: var(--fg-muted);
+    margin-left: auto;
+  }
+
+  .change-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .tag-feature { background: var(--green); color: #000; }
+  .tag-fix { background: var(--blue); color: white; }
+  .tag-breaking { background: var(--red); color: white; }
+  .tag-internal { background: var(--amber); color: #000; }
+
+  .tier-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .tier-general { background: var(--green); color: #000; }
+  .tier-technical { background: var(--blue); color: white; }
+  .tier-advanced { background: var(--amber); color: #000; }
+
+  .release-body { padding: 16px 20px; }
+
+  .change-group { margin-bottom: 16px; }
+  .change-group:last-child { margin-bottom: 0; }
+  .change-group h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  .change-group ul { padding-left: 20px; }
+  .change-group li {
+    color: var(--fg-muted);
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .change-group li strong { color: var(--fg); }
+
+  .release.hidden { display: none; }
+
+  .no-results {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--fg-muted);
+    font-size: 14px;
+    display: none;
+  }
+
+  .no-results.visible { display: block; }
+
+  .highlight { background: var(--accent-muted); color: white; border-radius: 2px; padding: 0 2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>MOBIUS</span> Release Notes</h1>
+  <div class="controls">
+    <input type="text" class="search-box" id="search" placeholder="Search release notes..." autocomplete="off" />
+    <div class="tier-tabs">
+      <button class="tier-tab active" data-tier="all">All</button>
+      <button class="tier-tab" data-tier="general">General</button>
+      <button class="tier-tab" data-tier="technical">Technical</button>
+      <button class="tier-tab" data-tier="advanced">Advanced</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- v0.7.0 -->
+  <div class="release" data-searchable>
+    <div class="release-header">
+      <h2>v0.7.0-AAA</h2>
+      <span class="change-tag tag-feature">Feature</span>
+      <span class="change-tag tag-fix">Stabilization</span>
+      <span class="release-date">February 2026</span>
+    </div>
+    <div class="release-body">
+
+      <div class="change-group" data-tier="general">
+        <h3><span class="tier-badge tier-general">General</span> What's New</h3>
+        <ul>
+          <li><strong>Text-to-Speech:</strong> AI responses can now be read aloud using local voice synthesis. No cloud services required.</li>
+          <li><strong>Document Intelligence:</strong> Drag PDF, DOCX, or TXT files into conversations. MOBIUS indexes them locally and uses relevant passages to inform AI responses.</li>
+          <li><strong>Annotations:</strong> Right-click any AI message to add personal notes and annotations.</li>
+          <li><strong>Context Menu:</strong> Right-click messages for quick actions &mdash; copy, annotate, regenerate, or speak.</li>
+          <li><strong>Data Folder Protection:</strong> MOBIUS now locks the shared data folder while running, preventing accidental deletion.</li>
+          <li><strong>Settings Overhaul:</strong> Local documentation with searchable index, "I agree" confirmation for data folder changes, direct link to GitHub releases.</li>
+        </ul>
+      </div>
+
+      <div class="change-group" data-tier="technical">
+        <h3><span class="tier-badge tier-technical">Technical</span> Under the Hood</h3>
+        <ul>
+          <li><strong>Voice Relay Server:</strong> Local HTTP relay for TTS audio streaming on a random port with start/stop lifecycle management.</li>
+          <li><strong>ChromaDB Integration:</strong> File-based vector store for document embeddings. Supports batch processing and collection stats.</li>
+          <li><strong>Python Bridge:</strong> Bundled Python 3.12 runtime with Tauri command interface for TTS and document processing.</li>
+          <li><strong>MCP Support:</strong> Model Context Protocol server management with auto-restart (up to 3 retries) and clean shutdown.</li>
+          <li><strong>OpenAI-Compatible API:</strong> Local server at configurable host/port with API key auth and CORS support.</li>
+        </ul>
+      </div>
+
+      <div class="change-group" data-tier="advanced">
+        <h3><span class="tier-badge tier-advanced">Advanced</span> Architecture</h3>
+        <ul>
+          <li><strong>Hard Fork Base:</strong> Built on Jan v0.6.8 with Tauri v2. Divergent feature set while maintaining shared data folder compatibility.</li>
+          <li><strong>Stabilization Audit:</strong> 34+ files, 8 commits &mdash; error toasts, unhandled promises, React ErrorBoundary, Rust panic fixes, memory leak patches, debug log cleanup.</li>
+          <li><strong>Data Folder Lock:</strong> <code>.mobius-lock</code> sentinel with open write handle prevents <code>RemoveDirectory</code> on Windows. Auto-releases on exit/crash via OS handle cleanup.</li>
+          <li><strong>AppState Extension:</strong> Added <code>data_folder_lock</code>, MCP restart counts, active server tracking, and successfully-connected tracking to Rust state management.</li>
+          <li><strong>Process Cleanup:</strong> Guaranteed MCP server and llama.cpp process cleanup on window close and app exit events.</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- v0.6.8 Base -->
+  <div class="release" data-searchable>
+    <div class="release-header">
+      <h2>v0.6.8 (Jan Base)</h2>
+      <span class="change-tag tag-internal">Upstream</span>
+      <span class="release-date">Fork Point</span>
+    </div>
+    <div class="release-body">
+
+      <div class="change-group" data-tier="general">
+        <h3><span class="tier-badge tier-general">General</span> Inherited from Jan</h3>
+        <ul>
+          <li><strong>Local LLM Chat:</strong> Run large language models entirely on your hardware.</li>
+          <li><strong>Model Hub:</strong> Browse and download models from Hugging Face and Jan's model registry.</li>
+          <li><strong>Thread Management:</strong> Create, organize, and search conversations.</li>
+          <li><strong>Multi-Model Support:</strong> Load and switch between multiple models.</li>
+          <li><strong>Spell Check:</strong> Built-in spell checking for chat input.</li>
+        </ul>
+      </div>
+
+      <div class="change-group" data-tier="technical">
+        <h3><span class="tier-badge tier-technical">Technical</span> Core Platform</h3>
+        <ul>
+          <li><strong>Tauri v2:</strong> Native desktop app framework with Rust backend.</li>
+          <li><strong>llama.cpp:</strong> High-performance LLM inference engine.</li>
+          <li><strong>GPU Acceleration:</strong> CUDA and Vulkan support for NVIDIA and AMD GPUs.</li>
+          <li><strong>Extension System:</strong> Pluggable architecture for additional capabilities.</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="no-results" id="no-results">No matching release notes found.</div>
+</main>
+
+<script>
+(function() {
+  var searchInput = document.getElementById('search');
+  var releases = document.querySelectorAll('.release[data-searchable]');
+  var noResults = document.getElementById('no-results');
+  var tierTabs = document.querySelectorAll('.tier-tab');
+  var activeTier = 'all';
+
+  function filterReleases() {
+    var query = searchInput.value.toLowerCase().trim();
+    var visible = 0;
+
+    // Remove existing highlights
+    releases.forEach(function(release) {
+      var highlights = release.querySelectorAll('.highlight');
+      highlights.forEach(function(el) {
+        var parent = el.parentNode;
+        parent.replaceChild(document.createTextNode(el.textContent), el);
+        parent.normalize();
+      });
+    });
+
+    releases.forEach(function(release) {
+      var groups = release.querySelectorAll('.change-group');
+      var releaseHasVisible = false;
+
+      groups.forEach(function(group) {
+        var tier = group.dataset.tier;
+        var matchesTier = activeTier === 'all' || tier === activeTier;
+        var text = group.textContent.toLowerCase();
+        var matchesSearch = !query || text.indexOf(query) !== -1;
+
+        if (matchesTier && matchesSearch) {
+          group.style.display = '';
+          releaseHasVisible = true;
+          if (query) highlightText(group, query);
+        } else if (matchesTier && !query) {
+          group.style.display = '';
+          releaseHasVisible = true;
+        } else {
+          group.style.display = 'none';
+        }
+      });
+
+      if (releaseHasVisible) {
+        release.classList.remove('hidden');
+        visible++;
+      } else {
+        release.classList.add('hidden');
+      }
+    });
+
+    noResults.classList.toggle('visible', visible === 0);
+  }
+
+  function highlightText(container, query) {
+    var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    var nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+
+    nodes.forEach(function(node) {
+      var idx = node.textContent.toLowerCase().indexOf(query);
+      if (idx === -1) return;
+      var span = document.createElement('span');
+      span.className = 'highlight';
+      var range = document.createRange();
+      range.setStart(node, idx);
+      range.setEnd(node, idx + query.length);
+      range.surroundContents(span);
+    });
+  }
+
+  tierTabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      tierTabs.forEach(function(t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      activeTier = tab.dataset.tier;
+      filterReleases();
+    });
+  });
+
+  searchInput.addEventListener('input', filterReleases);
+})();
+</script>
+</body>
+</html>

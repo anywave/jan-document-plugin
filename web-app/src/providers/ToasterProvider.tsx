@@ -4,6 +4,7 @@ export function ToasterProvider() {
   return (
     <Toaster
       richColors
+      closeButton
       position="top-right"
       offset={{ top: 8, right: 8 }}
       toastOptions={{

@@ -718,21 +718,29 @@ const LeftPanel = () => {
 
 /** Inline export dialog component */
 function ExportDialog({ threadIds, onClose }: { threadIds: string[]; onClose: () => void }) {
-  const [format, setFormat] = useState<'clipboard' | 'text' | 'docx'>('clipboard')
+  const [format, setFormat] = useState<'clipboard' | 'text' | 'docx' | 'mobius'>('clipboard')
   const [exporting, setExporting] = useState(false)
   const { t } = useTranslation()
 
   const handleExport = async () => {
     setExporting(true)
     try {
-      const { exportThreads } = await import('@/lib/exportThreads')
-      await exportThreads(threadIds, format)
-      toast.success(
-        format === 'clipboard'
-          ? 'Copied to clipboard'
-          : `Saved as .${format} file`,
-        { id: 'export-threads' }
-      )
+      if (format === 'mobius') {
+        const { exportSelectedThreads } = await import('@/lib/sharing/exportPackage')
+        const result = await exportSelectedThreads(threadIds)
+        if (result) {
+          toast.success(t('sharing:exportSuccess'), { id: 'export-threads' })
+        }
+      } else {
+        const { exportThreads } = await import('@/lib/exportThreads')
+        await exportThreads(threadIds, format)
+        toast.success(
+          format === 'clipboard'
+            ? 'Copied to clipboard'
+            : `Saved as .${format} file`,
+          { id: 'export-threads' }
+        )
+      }
       onClose()
     } catch (err) {
       toast.error('Export failed', { id: 'export-error' })
@@ -749,6 +757,7 @@ function ExportDialog({ threadIds, onClose }: { threadIds: string[]; onClose: ()
           { value: 'clipboard' as const, label: 'Copy to clipboard' },
           { value: 'text' as const, label: 'Save as .txt' },
           { value: 'docx' as const, label: 'Save as Word (.docx)' },
+          { value: 'mobius' as const, label: 'Save as .mobius (shareable package)' },
         ]).map((opt) => (
           <label key={opt.value} className="flex items-center gap-2 cursor-pointer text-sm">
             <input

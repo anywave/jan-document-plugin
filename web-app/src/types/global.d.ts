@@ -16,6 +16,7 @@ declare global {
   declare const IS_ANDROID: boolean
   declare const PLATFORM: string
   declare const VERSION: string
+  declare const MOBIUS_RELEASE: string
   declare const MODEL_CATALOG_URL: string
   declare const AUTO_UPDATER_DISABLED: boolean
   interface Window {

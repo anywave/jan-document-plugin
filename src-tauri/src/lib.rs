@@ -1,7 +1,7 @@
 mod core;
 use core::utils::extensions::inference_llamacpp_extension::cleanup::cleanup_processes;
 use core::{
-    cmd::get_jan_data_folder_path,
+    cmd::{get_jan_data_folder_path, lock_data_folder},
     setup::{self, setup_mcp},
     state::{generate_app_token, AppState},
     utils::download::DownloadManagerState,
@@ -97,6 +97,10 @@ pub fn run() {
             core::threads::get_thread_assistant,
             core::threads::create_thread_assistant,
             core::threads::modify_thread_assistant,
+            // Sharing
+            core::sharing::create_mobius_package,
+            core::sharing::read_mobius_package,
+            core::sharing::import_mobius_package,
             // generic utils
             core::utils::write_yaml,
             core::utils::read_yaml,
@@ -127,6 +131,7 @@ pub fn run() {
             mcp_successfully_connected: Arc::new(Mutex::new(HashMap::new())),
             server_handle: Arc::new(Mutex::new(None)),
             llama_server_process: Arc::new(Mutex::new(HashMap::new())),
+            data_folder_lock: Arc::new(std::sync::Mutex::new(None)),
         })
         .setup(|app| {
             app.handle().plugin(
@@ -147,6 +152,13 @@ pub fn run() {
             // Install extensions
             if let Err(e) = setup::install_extensions(app.handle().clone(), false) {
                 log::error!("Failed to install extensions: {}", e);
+            }
+
+            // Lock the data folder to prevent accidental deletion while running
+            let lock_handle = lock_data_folder(app.handle().clone());
+            let state = app.handle().state::<AppState>();
+            if let Ok(mut guard) = state.data_folder_lock.lock() {
+                *guard = lock_handle;
             }
 
             #[cfg(any(windows, target_os = "linux"))]

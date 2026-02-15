@@ -5,6 +5,7 @@ pub mod mcp;
 pub mod python_bridge;
 pub mod server;
 pub mod setup;
+pub mod sharing;
 pub mod state;
 pub mod threads;
 pub mod utils;

@@ -1,7 +1,7 @@
 {
   "autoDownload": "Tự động tải xuống các bản cập nhật mới",
   "checkForUpdates": "Kiểm tra Cập nhật",
-  "checkForUpdatesDesc": "Kiểm tra xem có phiên bản Jan mới hơn không.",
+  "checkForUpdatesDesc": "View the latest MOBIUS releases on GitHub.",
   "checkingForUpdates": "Đang kiểm tra cập nhật...",
   "noUpdateAvailable": "Bạn đang chạy phiên bản mới nhất",
   "devVersion": "Đã phát hiện phiên bản phát triển",
@@ -201,7 +201,7 @@
     "updateError": "Không thể kiểm tra cập nhật",
     "appVersion": "Phiên bản Ứng dụng",
     "checkForUpdates": "Kiểm tra Cập nhật",
-    "checkForUpdatesDesc": "Kiểm tra xem có phiên bản Jan mới hơn không.",
+    "checkForUpdatesDesc": "View the latest MOBIUS releases on GitHub.",
     "checkingForUpdates": "Đang kiểm tra cập nhật...",
     "copied": "Đã sao chép",
     "copyPath": "Sao chép Đường dẫn",
@@ -242,7 +242,10 @@
       "currentLocation": "Vị trí hiện tại:",
       "newLocation": "Vị trí mới:",
       "cancel": "Hủy",
-      "changeLocation": "Thay đổi vị trí"
+      "changeLocation": "Thay đổi vị trí",
+      "warning": "MOBIUS and Jan share the same data folder — together they are a pair of hands, the left and right hemispheres of the brain. Changing this location will separate your assistants, duplicate data unnecessarily, and will not prevent MOBIUS from interacting with Jan.",
+      "confirmPrompt": "Type \"I agree\" to continue",
+      "confirmPlaceholder": "I agree"
     }
   }
 }

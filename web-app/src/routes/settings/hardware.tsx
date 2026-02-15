@@ -56,6 +56,10 @@ import {
   type BenchmarkProgress,
   type OptimizedSettings,
 } from '@/lib/benchmark'
+import {
+  analyzeHardware,
+  type HardwareRecommendations,
+} from '@/lib/hardwareRecommendations'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const Route = createFileRoute(route.settings.hardware as any)({
@@ -124,6 +128,9 @@ function Hardware() {
   const [gpuClockMhz, setGpuClockMhz] = useState<string | null>(null)
   const [powerPlan, setPowerPlan] = useState<string | null>(null)
 
+  // ─── Hardware Recommendations state ──────────────────────
+  const [recommendations, setRecommendations] = useState<HardwareRecommendations | null>(null)
+
   const hasVulkan = hardwareData.gpus?.some(
     (g) => g.vulkan_info && g.vulkan_info.api_version !== ''
   ) ?? false
@@ -148,6 +155,13 @@ function Hardware() {
     const id = setInterval(check, 5000)
     return () => clearInterval(id)
   }, [])
+
+  // ─── Compute hardware recommendations ──────────────────────
+  useEffect(() => {
+    if (hardwareData.cpu || hardwareData.gpus?.length) {
+      setRecommendations(analyzeHardware(hardwareData))
+    }
+  }, [hardwareData])
 
   // ─── Load stored benchmark on mount ──────────────────────
   useEffect(() => {
@@ -349,6 +363,47 @@ function Hardware() {
       )
     }
   }, [perfState, loadedModel, t])
+
+  const handleRequestMcp = useCallback(() => {
+    const cpu = hardwareData.cpu?.name || 'Unknown'
+    const cores = hardwareData.cpu?.core_count || '?'
+    const ramGiB = hardwareData.total_memory ? Math.round(hardwareData.total_memory / 1024) : '?'
+    const gpu = hardwareData.gpus?.[0]
+    const gpuName = gpu?.name || 'None'
+    const vramGiB = gpu?.total_memory ? Math.round(gpu.total_memory / 1024) : 0
+    const os = `${hardwareData.os_type || ''} ${hardwareData.os_name || ''}`.trim()
+    const tier = calibration?.tier || 'Not calibrated'
+    const nvidiaDriver = gpu?.driver_version || 'N/A'
+    const cc = gpu?.nvidia_info?.compute_capability || 'N/A'
+
+    const body = [
+      'Hi,',
+      '',
+      'I would like to request a custom MCP server for MOBIUS.',
+      '',
+      '--- Hardware Profile ---',
+      `OS: ${os}`,
+      `CPU: ${cpu} (${cores} cores)`,
+      `RAM: ${ramGiB} GB`,
+      `GPU: ${gpuName} (${vramGiB} GB VRAM)`,
+      `NVIDIA Driver: ${nvidiaDriver}`,
+      `Compute Capability: ${cc}`,
+      `System Tier: ${tier}`,
+      '',
+      '--- What I need ---',
+      '[Describe the tools, APIs, or data sources you want connected to MOBIUS]',
+      '',
+      '--- Constraints ---',
+      '[Any limitations, security requirements, or specific workflows]',
+      '',
+      'Thanks!',
+    ].join('\n')
+
+    const subject = t('settings:hardware.mcpEmailSubject')
+    const mailto = `mailto:alex@anywavecreations.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    window.open(mailto)
+    toast.success(t('settings:hardware.mcpEmailSent'))
+  }, [hardwareData, calibration, t])
 
   // Llamacpp devices hook
   const llamacppDevicesResult = useLlamacppDevices()
@@ -1009,6 +1064,287 @@ function Hardware() {
                   </div>
                 </Card>
               )}
+
+              {/* Hardware Insights */}
+              {recommendations && (
+                <Card title={t('settings:hardware.hwTopRec')}>
+                  {/* Top Recommendation Banner */}
+                  <div className="px-3 py-2.5 bg-blue-500/10 border-b border-main-view-fg/5">
+                    <p className="text-sm text-blue-400">
+                      {t(`settings:hardware.hwTopRec${recommendations.topRecommendation.charAt(0).toUpperCase() + recommendations.topRecommendation.slice(1)}`)}
+                    </p>
+                  </div>
+
+                  {/* ── CPU Section ────────────────────── */}
+                  <div className="border-t border-main-view-fg/5 mt-1">
+                    <h3 className="text-xs font-medium text-main-view-fg/50 px-3 pt-3 pb-1">
+                      {t('settings:hardware.hwCpuTitle')}
+                    </h3>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-[11px] text-main-view-fg/30 px-3 pb-2 cursor-help">
+                          {t('settings:hardware.hwCpuTip')}
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm normal-case">
+                        <p>{t('settings:hardware.hwCpuTip')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <CardItem
+                      title={recommendations.cpu.name}
+                      actions={
+                        <span className="text-main-view-fg/60 text-sm">
+                          {recommendations.cpu.cores} {t('settings:hardware.hwCpuCores')} · {recommendations.cpu.threadsForInference} {t('settings:hardware.hwCpuThreadsUsed')}
+                        </span>
+                      }
+                    />
+                    <CardItem
+                      title={t('settings:hardware.hwCpuAvx2')}
+                      actions={
+                        <span className={`text-sm font-medium ${recommendations.cpu.hasAvx2 ? 'text-green-400' : 'text-red-400'}`}>
+                          {recommendations.cpu.hasAvx2 ? 'Yes' : 'No'}
+                        </span>
+                      }
+                    />
+                    <CardItem
+                      title={t('settings:hardware.hwCpuOverclock')}
+                      actions={
+                        <span className={`text-sm ${recommendations.cpu.overclockable ? 'text-yellow-400' : 'text-main-view-fg/50'}`}>
+                          {recommendations.cpu.overclockable ? t('settings:hardware.hwCpuOverclockYes') : t('settings:hardware.hwCpuOverclockNo')}
+                        </span>
+                      }
+                    />
+                    {recommendations.cpu.overclockable && (
+                      <div className="px-3 pb-2 space-y-1">
+                        <p className="text-[11px] text-main-view-fg/40">
+                          {t('settings:hardware.hwCpuOverclockDesc')}
+                        </p>
+                        <p className="text-[11px] text-orange-400/70">
+                          {t('settings:hardware.hwCpuOverclockWarn')}
+                        </p>
+                      </div>
+                    )}
+                    {recommendations.cpu.bottleneck && (
+                      <p className="text-[11px] text-red-400/70 px-3 pb-2">
+                        {recommendations.cpu.bottleneck === 'lowCores'
+                          ? t('settings:hardware.hwCpuBottleneckLowCores')
+                          : t('settings:hardware.hwCpuBottleneckNoAvx2')}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* ── RAM Section ────────────────────── */}
+                  <div className="border-t border-main-view-fg/5">
+                    <h3 className="text-xs font-medium text-main-view-fg/50 px-3 pt-3 pb-1">
+                      {t('settings:hardware.hwRamTitle')}
+                    </h3>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-[11px] text-main-view-fg/30 px-3 pb-2 cursor-help">
+                          {t('settings:hardware.hwRamTip')}
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm normal-case">
+                        <p>{t('settings:hardware.hwRamTip')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <CardItem
+                      title={t('settings:hardware.hwRamCurrent')}
+                      actions={
+                        <span className="text-main-view-fg/80">{recommendations.ram.currentGiB} GB</span>
+                      }
+                    />
+                    <CardItem
+                      title={t('settings:hardware.hwRamMaxModel')}
+                      actions={
+                        <span className="text-main-view-fg/80">{recommendations.ram.maxModelWithCpuOffload}</span>
+                      }
+                    />
+                    {recommendations.ram.upgradeImpact.length > 0 && (
+                      <div className="px-3 pb-2">
+                        <p className="text-xs font-medium text-main-view-fg/50 mb-1.5">
+                          {t('settings:hardware.hwRamUpgrades')}
+                        </p>
+                        {/* Table header */}
+                        <div className="flex items-center text-[10px] text-main-view-fg/40 font-medium py-1 border-b border-main-view-fg/5">
+                          <span className="w-16">{t('settings:hardware.hwRamTo')}</span>
+                          <span className="flex-1">{t('settings:hardware.hwRamModels')}</span>
+                          <span className="w-20 text-right">{t('settings:hardware.hwRamContext')}</span>
+                          <span className="w-16 text-right">{t('settings:hardware.hwRamCost')}</span>
+                        </div>
+                        {recommendations.ram.upgradeImpact.map((u) => (
+                          <div key={u.targetGiB} className="flex items-center text-xs py-1.5 border-b border-main-view-fg/5 last:border-0">
+                            <span className="w-16 text-green-400 font-medium">{u.targetGiB} GB</span>
+                            <span className="flex-1 text-main-view-fg/70">{u.modelsUnlocked}</span>
+                            <span className="w-20 text-right text-main-view-fg/50">{u.contextGain}</span>
+                            <span className="w-16 text-right text-main-view-fg/50">{u.estimatedCost}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── GPU Section ────────────────────── */}
+                  <div className="border-t border-main-view-fg/5">
+                    <h3 className="text-xs font-medium text-main-view-fg/50 px-3 pt-3 pb-1">
+                      {t('settings:hardware.hwGpuTitle')}
+                    </h3>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-[11px] text-main-view-fg/30 px-3 pb-2 cursor-help">
+                          {t('settings:hardware.hwGpuTip')}
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm normal-case">
+                        <p>{t('settings:hardware.hwGpuTip')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <CardItem
+                      title={t('settings:hardware.hwGpuCurrent')}
+                      actions={
+                        <span className="text-main-view-fg/80">{recommendations.gpu.name}</span>
+                      }
+                    />
+                    <CardItem
+                      title={t('settings:hardware.hwGpuVram')}
+                      actions={
+                        <span className="text-main-view-fg/80">{recommendations.gpu.vramGiB} GB</span>
+                      }
+                    />
+                    <CardItem
+                      title={t('settings:hardware.hwGpuMaxModel')}
+                      actions={
+                        <span className="text-main-view-fg/80">{recommendations.gpu.maxModelFullGpu}</span>
+                      }
+                    />
+                    {recommendations.gpu.upgradeImpact.length > 0 && (
+                      <div className="px-3 pb-2">
+                        <p className="text-xs font-medium text-main-view-fg/50 mb-1.5">
+                          {t('settings:hardware.hwGpuUpgrades')}
+                        </p>
+                        {recommendations.gpu.upgradeImpact.map((u) => (
+                          <div key={u.name} className="py-2 border-b border-main-view-fg/5 last:border-0">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-main-view-fg/80 font-medium">{u.name}</span>
+                              <span className="text-xs text-main-view-fg/50">
+                                {u.formFactor === 'eGPU' ? t('settings:hardware.hwGpuFormEgpu') : t('settings:hardware.hwGpuFormInternal')}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 mt-0.5 text-[11px]">
+                              <span className="text-main-view-fg/50">{u.vramGiB} GB VRAM</span>
+                              <span className="text-green-400">{t('settings:hardware.hwGpuSpeed')}: {u.speedMultiplier}</span>
+                              <span className="text-main-view-fg/50">{u.estimatedCost}</span>
+                            </div>
+                            <p className="text-[11px] text-main-view-fg/40 mt-0.5">
+                              {t('settings:hardware.hwGpuModelsUnlocked')}: {u.modelsUnlocked}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── External Acceleration ────────────── */}
+                  <div className="border-t border-main-view-fg/5">
+                    <h3 className="text-xs font-medium text-main-view-fg/50 px-3 pt-3 pb-1">
+                      {t('settings:hardware.hwExternalTitle')}
+                    </h3>
+                    <p className="text-[11px] text-main-view-fg/30 px-3 pb-1">
+                      {t('settings:hardware.hwExternalDesc')}
+                    </p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-[11px] text-main-view-fg/30 px-3 pb-2 cursor-help">
+                          {t('settings:hardware.hwExternalTip')}
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm normal-case">
+                        <p>{t('settings:hardware.hwExternalTip')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    {recommendations.external.map((ext) => (
+                      <div key={ext.id} className="px-3 py-2.5 border-t border-main-view-fg/5">
+                        <h4 className="text-sm text-main-view-fg/80 font-medium">{ext.name}</h4>
+                        <p className="text-[11px] text-main-view-fg/50 mt-0.5">{ext.description}</p>
+                        <div className="mt-1.5 space-y-0.5">
+                          <p className="text-[11px]">
+                            <span className="text-main-view-fg/40">{t('settings:hardware.hwExternalHowItWorks')}: </span>
+                            <span className="text-main-view-fg/60">{ext.howItWorks}</span>
+                          </p>
+                          <p className="text-[11px]">
+                            <span className="text-main-view-fg/40">{t('settings:hardware.hwExternalRequires')}: </span>
+                            <span className="text-main-view-fg/60">{ext.requirements}</span>
+                          </p>
+                          <p className="text-[11px]">
+                            <span className="text-main-view-fg/40">{t('settings:hardware.hwExternalCost')}: </span>
+                            <span className="text-green-400/70">{ext.estimatedCost}</span>
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* MCP Servers */}
+              <Card title={t('settings:hardware.mcpTitle')}>
+                {/* What are MCP Servers */}
+                <div className="px-3 pt-2 pb-2">
+                  <h3 className="text-xs font-medium text-main-view-fg/60 mb-1">
+                    {t('settings:hardware.mcpWhatTitle')}
+                  </h3>
+                  <p className="text-[11px] text-main-view-fg/40 leading-relaxed">
+                    {t('settings:hardware.mcpWhatDesc')}
+                  </p>
+                </div>
+
+                {/* How do they work */}
+                <div className="px-3 pb-2 border-t border-main-view-fg/5 pt-2">
+                  <h3 className="text-xs font-medium text-main-view-fg/60 mb-1">
+                    {t('settings:hardware.mcpHowTitle')}
+                  </h3>
+                  <p className="text-[11px] text-main-view-fg/40 leading-relaxed">
+                    {t('settings:hardware.mcpHowDesc')}
+                  </p>
+                </div>
+
+                {/* Common issues */}
+                <div className="px-3 pb-2 border-t border-main-view-fg/5 pt-2">
+                  <h3 className="text-xs font-medium text-main-view-fg/60 mb-1">
+                    {t('settings:hardware.mcpProblemsTitle')}
+                  </h3>
+                  <ul className="space-y-1.5">
+                    {(['mcpProblem1', 'mcpProblem2', 'mcpProblem3', 'mcpProblem4'] as const).map((key) => (
+                      <li key={key} className="text-[11px] text-main-view-fg/40 leading-relaxed pl-2 border-l-2 border-main-view-fg/10">
+                        {t(`settings:hardware.${key}`)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* How to fix */}
+                <div className="px-3 pb-2 border-t border-main-view-fg/5 pt-2">
+                  <h3 className="text-xs font-medium text-main-view-fg/60 mb-1">
+                    {t('settings:hardware.mcpFixTitle')}
+                  </h3>
+                  <p className="text-[11px] text-main-view-fg/40 leading-relaxed">
+                    {t('settings:hardware.mcpFixDesc')}
+                  </p>
+                </div>
+
+                {/* Custom MCP request */}
+                <div className="px-3 py-3 border-t border-main-view-fg/5 bg-blue-500/5">
+                  <h3 className="text-xs font-medium text-blue-400 mb-1">
+                    {t('settings:hardware.mcpCustomTitle')}
+                  </h3>
+                  <p className="text-[11px] text-main-view-fg/40 leading-relaxed mb-2.5">
+                    {t('settings:hardware.mcpCustomDesc')}
+                  </p>
+                  <Button onClick={handleRequestMcp}>
+                    {t('settings:hardware.mcpRequestButton')}
+                  </Button>
+                </div>
+              </Card>
 
               {/* OS Information */}
               <Card title={t('settings:hardware.os')}>

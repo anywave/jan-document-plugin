@@ -79,23 +79,19 @@ const SettingsMenu = () => {
       title: 'common:hardware',
       route: route.settings.hardware,
     },
-    // Only show MCP Servers when experimental features are enabled
+    // Only show MCP Servers and advanced settings when experimental features are enabled
     ...(experimentalFeatures
       ? [
           {
             title: 'common:mcp-servers',
             route: route.settings.mcp_servers,
           },
+          {
+            title: 'common:https_proxy',
+            route: route.settings.https_proxy,
+          },
         ]
       : []),
-    {
-      title: 'common:local_api_server',
-      route: route.settings.local_api_server,
-    },
-    {
-      title: 'common:https_proxy',
-      route: route.settings.https_proxy,
-    },
     {
       title: 'common:extensions',
       route: route.settings.extensions,

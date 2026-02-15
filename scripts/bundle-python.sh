@@ -37,7 +37,7 @@ fi
 mkdir -p "$BUNDLE_DIR"
 
 # 1. Copy Python runtime core
-echo "[1/5] Copying Python runtime..."
+echo "[1/7] Copying Python runtime..."
 cp "$SYSTEM_PYTHON/python.exe" "$BUNDLE_DIR/"
 cp "$SYSTEM_PYTHON/python3.dll" "$BUNDLE_DIR/"
 cp "$SYSTEM_PYTHON/python312.dll" "$BUNDLE_DIR/"
@@ -45,18 +45,18 @@ cp "$SYSTEM_PYTHON/vcruntime140.dll" "$BUNDLE_DIR/"
 cp "$SYSTEM_PYTHON/vcruntime140_1.dll" "$BUNDLE_DIR/"
 
 # 2. Copy DLLs directory (compiled extension modules)
-echo "[2/5] Copying DLLs..."
+echo "[2/7] Copying DLLs..."
 cp -r "$SYSTEM_PYTHON/DLLs" "$BUNDLE_DIR/DLLs"
 
 # 3. Copy standard library (trimmed)
-echo "[3/5] Copying standard library (trimmed)..."
+echo "[3/7] Copying standard library (trimmed)..."
 mkdir -p "$BUNDLE_DIR/Lib"
 
 # Copy everything except large unnecessary dirs
 cd "$SYSTEM_PYTHON/Lib"
 for item in *; do
     case "$item" in
-        test|tests|site-packages|ensurepip|idlelib|tkinter|turtledemo|lib2to3|__pycache__)
+        test|tests|site-packages|idlelib|tkinter|turtledemo|lib2to3|__pycache__)
             echo "  Skipping: $item"
             ;;
         *)
@@ -67,7 +67,7 @@ done
 cd "$PROJECT_ROOT"
 
 # 4. Copy site-packages from venv (the ML packages)
-echo "[4/5] Copying site-packages from venv..."
+echo "[4/7] Copying site-packages from venv..."
 mkdir -p "$BUNDLE_DIR/Lib/site-packages"
 cp -r "$VENV_SITE_PACKAGES"/* "$BUNDLE_DIR/Lib/site-packages/"
 
@@ -78,11 +78,10 @@ find "$BUNDLE_DIR/Lib/site-packages" -type d -name "tests" -exec rm -rf {} + 2>/
 find "$BUNDLE_DIR/Lib/site-packages" -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
 # NOTE: Do NOT remove .dist-info directories — they contain entry_points metadata
 # required by packages like opentelemetry, chromadb, etc.
-rm -rf "$BUNDLE_DIR/Lib/site-packages/pip" 2>/dev/null || true
-rm -rf "$BUNDLE_DIR/Lib/site-packages/setuptools" 2>/dev/null || true
+# NOTE: pip and setuptools are kept — needed by ensure_python_deps() runtime safety net
 
 # 5. Copy document processing scripts
-echo "[5/5] Copying document processing scripts..."
+echo "[5/7] Copying document processing scripts..."
 mkdir -p "$BUNDLE_DIR/scripts"
 cp "$PYTHON_SCRIPTS/document_processor.py" "$BUNDLE_DIR/scripts/"
 cp "$PYTHON_SCRIPTS/docx_processor.py" "$BUNDLE_DIR/scripts/"
@@ -91,6 +90,29 @@ cp "$PYTHON_SCRIPTS/image_processor.py" "$BUNDLE_DIR/scripts/"
 cp "$PYTHON_SCRIPTS/pdf_processor.py" "$BUNDLE_DIR/scripts/"
 cp "$PYTHON_SCRIPTS/vector_store.py" "$BUNDLE_DIR/scripts/"
 cp "$PYTHON_SCRIPTS/requirements.txt" "$BUNDLE_DIR/scripts/"
+
+# 6. Copy TTS and voice relay scripts
+echo "[6/7] Copying TTS and voice relay scripts..."
+cp "$PYTHON_SCRIPTS/tts_engine.py" "$BUNDLE_DIR/scripts/"
+cp "$PYTHON_SCRIPTS/voice_relay.py" "$BUNDLE_DIR/scripts/"
+
+# 7. Install TTS/relay pip dependencies into bundle's site-packages
+echo "[7/7] Installing TTS/relay dependencies..."
+SYSTEM_PYTHON_EXE="$SYSTEM_PYTHON/python.exe"
+"$SYSTEM_PYTHON_EXE" -m pip install \
+    --target "$BUNDLE_DIR/Lib/site-packages" \
+    --no-input --no-compile --quiet \
+    pyttsx3 websockets "qrcode[pil]" 2>&1 | while read -r line; do
+    echo "  pip: $line"
+done
+echo "  Verifying installed packages..."
+for pkg in pyttsx3 websockets qrcode; do
+    if [ -d "$BUNDLE_DIR/Lib/site-packages/$pkg" ]; then
+        echo "  ✓ $pkg"
+    else
+        echo "  ✗ $pkg — MISSING (bundle may be incomplete)"
+    fi
+done
 
 # Create python312._pth to configure import paths
 # This tells the embedded Python where to find modules

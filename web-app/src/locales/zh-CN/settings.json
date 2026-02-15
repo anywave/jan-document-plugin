@@ -1,7 +1,7 @@
 {
   "autoDownload": "自动下载新更新",
   "checkForUpdates": "检查更新",
-  "checkForUpdatesDesc": "检查是否有更新版本的 Jan 可用。",
+  "checkForUpdatesDesc": "View the latest MOBIUS releases on GitHub.",
   "checkingForUpdates": "正在检查更新...",
   "noUpdateAvailable": "您正在运行最新版本",
   "devVersion": "检测到开发版本",
@@ -201,7 +201,7 @@
     "updateError": "检查更新失败",
     "appVersion": "应用版本",
     "checkForUpdates": "检查更新",
-    "checkForUpdatesDesc": "检查是否有更新版本的 Jan 可用。",
+    "checkForUpdatesDesc": "View the latest MOBIUS releases on GitHub.",
     "checkingForUpdates": "正在检查更新...",
     "copied": "已复制",
     "copyPath": "复制路径",
@@ -242,7 +242,10 @@
       "currentLocation": "当前位置：",
       "newLocation": "新位置：",
       "cancel": "取消",
-      "changeLocation": "更改位置"
+      "changeLocation": "更改位置",
+      "warning": "MOBIUS and Jan share the same data folder — together they are a pair of hands, the left and right hemispheres of the brain. Changing this location will separate your assistants, duplicate data unnecessarily, and will not prevent MOBIUS from interacting with Jan.",
+      "confirmPrompt": "Type \"I agree\" to continue",
+      "confirmPlaceholder": "I agree"
     }
   }
 }

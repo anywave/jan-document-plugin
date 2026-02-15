@@ -50,6 +50,7 @@ export default defineConfig(({ mode }) => {
       PLATFORM: JSON.stringify(process.env.TAURI_ENV_PLATFORM),
 
       VERSION: JSON.stringify(packageJson.version),
+      MOBIUS_RELEASE: JSON.stringify('AAA'),
 
       MODEL_CATALOG_URL: JSON.stringify(
         'https://raw.githubusercontent.com/menloresearch/model-catalog/main/model_catalog.json'

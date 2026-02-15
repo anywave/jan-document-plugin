@@ -15,7 +15,6 @@ pub struct LLamaBackendSession {
     pub info: SessionInfo,
 }
 
-#[derive(Default)]
 pub struct AppState {
     pub app_token: Option<String>,
     pub mcp_servers: Arc<Mutex<HashMap<String, RunningService<RoleClient, ()>>>>,
@@ -25,6 +24,9 @@ pub struct AppState {
     pub mcp_successfully_connected: Arc<Mutex<HashMap<String, bool>>>,
     pub server_handle: Arc<Mutex<Option<ServerHandle>>>,
     pub llama_server_process: Arc<Mutex<HashMap<i32, LLamaBackendSession>>>,
+    /// Holds an open file handle to `.mobius-lock` in the data folder.
+    /// On Windows this prevents the directory from being deleted while running.
+    pub data_folder_lock: Arc<std::sync::Mutex<Option<std::fs::File>>>,
 }
 pub fn generate_app_token() -> String {
     rand::thread_rng()

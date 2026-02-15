@@ -1,0 +1,23 @@
+{
+  "exportTitle": "Export .mobius Package",
+  "exportDescription": "Select assistants and threads to include in the package.",
+  "importTitle": "Import .mobius Package",
+  "packageName": "Package Name",
+  "packageDescription": "Description (optional)",
+  "descriptionPlaceholder": "What's in this package?",
+  "includeInstructions": "Include assistant instructions",
+  "export": "Export",
+  "import": "Import",
+  "exporting": "Exporting...",
+  "importing": "Importing...",
+  "exportSuccess": "Package exported successfully",
+  "exportFailed": "Failed to export package",
+  "importSuccess": "Imported: {{items}}",
+  "importFailed": "Failed to import package",
+  "modelWarningTitle": "Referenced models may not be available locally:",
+  "modelWarningDesc": "You can reassign the model after import.",
+  "shareAsMobius": "Share as .mobius",
+  "exportAsMobius": "Export as .mobius",
+  "importMobius": "Import .mobius",
+  "importExport": "Import & Export"
+}

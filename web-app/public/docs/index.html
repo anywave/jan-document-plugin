@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOBIUS Documentation</title>
+<style>
+  :root {
+    --bg: #0e0e10;
+    --bg-surface: #18181b;
+    --bg-elevated: #222225;
+    --fg: #e4e4e7;
+    --fg-muted: #a1a1aa;
+    --accent: #8b5cf6;
+    --accent-muted: #7c3aed;
+    --border: #27272a;
+    --amber: #f59e0b;
+    --green: #22c55e;
+    --blue: #3b82f6;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+  }
+
+  header {
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  header h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  header h1 span { color: var(--accent); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .search-box {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg);
+    font-size: 14px;
+    outline: none;
+  }
+
+  .search-box:focus { border-color: var(--accent); }
+  .search-box::placeholder { color: var(--fg-muted); }
+
+  .tier-tabs {
+    display: flex;
+    gap: 4px;
+  }
+
+  .tier-tab {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fg-muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .tier-tab:hover { background: var(--bg-elevated); color: var(--fg); }
+  .tier-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+  main { max-width: 900px; margin: 0 auto; padding: 24px; }
+
+  .section {
+    margin-bottom: 32px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .section-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-header h2 { font-size: 16px; font-weight: 600; }
+
+  .tier-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .tier-general { background: var(--green); color: #000; }
+  .tier-technical { background: var(--blue); color: white; }
+  .tier-advanced { background: var(--amber); color: #000; }
+
+  .section-body { padding: 16px 20px; }
+  .section-body p { color: var(--fg-muted); margin-bottom: 12px; font-size: 14px; }
+  .section-body p:last-child { margin-bottom: 0; }
+  .section-body h3 { font-size: 14px; font-weight: 600; margin: 16px 0 8px; color: var(--fg); }
+  .section-body h3:first-child { margin-top: 0; }
+  .section-body ul { padding-left: 20px; margin-bottom: 12px; }
+  .section-body li { color: var(--fg-muted); font-size: 14px; margin-bottom: 4px; }
+  .section-body code {
+    background: var(--bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--accent);
+  }
+
+  .section.hidden { display: none; }
+
+  .no-results {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--fg-muted);
+    font-size: 14px;
+    display: none;
+  }
+
+  .no-results.visible { display: block; }
+
+  .highlight { background: var(--accent-muted); color: white; border-radius: 2px; padding: 0 2px; }
+
+  .toc {
+    margin-bottom: 24px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+  }
+
+  .toc h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .toc ul { list-style: none; padding: 0; }
+  .toc li { margin-bottom: 4px; }
+  .toc a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .toc a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>MOBIUS</span> Documentation</h1>
+  <div class="controls">
+    <input type="text" class="search-box" id="search" placeholder="Search documentation..." autocomplete="off" />
+    <div class="tier-tabs">
+      <button class="tier-tab active" data-tier="all">All</button>
+      <button class="tier-tab" data-tier="general">General</button>
+      <button class="tier-tab" data-tier="technical">Technical</button>
+      <button class="tier-tab" data-tier="advanced">Advanced</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="toc" id="toc">
+    <h3>Contents</h3>
+    <ul id="toc-list"></ul>
+  </div>
+
+  <!-- GENERAL USER -->
+
+  <div class="section" data-tier="general" data-searchable>
+    <div class="section-header">
+      <h2>What is MOBIUS?</h2>
+      <span class="tier-badge tier-general">General</span>
+    </div>
+    <div class="section-body">
+      <p>MOBIUS is a desktop AI companion built on top of <strong>Jan</strong> (v0.6.8). MOBIUS and Jan share the same data folder &mdash; they are a pair of hands, the left and right hemispheres of the brain. Jan provides the open-source LLM runtime; MOBIUS extends it with voice, document intelligence, annotations, and context-aware features.</p>
+      <p>Think of Jan as the engine room and MOBIUS as the bridge. You can run both simultaneously &mdash; they read and write the same assistants, threads, and models.</p>
+    </div>
+  </div>
+
+  <div class="section" data-tier="general" data-searchable>
+    <div class="section-header">
+      <h2>Getting Started</h2>
+      <span class="tier-badge tier-general">General</span>
+    </div>
+    <div class="section-body">
+      <h3>First Launch</h3>
+      <p>On first launch, MOBIUS creates its shared data folder at <code>%APPDATA%/jan/data</code> (Windows) or <code>~/Library/Application Support/jan/data</code> (macOS). If Jan is already installed, MOBIUS will find and use the existing data folder automatically.</p>
+      <h3>Choosing a Model</h3>
+      <p>Navigate to the <strong>Hub</strong> to browse and download models. Recommended starting models:</p>
+      <ul>
+        <li><strong>jan-nano:128k</strong> &mdash; Lightweight, fast, good for general tasks</li>
+        <li><strong>qwen2.5:7b-instruct</strong> &mdash; Strong instruction following, medium resource use</li>
+      </ul>
+      <h3>Starting a Conversation</h3>
+      <p>Click <strong>New Thread</strong> in the sidebar, select your model, and start typing. Your conversations persist across sessions and are shared with Jan.</p>
+    </div>
+  </div>
+
+  <div class="section" data-tier="general" data-searchable>
+    <div class="section-header">
+      <h2>MOBIUS Features</h2>
+      <span class="tier-badge tier-general">General</span>
+    </div>
+    <div class="section-body">
+      <h3>Text-to-Speech (TTS)</h3>
+      <p>MOBIUS can read AI responses aloud. Enable TTS in thread settings or use the speaker icon on any message. Voices are powered by a local Python TTS engine &mdash; no data leaves your machine.</p>
+      <h3>Document RAG</h3>
+      <p>Drag documents (PDF, DOCX, TXT) into a thread to give the AI context from your files. MOBIUS indexes them locally using ChromaDB and retrieves relevant passages during conversation.</p>
+      <h3>Annotations</h3>
+      <p>Right-click any message to add annotations. Annotations are personal notes attached to AI responses &mdash; useful for marking important insights, corrections, or follow-up items.</p>
+      <h3>Context Menu</h3>
+      <p>Right-click messages for quick actions: copy, annotate, regenerate, or speak aloud.</p>
+    </div>
+  </div>
+
+  <div class="section" data-tier="general" data-searchable>
+    <div class="section-header">
+      <h2>Data &amp; Privacy</h2>
+      <span class="tier-badge tier-general">General</span>
+    </div>
+    <div class="section-body">
+      <p>All data stays on your machine. MOBIUS runs models locally via llama.cpp &mdash; no API keys required for local models. Your conversations, documents, and annotations are stored in the shared data folder and never transmitted externally.</p>
+      <p>The data folder is protected while MOBIUS is running &mdash; a lock file prevents accidental deletion.</p>
+    </div>
+  </div>
+
+  <!-- TECHNICAL USER -->
+
+  <div class="section" data-tier="technical" data-searchable>
+    <div class="section-header">
+      <h2>Architecture Overview</h2>
+      <span class="tier-badge tier-technical">Technical</span>
+    </div>
+    <div class="section-body">
+      <p>MOBIUS is a <strong>Tauri v2</strong> application with a React frontend and Rust backend.</p>
+      <ul>
+        <li><strong>Frontend:</strong> React + TypeScript, Vite bundler, TanStack Router, Tailwind CSS</li>
+        <li><strong>Backend:</strong> Rust (Tauri), manages process lifecycle, file I/O, and native OS integration</li>
+        <li><strong>LLM Runtime:</strong> llama.cpp server processes spawned per-model, managed via Rust</li>
+        <li><strong>Python Bridge:</strong> Embedded Python 3.12 for TTS, document processing, and ChromaDB</li>
+        <li><strong>MCP:</strong> Model Context Protocol servers for tool use and external integrations</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section" data-tier="technical" data-searchable>
+    <div class="section-header">
+      <h2>Data Folder Structure</h2>
+      <span class="tier-badge tier-technical">Technical</span>
+    </div>
+    <div class="section-body">
+      <p>The shared data folder contains:</p>
+      <ul>
+        <li><code>models/</code> &mdash; Downloaded model files (GGUF format)</li>
+        <li><code>threads/</code> &mdash; Conversation history (JSON)</li>
+        <li><code>assistants/</code> &mdash; Assistant configurations</li>
+        <li><code>extensions/</code> &mdash; Installed extension manifests</li>
+        <li><code>logs/</code> &mdash; Application logs</li>
+        <li><code>.mobius-lock</code> &mdash; Sentinel file held open while MOBIUS runs (prevents directory deletion on Windows)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section" data-tier="technical" data-searchable>
+    <div class="section-header">
+      <h2>Local API Server</h2>
+      <span class="tier-badge tier-technical">Technical</span>
+    </div>
+    <div class="section-body">
+      <p>MOBIUS includes an OpenAI-compatible API server. Enable it in <strong>Settings &gt; Local API Server</strong>. The server exposes <code>/v1/chat/completions</code> and <code>/v1/models</code> endpoints compatible with any OpenAI SDK client.</p>
+      <h3>Configuration</h3>
+      <ul>
+        <li><strong>Host:</strong> Default <code>127.0.0.1</code></li>
+        <li><strong>Port:</strong> Default <code>1337</code></li>
+        <li><strong>API Key:</strong> Optional, for access control</li>
+        <li><strong>CORS:</strong> Configurable for web client access</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section" data-tier="technical" data-searchable>
+    <div class="section-header">
+      <h2>Python Bridge &amp; Document RAG</h2>
+      <span class="tier-badge tier-technical">Technical</span>
+    </div>
+    <div class="section-body">
+      <p>MOBIUS bundles Python 3.12 with dependencies for document processing and TTS. The Python bridge communicates with the Rust backend via Tauri commands.</p>
+      <h3>Document Processing Pipeline</h3>
+      <ul>
+        <li>Documents are chunked and embedded using a local embedding model</li>
+        <li>Vectors stored in ChromaDB (local, file-based)</li>
+        <li>At query time, relevant chunks are retrieved and injected into the prompt context</li>
+      </ul>
+      <h3>TTS Pipeline</h3>
+      <ul>
+        <li>Voice relay server runs locally on a random port</li>
+        <li>Supports multiple voices (list via <code>list_tts_voices</code> command)</li>
+        <li>Audio streamed directly to the frontend</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ADVANCED USER -->
+
+  <div class="section" data-tier="advanced" data-searchable>
+    <div class="section-header">
+      <h2>MCP Server Integration</h2>
+      <span class="tier-badge tier-advanced">Advanced</span>
+    </div>
+    <div class="section-body">
+      <p>MOBIUS supports the <strong>Model Context Protocol (MCP)</strong> for extending AI capabilities with external tools. MCP servers can provide file system access, web search, database queries, and custom tools.</p>
+      <h3>Configuration</h3>
+      <p>MCP servers are configured in <strong>Settings &gt; Extensions &gt; MCP</strong>. Each server definition includes:</p>
+      <ul>
+        <li><code>command</code> &mdash; The executable to launch (e.g., <code>npx</code>, <code>uvx</code>)</li>
+        <li><code>args</code> &mdash; Arguments passed to the command</li>
+        <li><code>env</code> &mdash; Environment variables for the server process</li>
+        <li><code>active</code> &mdash; Whether the server starts automatically</li>
+      </ul>
+      <h3>Server Lifecycle</h3>
+      <p>Servers are started when activated and stopped on app exit. Failed servers are automatically restarted up to 3 times. All MCP cleanup happens in the Rust backend to ensure processes don't leak.</p>
+    </div>
+  </div>
+
+  <div class="section" data-tier="advanced" data-searchable>
+    <div class="section-header">
+      <h2>Building from Source</h2>
+      <span class="tier-badge tier-advanced">Advanced</span>
+    </div>
+    <div class="section-body">
+      <h3>Prerequisites</h3>
+      <ul>
+        <li>Node.js 18+ and Yarn</li>
+        <li>Rust toolchain (rustup)</li>
+        <li>Python 3.12 (for document-rag extension)</li>
+        <li>Platform build tools (Visual Studio Build Tools on Windows, Xcode on macOS)</li>
+      </ul>
+      <h3>Build Steps</h3>
+      <ul>
+        <li><code>yarn install</code> &mdash; Install frontend dependencies</li>
+        <li><code>yarn dev</code> &mdash; Run in development mode (hot reload)</li>
+        <li><code>yarn build</code> &mdash; Production build</li>
+        <li><code>cargo tauri build</code> &mdash; Build distributable binary</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section" data-tier="advanced" data-searchable>
+    <div class="section-header">
+      <h2>Rust Backend Internals</h2>
+      <span class="tier-badge tier-advanced">Advanced</span>
+    </div>
+    <div class="section-body">
+      <h3>Core Modules</h3>
+      <ul>
+        <li><code>src-tauri/src/core/cmd.rs</code> &mdash; App configuration, data folder management, file lock</li>
+        <li><code>src-tauri/src/core/state.rs</code> &mdash; AppState (MCP servers, download manager, llama sessions, data folder lock)</li>
+        <li><code>src-tauri/src/core/mcp.rs</code> &mdash; MCP server lifecycle management</li>
+        <li><code>src-tauri/src/core/python_bridge.rs</code> &mdash; Python process management for TTS and document RAG</li>
+        <li><code>src-tauri/src/core/threads.rs</code> &mdash; Thread/message CRUD operations</li>
+      </ul>
+      <h3>Data Folder Lock</h3>
+      <p>On startup, MOBIUS creates <code>.mobius-lock</code> in the data folder with an open write handle. On Windows, this prevents <code>RemoveDirectory</code> on the parent. The handle is stored in <code>AppState.data_folder_lock</code> and released automatically on exit or crash.</p>
+    </div>
+  </div>
+
+  <div class="section" data-tier="advanced" data-searchable>
+    <div class="section-header">
+      <h2>MOBIUS / Jan Symbiosis</h2>
+      <span class="tier-badge tier-advanced">Advanced</span>
+    </div>
+    <div class="section-body">
+      <p>MOBIUS is a hard fork of Jan v0.6.8, not a plugin or extension. The relationship is architectural:</p>
+      <ul>
+        <li><strong>Shared data folder:</strong> Both apps read/write the same <code>threads/</code>, <code>models/</code>, and <code>assistants/</code> directories</li>
+        <li><strong>Independent processes:</strong> MOBIUS and Jan run as separate Tauri apps with separate configs</li>
+        <li><strong>Configuration isolation:</strong> App settings (<code>settings.json</code>) are stored per-app in the OS app data directory, not the shared data folder</li>
+        <li><strong>Divergent features:</strong> MOBIUS adds TTS, document RAG, annotations, voice relay, MCP, and context menus that Jan does not have</li>
+      </ul>
+      <p>Changing the data folder location in MOBIUS will <em>not</em> prevent it from interacting with Jan &mdash; it will simply duplicate data. This is why the data folder change requires explicit "I agree" confirmation.</p>
+    </div>
+  </div>
+
+  <div class="no-results" id="no-results">No matching documentation found.</div>
+</main>
+
+<script>
+(function() {
+  var searchInput = document.getElementById('search');
+  var sections = document.querySelectorAll('.section[data-searchable]');
+  var noResults = document.getElementById('no-results');
+  var tierTabs = document.querySelectorAll('.tier-tab');
+  var tocList = document.getElementById('toc-list');
+  var activeTier = 'all';
+
+  // Build table of contents using safe DOM methods
+  sections.forEach(function(section, i) {
+    var title = section.querySelector('h2').textContent;
+    var tier = section.dataset.tier;
+    var id = 'section-' + i;
+    section.id = id;
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + id;
+    a.dataset.tier = tier;
+    a.textContent = title;
+    li.appendChild(a);
+    tocList.appendChild(li);
+  });
+
+  function filterSections() {
+    var query = searchInput.value.toLowerCase().trim();
+    var visible = 0;
+
+    // Remove existing highlights
+    sections.forEach(function(section) {
+      var highlights = section.querySelectorAll('.highlight');
+      highlights.forEach(function(el) {
+        var parent = el.parentNode;
+        parent.replaceChild(document.createTextNode(el.textContent), el);
+        parent.normalize();
+      });
+    });
+
+    sections.forEach(function(section) {
+      var tier = section.dataset.tier;
+      var text = section.textContent.toLowerCase();
+      var matchesTier = activeTier === 'all' || tier === activeTier;
+      var matchesSearch = !query || text.indexOf(query) !== -1;
+
+      if (matchesTier && matchesSearch) {
+        section.classList.remove('hidden');
+        visible++;
+        if (query) highlightText(section, query);
+      } else {
+        section.classList.add('hidden');
+      }
+    });
+
+    // Filter TOC
+    tocList.querySelectorAll('a').forEach(function(a) {
+      var tier = a.dataset.tier;
+      var matchesTier = activeTier === 'all' || tier === activeTier;
+      a.parentElement.style.display = matchesTier ? '' : 'none';
+    });
+
+    noResults.classList.toggle('visible', visible === 0);
+  }
+
+  function highlightText(container, query) {
+    var body = container.querySelector('.section-body');
+    var walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+    var nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+
+    nodes.forEach(function(node) {
+      var idx = node.textContent.toLowerCase().indexOf(query);
+      if (idx === -1) return;
+      var span = document.createElement('span');
+      span.className = 'highlight';
+      var range = document.createRange();
+      range.setStart(node, idx);
+      range.setEnd(node, idx + query.length);
+      range.surroundContents(span);
+    });
+  }
+
+  tierTabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      tierTabs.forEach(function(t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      activeTier = tab.dataset.tier;
+      filterSections();
+    });
+  });
+
+  searchInput.addEventListener('input', filterSections);
+})();
+</script>
+</body>
+</html>

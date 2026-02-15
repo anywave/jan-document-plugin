@@ -95,7 +95,9 @@
       "exceptionDomain": ""
     },
     "resources": [
-      "resources/python312.zip"
+      "resources/python312.zip",
+      "resources/python312/scripts/tts_engine.py",
+      "resources/python312/scripts/voice_relay.py"
     ],
     "copyright": "",
     "category": "Utility",

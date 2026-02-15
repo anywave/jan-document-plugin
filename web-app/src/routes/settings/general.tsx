@@ -7,30 +7,16 @@ import { Button } from '@/components/ui/button'
 import { Card, CardItem } from '@/containers/Card'
 import { useTranslation } from '@/i18n/react-i18next-compat'
 import { useGeneralSetting } from '@/hooks/useGeneralSetting'
-import { useAppUpdater } from '@/hooks/useAppUpdater'
-import { useEffect, useState, useCallback } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
-import { revealItemInDir } from '@tauri-apps/plugin-opener'
+import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
 import ChangeDataFolderLocation from '@/containers/dialogs/ChangeDataFolderLocation'
 
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import {
-  factoryReset,
   getJanDataFolder,
   relocateJanDataFolder,
 } from '@/services/app'
 import {
-  IconBrandDiscord,
-  IconBrandGithub,
   IconExternalLink,
   IconFolder,
   IconLogs,
@@ -40,15 +26,17 @@ import {
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { windowKey } from '@/constants/windows'
 import { toast } from 'sonner'
-import { isDev } from '@/lib/utils'
 import { emit } from '@tauri-apps/api/event'
 import { stopAllModels } from '@/services/models'
 import { SystemEvent } from '@/types/events'
 import { Input } from '@/components/ui/input'
-import { useHardware } from '@/hooks/useHardware'
 import { getConnectedServers } from '@/services/mcp'
 import { invoke } from '@tauri-apps/api/core'
 import { useMCPServers } from '@/hooks/useMCPServers'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+
+const ExportMobiusDialog = lazy(() => import('@/containers/dialogs/ExportMobiusDialog'))
+const ImportMobiusDialog = lazy(() => import('@/containers/dialogs/ImportMobiusDialog'))
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const Route = createFileRoute(route.settings.general as any)({
@@ -73,28 +61,30 @@ function General() {
       return t('settings:general.openContainingFolder')
     }
   }
-  const { checkForUpdate } = useAppUpdater()
-  const { pausePolling } = useHardware()
   const [janDataFolder, setJanDataFolder] = useState<string | undefined>()
   const [isCopied, setIsCopied] = useState(false)
-  const [selectedNewPath, setSelectedNewPath] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false)
-
+  const [experimentalAllowed, setExperimentalAllowed] = useState(false)
+  const [showMobiusExport, setShowMobiusExport] = useState(false)
+  const [showMobiusImport, setShowMobiusImport] = useState(false)
   useEffect(() => {
     const fetchDataFolder = async () => {
       const path = await getJanDataFolder()
       setJanDataFolder(path)
+
+      // Check if experimental features are allowed via shared marker file
+      try {
+        const allowed = await invoke<boolean>('exists_sync', {
+          args: ['file://.experimental-features'],
+        })
+        setExperimentalAllowed(allowed)
+      } catch {
+        setExperimentalAllowed(false)
+      }
     }
 
     fetchDataFolder()
   }, [])
-
-  const resetApp = async () => {
-    pausePolling()
-    // TODO: Loading indicator
-    await factoryReset()
-  }
 
   const handleOpenLogs = async () => {
     try {
@@ -133,6 +123,48 @@ function General() {
     }
   }
 
+  const handleOpenDocs = async () => {
+    try {
+      const existing = await WebviewWindow.getByLabel(windowKey.docsWindow)
+      if (existing) {
+        await existing.setFocus()
+      } else {
+        new WebviewWindow(windowKey.docsWindow, {
+          url: '/docs/index.html',
+          title: 'MOBIUS Documentation',
+          width: 960,
+          height: 700,
+          resizable: true,
+          center: true,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to open docs window:', error)
+    }
+  }
+
+  const handleOpenReleaseNotes = async () => {
+    try {
+      const existing = await WebviewWindow.getByLabel(
+        windowKey.releaseNotesWindow
+      )
+      if (existing) {
+        await existing.setFocus()
+      } else {
+        new WebviewWindow(windowKey.releaseNotesWindow, {
+          url: '/docs/release-notes.html',
+          title: 'MOBIUS Release Notes',
+          width: 960,
+          height: 700,
+          resizable: true,
+          center: true,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to open release notes window:', error)
+    }
+  }
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -143,65 +175,41 @@ function General() {
     }
   }
 
-  const handleDataFolderChange = async () => {
+  const handleDataFolderChange = () => {
+    setIsDialogOpen(true)
+  }
+
+  const confirmDataFolderChange = async () => {
+    setIsDialogOpen(false)
+
     const selectedPath = await open({
       multiple: false,
       directory: true,
       defaultPath: janDataFolder,
     })
 
-    if (selectedPath === janDataFolder) return
-    if (selectedPath !== null) {
-      setSelectedNewPath(selectedPath)
-      setIsDialogOpen(true)
-    }
-  }
+    if (selectedPath === janDataFolder || selectedPath === null) return
 
-  const confirmDataFolderChange = async () => {
-    if (selectedNewPath) {
-      try {
-        await stopAllModels()
-        emit(SystemEvent.KILL_SIDECAR)
-        setTimeout(async () => {
-          try {
-            await relocateJanDataFolder(selectedNewPath)
-            setJanDataFolder(selectedNewPath)
-            // Only relaunch if relocation was successful
-            window.core?.api?.relaunch()
-            setSelectedNewPath(null)
-            setIsDialogOpen(false)
-          } catch (error) {
-            console.error(error)
-            toast.error(t('settings:general.failedToRelocateDataFolder'))
-          }
-        }, 1000)
-      } catch (error) {
-        console.error('Failed to relocate data folder:', error)
-        // Revert the data folder path on error
-        const originalPath = await getJanDataFolder()
-        setJanDataFolder(originalPath)
-
-        toast.error(t('settings:general.failedToRelocateDataFolderDesc'))
-      }
-    }
-  }
-
-  const handleCheckForUpdate = useCallback(async () => {
-    setIsCheckingUpdate(true)
     try {
-      if (isDev()) return toast.info(t('settings:general.devVersion'))
-      const update = await checkForUpdate(true)
-      if (!update) {
-        toast.info(t('settings:general.noUpdateAvailable'))
-      }
-      // If update is available, the AppUpdater dialog will automatically show
+      await stopAllModels()
+      emit(SystemEvent.KILL_SIDECAR)
+      setTimeout(async () => {
+        try {
+          await relocateJanDataFolder(selectedPath)
+          setJanDataFolder(selectedPath)
+          window.core?.api?.relaunch()
+        } catch (error) {
+          console.error(error)
+          toast.error(t('settings:general.failedToRelocateDataFolder'))
+        }
+      }, 1000)
     } catch (error) {
-      console.error('Failed to check for updates:', error)
-      toast.error(t('settings:general.updateError'))
-    } finally {
-      setIsCheckingUpdate(false)
+      console.error('Failed to relocate data folder:', error)
+      const originalPath = await getJanDataFolder()
+      setJanDataFolder(originalPath)
+      toast.error(t('settings:general.failedToRelocateDataFolderDesc'))
     }
-  }, [t, checkForUpdate])
+  }
 
   const handleStopAllMCPServers = async () => {
     try {
@@ -250,32 +258,29 @@ function General() {
                 title={t('settings:general.appVersion')}
                 actions={
                   <span className="text-main-view-fg/80 font-medium">
-                    v{VERSION}
+                    v{VERSION}⋈{MOBIUS_RELEASE}
                   </span>
                 }
               />
-              {!AUTO_UPDATER_DISABLED && (
-                <CardItem
-                  title={t('settings:general.checkForUpdates')}
-                  description={t('settings:general.checkForUpdatesDesc')}
-                  className="flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-y-2"
-                  actions={
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="p-0"
-                      onClick={handleCheckForUpdate}
-                      disabled={isCheckingUpdate}
-                    >
-                      <div className="cursor-pointer rounded-sm hover:bg-main-view-fg/15 bg-main-view-fg/10 transition-all duration-200 ease-in-out px-2 py-1 gap-1">
-                        {isCheckingUpdate
-                          ? t('settings:general.checkingForUpdates')
-                          : t('settings:general.checkForUpdates')}
-                      </div>
-                    </Button>
-                  }
-                />
-              )}
+              <CardItem
+                title={t('settings:general.checkForUpdates')}
+                description={t('settings:general.checkForUpdatesDesc')}
+                className="flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-y-2"
+                actions={
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="p-0"
+                    onClick={() =>
+                      openUrl('https://github.com/anywave/mobius/releases')
+                    }
+                  >
+                    <div className="cursor-pointer rounded-sm hover:bg-main-view-fg/15 bg-main-view-fg/10 transition-all duration-200 ease-in-out px-2 py-1 gap-1">
+                      {t('settings:general.viewReleases')}
+                    </div>
+                  </Button>
+                }
+              />
               {/* <CardItem
                 title={t('common:language')}
                 actions={<LanguageSwitcher />}
@@ -352,22 +357,14 @@ function General() {
                         <span>{t('settings:general.changeLocation')}</span>
                       </div>
                     </Button>
-                    {selectedNewPath && (
-                      <ChangeDataFolderLocation
-                        currentPath={janDataFolder || ''}
-                        newPath={selectedNewPath}
-                        onConfirm={confirmDataFolderChange}
-                        open={isDialogOpen}
-                        onOpenChange={(open) => {
-                          setIsDialogOpen(open)
-                          if (!open) {
-                            setSelectedNewPath(null)
-                          }
-                        }}
-                      >
-                        <div />
-                      </ChangeDataFolderLocation>
-                    )}
+                    <ChangeDataFolderLocation
+                      currentPath={janDataFolder || ''}
+                      onConfirm={confirmDataFolderChange}
+                      open={isDialogOpen}
+                      onOpenChange={setIsDialogOpen}
+                    >
+                      <div />
+                    </ChangeDataFolderLocation>
                   </>
                 }
               />
@@ -422,65 +419,61 @@ function General() {
                 }
               />
             </Card>
+            {/* Import & Export */}
+            <Card title={t('sharing:importExport')}>
+              <CardItem
+                title={t('sharing:exportAsMobius')}
+                description="Export assistants, threads, and knowledge as a shareable .mobius package"
+                actions={
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="p-0"
+                    onClick={() => setShowMobiusExport(true)}
+                  >
+                    <div className="cursor-pointer rounded-sm hover:bg-main-view-fg/15 bg-main-view-fg/10 transition-all duration-200 ease-in-out px-2 py-1 gap-1">
+                      {t('sharing:export')}
+                    </div>
+                  </Button>
+                }
+              />
+              <CardItem
+                title={t('sharing:importMobius')}
+                description="Import assistants, threads, and knowledge from a .mobius package"
+                actions={
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="p-0"
+                    onClick={() => setShowMobiusImport(true)}
+                  >
+                    <div className="cursor-pointer rounded-sm hover:bg-main-view-fg/15 bg-main-view-fg/10 transition-all duration-200 ease-in-out px-2 py-1 gap-1">
+                      {t('sharing:import')}
+                    </div>
+                  </Button>
+                }
+              />
+            </Card>
+
             {/* Advanced */}
             <Card title="Advanced">
               <CardItem
                 title="Experimental Features"
-                description="Enable experimental features. They may be unstable or change at any time."
+                description={
+                  experimentalAllowed
+                    ? 'Enable experimental features. They may be unstable or change at any time.'
+                    : 'Experimental features must be enabled in Jan first. Place a .experimental-features file in the shared data folder to unlock.'
+                }
                 actions={
                   <Switch
-                    checked={experimentalFeatures}
+                    checked={experimentalFeatures && experimentalAllowed}
+                    disabled={!experimentalAllowed}
                     onCheckedChange={async (e) => {
+                      if (!experimentalAllowed) return
                       await handleStopAllMCPServers()
                       setExperimentalFeatures(e)
                     }}
                   />
-                }
-              />
-              <CardItem
-                title={t('settings:others.resetFactory', {
-                  ns: 'settings',
-                })}
-                description={t('settings:others.resetFactoryDesc', {
-                  ns: 'settings',
-                })}
-                actions={
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="destructive" size="sm">
-                        {t('common:reset')}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>
-                          {t('settings:general.factoryResetTitle')}
-                        </DialogTitle>
-                        <DialogDescription>
-                          {t('settings:general.factoryResetDesc')}
-                        </DialogDescription>
-                        <DialogFooter className="mt-2 flex items-center">
-                          <DialogClose asChild>
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="hover:no-underline"
-                            >
-                              {t('settings:general.cancel')}
-                            </Button>
-                          </DialogClose>
-                          <DialogClose asChild>
-                            <Button
-                              variant="destructive"
-                              onClick={() => resetApp()}
-                            >
-                              {t('settings:general.reset')}
-                            </Button>
-                          </DialogClose>
-                        </DialogFooter>
-                      </DialogHeader>
-                    </DialogContent>
-                  </Dialog>
                 }
               />
             </Card>
@@ -509,63 +502,32 @@ function General() {
                 title={t('settings:general.documentation')}
                 description={t('settings:general.documentationDesc')}
                 actions={
-                  <a
-                    href="https://github.com/anywave/mobius/docs"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="p-0"
+                    onClick={handleOpenDocs}
                   >
-                    <div className="flex items-center gap-1">
-                      <span>{t('settings:general.viewDocs')}</span>
-                      <IconExternalLink size={14} />
+                    <div className="cursor-pointer rounded-sm hover:bg-main-view-fg/15 bg-main-view-fg/10 transition-all duration-200 ease-in-out px-2 py-1 gap-1">
+                      {t('settings:general.viewDocs')}
                     </div>
-                  </a>
+                  </Button>
                 }
               />
               <CardItem
                 title={t('settings:general.releaseNotes')}
                 description={t('settings:general.releaseNotesDesc')}
                 actions={
-                  <a
-                    href="https://github.com/anywave/mobius/releases"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="p-0"
+                    onClick={handleOpenReleaseNotes}
                   >
-                    <div className="flex items-center gap-1">
-                      <span>{t('settings:general.viewReleases')}</span>
-                      <IconExternalLink size={14} />
+                    <div className="cursor-pointer rounded-sm hover:bg-main-view-fg/15 bg-main-view-fg/10 transition-all duration-200 ease-in-out px-2 py-1 gap-1">
+                      {t('settings:general.viewReleases')}
                     </div>
-                  </a>
-                }
-              />
-            </Card>
-
-            {/* Community */}
-            <Card title={t('settings:general.community')}>
-              <CardItem
-                title={t('settings:general.github')}
-                description={t('settings:general.githubDesc')}
-                actions={
-                  <a
-                    href="https://github.com/anywave/mobius"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <div className="size-6 cursor-pointer flex items-center justify-center rounded hover:bg-main-view-fg/15 bg-main-view-fg/10 transition-all duration-200 ease-in-out">
-                      <IconBrandGithub
-                        size={18}
-                        className="text-main-view-fg/50"
-                      />
-                    </div>
-                  </a>
-                }
-              />
-              <CardItem
-                title="Community"
-                description="Join our community - coming soon!"
-                actions={
-                  <div className="text-main-view-fg/50 text-sm">
-                    Coming Soon
-                  </div>
+                  </Button>
                 }
               />
             </Card>
@@ -591,6 +553,30 @@ function General() {
           </div>
         </div>
       </div>
+
+      {/* .mobius Export Dialog */}
+      <Dialog open={showMobiusExport} onOpenChange={setShowMobiusExport}>
+        <DialogContent>
+          <Suspense fallback={null}>
+            <ExportMobiusDialog onClose={() => setShowMobiusExport(false)} />
+          </Suspense>
+        </DialogContent>
+      </Dialog>
+
+      {/* .mobius Import Dialog */}
+      <Dialog open={showMobiusImport} onOpenChange={setShowMobiusImport}>
+        <DialogContent>
+          <Suspense fallback={null}>
+            <ImportMobiusDialog
+              onClose={() => setShowMobiusImport(false)}
+              onImported={() => {
+                // Trigger a page reload to refresh thread list
+                window.location.reload()
+              }}
+            />
+          </Suspense>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

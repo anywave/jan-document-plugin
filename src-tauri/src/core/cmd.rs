@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::{fs, io, path::PathBuf};
+use std::fs::OpenOptions;
 use tauri::{AppHandle, Manager, Runtime, State};
 
 use crate::core::{mcp::clean_up_mcp_servers, utils::extensions::inference_llamacpp_extension::cleanup::cleanup_processes};
@@ -372,6 +373,32 @@ pub fn change_app_data_folder(
 #[tauri::command]
 pub fn app_token(state: State<'_, AppState>) -> Option<String> {
     state.app_token.clone()
+}
+
+/// Create a sentinel file `.mobius-lock` in the data folder and hold an open
+/// write handle to it. On Windows the open handle prevents Explorer (or any
+/// other process) from deleting the parent directory while MOBIUS is running.
+/// The handle is released automatically when the returned `File` is dropped
+/// (app exit or crash).
+pub fn lock_data_folder<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Option<fs::File> {
+    let data_folder = get_jan_data_folder_path(app_handle);
+    let lock_path = data_folder.join(".mobius-lock");
+
+    match OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&lock_path)
+    {
+        Ok(file) => {
+            log::info!("Data folder lock acquired: {:?}", lock_path);
+            Some(file)
+        }
+        Err(e) => {
+            log::warn!("Failed to acquire data folder lock at {:?}: {}", lock_path, e);
+            None
+        }
+    }
 }
 
 #[tauri::command]

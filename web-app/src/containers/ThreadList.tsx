@@ -333,6 +333,24 @@ const SortableItem = memo(({
               </DialogContent>
             </Dialog>
 
+            <DropdownMenuItem
+              onClick={async (e) => {
+                e.stopPropagation()
+                setOpenDropdown(false)
+                try {
+                  const { exportThread } = await import('@/lib/sharing/exportPackage')
+                  const result = await exportThread(thread.id)
+                  if (result) {
+                    toast.success(t('sharing:exportSuccess'), { id: 'mobius-export' })
+                  }
+                } catch {
+                  toast.error(t('sharing:exportFailed'), { id: 'mobius-export-error' })
+                }
+              }}
+            >
+              <IconShare />
+              <span>{t('sharing:shareAsMobius')}</span>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <Dialog
               onOpenChange={(open) => {
