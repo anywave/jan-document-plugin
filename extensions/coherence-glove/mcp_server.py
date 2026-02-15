@@ -221,12 +221,12 @@ class CoherenceGloveServer:
         )
         log.info('Engine initialized with text_coherence stream (breath target=phi^-2=0.382Hz)')
 
-        # Start HTTP bloom relay if configured
+        # Start HTTP relay for biometric sensors (and optionally bloom injection)
         self._relay_server = None
-        if BLOOM_RELAY_PORT > 0 and BLOOM_RELAY_TOKEN:
+        if BLOOM_RELAY_PORT > 0:
             self._start_bloom_relay()
-        elif BLOOM_RELAY_PORT > 0 and not BLOOM_RELAY_TOKEN:
-            log.info('Bloom relay disabled: BLOOM_RELAY_TOKEN not set')
+            if not BLOOM_RELAY_TOKEN:
+                log.info('Bloom relay: /bloom endpoint disabled (no BLOOM_RELAY_TOKEN), /samples open')
 
     def _start_bloom_relay(self):
         """Start the HTTP bloom relay in a background thread."""
@@ -263,6 +263,10 @@ class CoherenceGloveServer:
 
             def do_POST(self):
                 if self.path == '/bloom':
+                    if not BLOOM_RELAY_TOKEN:
+                        self.send_response(404)
+                        self.end_headers()
+                        return
                     if not self._check_token():
                         return
                     content_len = int(self.headers.get('Content-Length', 0))
@@ -280,8 +284,7 @@ class CoherenceGloveServer:
                         self.end_headers()
                         self.wfile.write(json.dumps({'error': str(e)}).encode())
                 elif self.path == '/samples':
-                    if not self._check_token():
-                        return
+                    # No auth for /samples — local sensors on localhost
                     content_len = int(self.headers.get('Content-Length', 0))
                     body = self.rfile.read(content_len)
                     try:
