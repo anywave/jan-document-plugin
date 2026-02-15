@@ -141,7 +141,7 @@ function persistable(state: CodexStateStore): PersistedCodexState {
   }
 }
 
-// --- Thresholds from 03_JAN_VARIS_HANDBOOK.md ---
+// --- Thresholds from Cybernetic Mirror Gearbox Handbook ---
 
 const SYNTARA_THRESHOLD = 0.92 // Minimum fidelity for ΣYNTARA integration
 const CALYPSO_THRESHOLD = 0.85 // CALYPSO activates: resonance high but integration incomplete

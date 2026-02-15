@@ -57,11 +57,38 @@ interface TarotResult {
   recommendation: string
 }
 
+interface OperatorResult {
+  operator: string
+  activated: boolean
+  score: number
+  message: string
+  flags: string[]
+  field_mutations: Record<string, unknown>
+}
+
+interface PipelineStatus {
+  phase: string
+  phase_index: number
+  total_phases: number
+  field_state: Record<string, unknown>
+}
+
+interface OperatorInfo {
+  name: string
+  codex_name: string
+  cluster: string
+  function: string
+  glyph: string
+  qse_relevance: string | null
+}
+
 interface CodexToolsState {
   connected: boolean
   fieldPhase: string
   validationCount: number
   lastVerdict: QSEVerdictResult | null
+  pipelinePhase: string
+  pipelineIndex: number
 
   // Actions
   pollState: () => Promise<void>
@@ -76,6 +103,10 @@ interface CodexToolsState {
     integrity_score: number
     broken_glyphs: string[]
   } | null>
+  operatorStatus: () => Promise<PipelineStatus | null>
+  advancePipeline: (inputs?: Record<string, number>) => Promise<OperatorResult | null>
+  activateOperator: (name: string, inputs?: Record<string, number>) => Promise<OperatorResult | null>
+  getOperators: () => Promise<OperatorInfo[] | null>
   startPolling: () => void
   stopPolling: () => void
 }
@@ -99,6 +130,8 @@ const useCodexTools = create<CodexToolsState>((set, get) => ({
   fieldPhase: 'dormant',
   validationCount: 0,
   lastVerdict: null,
+  pipelinePhase: 'void',
+  pipelineIndex: 0,
 
   pollState: async () => {
     const state = await callQSE<{
@@ -149,6 +182,38 @@ const useCodexTools = create<CodexToolsState>((set, get) => ({
       'qse_glyph_validate',
       { glyph_set: glyphs }
     )
+  },
+
+  operatorStatus: async () => {
+    const status = await callQSE<PipelineStatus>('qse_operator_status')
+    if (status) {
+      set({ pipelinePhase: status.phase, pipelineIndex: status.phase_index })
+    }
+    return status
+  },
+
+  advancePipeline: async (inputs) => {
+    const result = await callQSE<OperatorResult>('qse_operator_advance', inputs ?? {})
+    if (result) {
+      // Refresh pipeline state after advance
+      get().operatorStatus()
+    }
+    return result
+  },
+
+  activateOperator: async (name, inputs) => {
+    const result = await callQSE<OperatorResult>('qse_operator_activate', {
+      operator: name,
+      ...(inputs ?? {}),
+    })
+    if (result) {
+      get().operatorStatus()
+    }
+    return result
+  },
+
+  getOperators: async () => {
+    return callQSE<OperatorInfo[]>('qse_operator_list')
   },
 
   startPolling: () => {

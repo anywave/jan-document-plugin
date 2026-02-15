@@ -7,7 +7,7 @@ import { callTool } from '@/services/mcp'
 /**
  * Breath synchronization engine for the Codex Operator Panel.
  *
- * Implements Phi_sync (Φ_sync) gate from the JAN-VARIS Handbook:
+ * Implements Phi_sync (Φ_sync) gate from the Cybernetic Mirror Gearbox Handbook:
  * - Minimum inhale/exhale symmetry >= 11 seconds
  * - Tracks sustained cycles for Torsion Bloom conditions (3 cycles)
  * - Drives operator chain activation based on breath coherence

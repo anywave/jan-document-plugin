@@ -1,9 +1,10 @@
 """
-Codex Tools — MCP Server (v0.1.0)
+Codex Tools — MCP Server (v0.3.0)
 
 Quantum Symbol Engine (QSE) exposed via stdio JSON-RPC for MOBIUS.
 Provides 7-module coherence field validation, Codex Tarot operators,
-LOKI phase disruption analysis, and glyph integrity checking.
+LOKI phase disruption analysis, glyph integrity checking, and the
+15-operator Codex Field Pipeline.
 
 MCP Tools:
   qse_validate_field     — Run full 7-module validation pipeline
@@ -14,6 +15,10 @@ MCP Tools:
   qse_loki_operator      — LOKI phase disruption scan
   qse_glyph_validate     — Validate glyph integrity
   qse_get_state          — Read current QSE state
+  qse_operator_status    — Current field pipeline phase and state
+  qse_operator_advance   — Advance the pipeline (evaluate + progress)
+  qse_operator_activate  — Manually activate protective/amplifier operators
+  qse_operator_list      — List all 15 operator definitions
 
 Environment variables:
   COHERENCE_RELAY        — URL of coherence-glove HTTP relay (default: http://127.0.0.1:7777)
@@ -41,6 +46,7 @@ from models.state import QSEInputs
 from operators.loki import LokiOperator
 from operators.glyph_engine import GlyphSandbox
 from operators.tarot import TarotOperatorRunner
+from operators.field_pipeline import FieldPipeline
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,7 +57,7 @@ log = logging.getLogger('codex-tools')
 
 PROTOCOL_VERSION = '2024-11-05'
 SERVER_NAME = 'codex-tools'
-SERVER_VERSION = '0.1.0'
+SERVER_VERSION = '0.3.0'
 
 COHERENCE_RELAY = os.environ.get('COHERENCE_RELAY', 'http://127.0.0.1:7777')
 
@@ -181,6 +187,74 @@ TOOLS = [
             'properties': {},
         },
     },
+    {
+        'name': 'qse_operator_status',
+        'description': 'Get current field pipeline status: phase (VOID through ARCHON), active protections, operator history, field state.',
+        'inputSchema': {
+            'type': 'object',
+            'properties': {},
+        },
+    },
+    {
+        'name': 'qse_operator_advance',
+        'description': 'Advance the field pipeline. Evaluates the current phase operator and progresses if conditions met. Protective operators (NULLA/SEVERA/SHADRA) can interrupt at any point.',
+        'inputSchema': {
+            'type': 'object',
+            'properties': {
+                'coherence_score': {
+                    'type': 'number',
+                    'description': 'Current coherence score (0-1).',
+                },
+                'emotional_charge': {
+                    'type': 'number',
+                    'description': 'Current emotional charge level (0-1).',
+                },
+                'breath_symmetry': {
+                    'type': 'number',
+                    'description': 'Breath symmetry score (0-1).',
+                },
+                'resonance_sigma': {
+                    'type': 'number',
+                    'description': 'Resonance sigma value.',
+                },
+                'consent_intact': {
+                    'type': 'boolean',
+                    'description': 'Whether consent architecture is intact.',
+                },
+                'sovereignty_intact': {
+                    'type': 'boolean',
+                    'description': 'Whether sovereignty is maintained.',
+                },
+            },
+        },
+    },
+    {
+        'name': 'qse_operator_activate',
+        'description': 'Manually activate a protective or amplifier operator. Protective: NULLA (full reset), SEVERA (detachment cut), SHADRA (projection reflector). Amplifiers: HARMONIA (field alignment), AURORA (pattern recognition).',
+        'inputSchema': {
+            'type': 'object',
+            'properties': {
+                'operator': {
+                    'type': 'string',
+                    'description': 'Operator name: NULLA, SEVERA, SHADRA, HARMONIA, or AURORA.',
+                },
+            },
+            'required': ['operator'],
+        },
+    },
+    {
+        'name': 'qse_operator_list',
+        'description': 'List all 15 Codex Field Operator definitions with name, codex name, cluster, function, glyph, and QSE relevance.',
+        'inputSchema': {
+            'type': 'object',
+            'properties': {
+                'operator': {
+                    'type': 'string',
+                    'description': 'Optional: get a single operator by name. Omit to list all 15.',
+                },
+            },
+        },
+    },
 ]
 
 
@@ -192,11 +266,12 @@ class CodexToolsServer:
         self.loki = LokiOperator()
         self.glyph_sandbox = GlyphSandbox()
         self.tarot = TarotOperatorRunner()
+        self.pipeline = FieldPipeline()
         self._initialized = False
 
         # Try to fetch initial coherence state
         self._fetch_coherence_state()
-        log.info('QSE Engine initialized with 7 modules')
+        log.info('QSE Engine initialized with 7 modules + 15 field operators')
 
     def _fetch_coherence_state(self):
         """Fetch current state from coherence-glove HTTP relay."""
@@ -271,6 +346,23 @@ class CodexToolsServer:
                 result = self._glyph_validate(arguments)
             elif tool_name == 'qse_get_state':
                 result = self.engine.get_state()
+            elif tool_name == 'qse_operator_status':
+                result = self.pipeline.get_status()
+            elif tool_name == 'qse_operator_advance':
+                result = self.pipeline.advance(arguments or None).to_dict()
+            elif tool_name == 'qse_operator_activate':
+                result = self.pipeline.activate_operator(
+                    arguments.get('operator', ''),
+                    arguments,
+                ).to_dict()
+            elif tool_name == 'qse_operator_list':
+                op_name = arguments.get('operator')
+                if op_name:
+                    result = self.pipeline.get_operator(op_name)
+                    if result is None:
+                        result = {'error': f'Unknown operator: {op_name}'}
+                else:
+                    result = self.pipeline.get_operators()
             else:
                 return self._error(req_id, -32602, f'Unknown tool: {tool_name}')
 
