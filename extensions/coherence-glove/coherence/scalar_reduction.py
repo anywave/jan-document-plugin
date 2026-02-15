@@ -80,23 +80,30 @@ def compute_amplitude_factor(band_amplitudes: np.ndarray) -> float:
 def select_reference_phase(band_phases: np.ndarray,
                            breath_phase: Optional[float],
                            intentionality: float,
-                           intentionality_threshold: float = 0.5) -> float:
+                           intentionality_threshold: float = 0.5,
+                           band_amplitudes: Optional[np.ndarray] = None) -> float:
     """Select appropriate reference phase based on intentionality.
 
     When user is intentionally controlling breath, use breath phase.
-    Otherwise, use CORE band phase as stable reference.
+    Otherwise, use the DOMINANT band's phase (strongest signal = most
+    reliable phase estimate). Falls back to CORE if no amplitudes given.
 
     Args:
         band_phases: Array of 5 band phases
         breath_phase: Breath signal phase if available
         intentionality: Current intentionality score
         intentionality_threshold: Threshold for intentional control
+        band_amplitudes: Optional band amplitudes for dominant selection
 
     Returns:
         Selected reference phase
     """
     if intentionality > intentionality_threshold and breath_phase is not None:
         return breath_phase
+    elif band_amplitudes is not None:
+        # Use dominant band (highest amplitude = most reliable phase)
+        dominant_idx = int(np.argmax(band_amplitudes))
+        return band_phases[dominant_idx]
     else:
         # Fall back to CORE band phase
         return band_phases[CORE_INDEX]
@@ -110,7 +117,16 @@ def compute_scalar_coherence(band_amplitudes: np.ndarray,
                               reference_phase: Optional[float] = None) -> float:
     """Compute scalar coherence from band data.
 
-    Formula: C = I * sum(w_k * A_k * cos(psi_k - psi_ref)) / sum(w_k)
+    Formula: C = I * sum(w_k * A_k * align_k) / sum(w_k)
+    where align_k = (1 + cos(psi_k - psi_ref)) / 2
+
+    The alignment term maps [-1, 1] → [0, 1] so that:
+    - Aligned phases (cos=1) → 1.0 (full contribution)
+    - Orthogonal (cos=0) → 0.5 (half contribution)
+    - Opposed (cos=-1) → 0.0 (no contribution, but no subtraction)
+
+    This prevents noisy phase estimates from driving coherence negative
+    while still rewarding genuine phase alignment.
 
     When intentionality > threshold, breath phase is used as reference,
     enabling intentional control over coherence. Otherwise, CORE band
@@ -130,7 +146,8 @@ def compute_scalar_coherence(band_amplitudes: np.ndarray,
     # Select reference phase
     if reference_phase is None:
         ref_phase = select_reference_phase(
-            band_phases, breath_phase, intentionality, intentionality_threshold
+            band_phases, breath_phase, intentionality, intentionality_threshold,
+            band_amplitudes=band_amplitudes,
         )
     else:
         ref_phase = reference_phase
@@ -138,25 +155,36 @@ def compute_scalar_coherence(band_amplitudes: np.ndarray,
     # Get weights
     weights = get_phi_weights()
 
-    # Phase alignment term: cos(psi_k - psi_ref)
+    # Phase alignment: (1 + cos(psi_k - psi_ref)) / 2 → [0, 1]
     phase_diffs = band_phases - ref_phase
-    alignment = np.cos(phase_diffs)
+    alignment = (1.0 + np.cos(phase_diffs)) / 2.0
 
-    # Weighted sum: sum(w_k * A_k * cos(psi_k - psi_ref))
+    # Weighted sum: sum(w_k * A_k * align_k)
     weighted_sum = np.sum(weights * band_amplitudes * alignment)
 
-    # Normalize by weight sum
-    weight_sum = np.sum(weights)
-    normalized = weighted_sum / weight_sum if weight_sum > 0 else 0.0
+    # Amplitude-weighted normalization: divide by sum(w_k * A_k).
+    # This computes the weighted-average alignment across bands,
+    # where each band's influence is proportional to its energy.
+    # Strong bands dominate; noise bands contribute negligibly.
+    # Without this, breath-only (energy in ULTRA, weight 0.382)
+    # is capped at 0.127 by the total weight sum (3.0).
+    amp_weight_sum = np.sum(weights * band_amplitudes)
 
-    # Apply intentionality factor
-    if intentionality > intentionality_threshold:
-        # Full intentional mode
-        coherence = intentionality * normalized
+    if amp_weight_sum > 1e-10:
+        normalized = weighted_sum / amp_weight_sum
     else:
-        # Reduced coherence without intentional control
-        # Scale by 0.5 to indicate autonomous (not volitional) coherence
-        coherence = 0.5 * normalized
+        normalized = 0.0
+
+    # Smooth intentionality factor (no hard threshold).
+    # Ranges 0.2 (no intentionality) to 1.0 (full intentionality).
+    # Consent level mapping with dominant-band reference (normalized ~ 1.0):
+    #   intent=0.0 → coh~0.2 → EMERGENCY    (no control)
+    #   intent=0.2 → coh~0.36 → SUSPENDED   (some regularity)
+    #   intent=0.3 → coh~0.44 → DIMINISHED  (moderate control)
+    #   intent=0.5 → coh~0.60 → DIMINISHED  (good control)
+    #   intent=0.8 → coh~0.84 → FULL_CONSENT (deep entrainment)
+    intent_factor = 0.2 + 0.8 * intentionality
+    coherence = intent_factor * normalized
 
     # Clamp to valid range
     return float(max(0.0, min(1.0, coherence)))

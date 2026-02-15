@@ -350,6 +350,7 @@ class MultiWaveCoherenceEngine:
             breath_phase,
             intentionality,
             self.config.intentionality_threshold,
+            band_amplitudes=band_amps,
         )
 
         # Compute scalar coherence
@@ -409,6 +410,7 @@ class MultiWaveCoherenceEngine:
             breath_phase,
             intentionality,
             self.config.intentionality_threshold,
+            band_amplitudes=band_amps,
         )
 
         scalar = compute_scalar_coherence(
@@ -485,6 +487,7 @@ class MultiWaveCoherenceEngine:
             breath_phase,
             intentionality,
             self.config.intentionality_threshold,
+            band_amplitudes=band_amps,
         )
 
         scalar = compute_scalar_coherence(
