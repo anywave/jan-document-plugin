@@ -298,7 +298,6 @@ class CoherenceGloveServer:
         from coherence.scouter import Scouter
         from coherence.network import KuramotoNetwork, NetworkNode
 
-        import os
         sessions_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sessions')
         self.session_mgr = SessionManager(sessions_dir)
         self.subjective = SubjectiveTracker()
