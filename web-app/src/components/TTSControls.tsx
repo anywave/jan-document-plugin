@@ -37,11 +37,13 @@ export function TTSControls({ text, threadTitle, className = '' }: TTSControlsPr
           try {
             await saveLastAsFile()
             toast.success('Audio saved')
-          } catch {
+          } catch (err) {
+            console.error('TTS save error:', err)
             toast.error('Failed to save audio')
           }
         }, 500)
-      } catch {
+      } catch (err) {
+        console.error('TTS generation error:', err)
         toast.error('Failed to generate speech')
       }
       return
@@ -49,7 +51,8 @@ export function TTSControls({ text, threadTitle, className = '' }: TTSControlsPr
     try {
       await saveLastAsFile()
       toast.success('Audio saved')
-    } catch {
+    } catch (err) {
+      console.error('TTS save error:', err)
       toast.error('Failed to save audio')
     }
   }

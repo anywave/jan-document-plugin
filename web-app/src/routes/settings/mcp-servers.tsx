@@ -199,9 +199,8 @@ function MCPServers() {
               ...(config ?? (mcpServers[serverKey] as MCPServerConfig)),
               active: false,
             })
-            toast.error(error, {
-              description: t('mcp-servers:checkParams'),
-            })
+            console.error('MCP server activation error:', error)
+            toast.error(t('mcp-servers:checkParams'))
           })
           .finally(() => {
             setLoadingServers((prev) => ({ ...prev, [serverKey]: false }))
