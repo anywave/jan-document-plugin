@@ -577,7 +577,8 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
           }
         })
         .catch((err) => {
-          toast.error(`Upload error: ${String(err)}`, { id: `doc-${fileName}` })
+          console.error('Document processing error:', err)
+          toast.error('Failed to process document', { id: `doc-${fileName}` })
         })
       return
     }
@@ -614,7 +615,8 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
         `\n\nPlease briefly acknowledge the indexed documents.`
       )
     } catch (err) {
-      toast.error(`Batch error: ${String(err)}`, { id: 'batch' })
+      console.error('Batch processing error:', err)
+      toast.error('Batch processing failed', { id: 'batch' })
     } finally {
       setIsBatchProcessing(false)
       // Clear batch files after a short delay to let user see final state
@@ -637,7 +639,8 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
       handleBatchProcess(paths)
     } catch (err) {
       if (String(err).includes('cancelled')) return
-      toast.error(`File selection error: ${String(err)}`)
+      console.error('File selection error:', err)
+      toast.error('Unable to open file browser')
     }
   }
 
@@ -665,7 +668,8 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
       handleBatchProcess(scanResult.files.map((f) => f.path))
     } catch (err) {
       if (String(err).includes('cancelled')) return
-      toast.error(`Folder scan error: ${String(err)}`, { id: 'folder-scan' })
+      console.error('Folder scan error:', err)
+      toast.error('Unable to scan folder', { id: 'folder-scan' })
     }
   }
 

@@ -179,7 +179,8 @@ function ThreadDetail() {
         toast.error('Summarization failed', { id: toastId })
       }
     } catch (err) {
-      toast.error('Summarization error', { id: toastId })
+      console.error('Summarize error:', err)
+      toast.error('Summarization failed — model may be offline', { id: toastId })
     }
     clearSelection()
   }, [selection, thread, threadId, getProviderByName, addAnnotation, clearSelection])
