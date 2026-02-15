@@ -331,8 +331,8 @@ pub async fn load_llama_model(
     // Spawn the child process
     let mut child = command.spawn().map_err(ServerError::Io)?;
 
-    let stderr = child.stderr.take().expect("stderr was piped");
-    let stdout = child.stdout.take().expect("stdout was piped");
+    let stderr = child.stderr.take().ok_or_else(|| ServerError::Io(std::io::Error::new(std::io::ErrorKind::Other, "Failed to capture stderr")))?;
+    let stdout = child.stdout.take().ok_or_else(|| ServerError::Io(std::io::Error::new(std::io::ErrorKind::Other, "Failed to capture stdout")))?;
 
     // Create channels for communication between tasks
     let (ready_tx, mut ready_rx) = mpsc::channel::<bool>(1);

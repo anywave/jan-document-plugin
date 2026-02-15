@@ -21,7 +21,7 @@ use super::{
 pub fn install_extensions(app: tauri::AppHandle, force: bool) -> Result<(), String> {
     let mut store_path = get_jan_data_folder_path(app.clone());
     store_path.push("store.json");
-    let store = app.store(store_path).expect("Store not initialized");
+    let store = app.store(store_path).map_err(|e| format!("Store not initialized: {}", e))?;
     let stored_version = store
         .get("version")
         .and_then(|v| v.as_str().map(String::from))
@@ -37,7 +37,7 @@ pub fn install_extensions(app: tauri::AppHandle, force: bool) -> Result<(), Stri
     let pre_install_path = app
         .path()
         .resource_dir()
-        .unwrap()
+        .map_err(|e| format!("Failed to get resource dir: {}", e))?
         .join("resources")
         .join("pre-install");
 
@@ -160,7 +160,9 @@ pub fn install_extensions(app: tauri::AppHandle, force: bool) -> Result<(), Stri
 
     // Store the new app version
     store.set("version", serde_json::json!(app_version));
-    store.save().expect("Failed to save store");
+    if let Err(e) = store.save() {
+        log::error!("Failed to save store: {}", e);
+    }
 
     Ok(())
 }
@@ -203,8 +205,6 @@ pub fn setup_mcp(app: &App) {
         if let Err(e) = run_mcp_commands(&app_handle, servers).await {
             log::error!("Failed to run mcp commands: {}", e);
         }
-        app_handle
-            .emit("mcp-update", "MCP servers updated")
-            .unwrap();
+        let _ = app_handle.emit("mcp-update", "MCP servers updated");
     });
 }
