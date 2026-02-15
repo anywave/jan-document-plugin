@@ -49,5 +49,5 @@ export const getLlamacppDevices = async (): Promise<DeviceList[]> => {
  */
 export const setActiveGpus = async (data: { gpus: number[] }) => {
   // TODO: llama.cpp extension should handle this
-  console.log(data)
+  void data
 }

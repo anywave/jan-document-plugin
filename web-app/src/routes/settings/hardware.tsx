@@ -112,7 +112,7 @@ function Hardware() {
       if (existingWindow) {
         // If window exists, focus it
         await existingWindow.setFocus()
-        console.log('Focused existing system monitor window')
+        // focused existing monitor window
       } else {
         // Create a new system monitor window
         const monitorWindow = new WebviewWindow(windowKey.systemMonitorWindow, {
@@ -126,7 +126,7 @@ function Hardware() {
 
         // Listen for window creation
         monitorWindow.once('tauri://created', () => {
-          console.log('System monitor window created')
+          // window ready
         })
 
         // Listen for window errors

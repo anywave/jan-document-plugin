@@ -54,7 +54,6 @@ export const useAppUpdater = () => {
   const checkForUpdate = useCallback(
     async (resetRemindMeLater = false) => {
       if (AUTO_UPDATER_DISABLED) {
-        console.log('Auto updater is disabled')
         return
       }
 
@@ -88,7 +87,7 @@ export const useAppUpdater = () => {
             }))
             // Sync to other instances
             syncStateToOtherInstances(newState)
-            console.log('Update available:', update.version)
+            console.info('Update available:', update.version)
             return update
           } else {
             // No update available - reset state
@@ -153,12 +152,7 @@ export const useAppUpdater = () => {
   )
 
   const downloadAndInstallUpdate = useCallback(async () => {
-    if (AUTO_UPDATER_DISABLED) {
-      console.log('Auto updater is disabled')
-      return
-    }
-
-    if (!updateState.updateInfo) return
+    if (AUTO_UPDATER_DISABLED || !updateState.updateInfo) return
 
     try {
       setUpdateState((prev) => ({
@@ -180,7 +174,7 @@ export const useAppUpdater = () => {
               ...prev,
               totalBytes: contentLength,
             }))
-            console.log(`Started downloading ${contentLength} bytes`)
+            console.info(`Update download started: ${contentLength} bytes`)
 
             // Emit app update download started event
             events.emit(AppEvent.onAppUpdateDownloadUpdate, {
@@ -197,7 +191,7 @@ export const useAppUpdater = () => {
               downloadProgress: progress,
               downloadedBytes: downloaded,
             }))
-            console.log(`Downloaded ${downloaded} from ${contentLength}`)
+            // progress tracked via state + events
 
             // Emit app update download progress event
             events.emit(AppEvent.onAppUpdateDownloadUpdate, {
@@ -208,7 +202,7 @@ export const useAppUpdater = () => {
             break
           }
           case 'Finished':
-            console.log('Download finished')
+            console.info('Update download finished')
             setUpdateState((prev) => ({
               ...prev,
               isDownloading: false,
@@ -223,7 +217,7 @@ export const useAppUpdater = () => {
 
       await window.core?.api?.relaunch()
 
-      console.log('Update installed')
+      console.info('Update installed, relaunching')
     } catch (error) {
       console.error('Error downloading update:', error)
       setUpdateState((prev) => ({

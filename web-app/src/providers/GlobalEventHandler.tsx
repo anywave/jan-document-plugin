@@ -16,7 +16,7 @@ export function GlobalEventHandler() {
       key: string
       value: string
     }) => {
-      console.log('Global settingsChanged event:', event)
+      // settingsChanged event received
 
       // Handle version_backend changes specifically
       if (event.key === 'version_backend') {
@@ -24,7 +24,7 @@ export function GlobalEventHandler() {
           // Refresh providers to get updated settings from the extension
           const updatedProviders = await getProviders()
           setProviders(updatedProviders)
-          console.log('Providers refreshed after version_backend change')
+          // providers refreshed
         } catch (error) {
           console.error(
             'Failed to refresh providers after settingsChanged:',

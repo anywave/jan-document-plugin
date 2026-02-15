@@ -106,7 +106,7 @@ function General() {
       if (existingWindow) {
         // If window exists, focus it
         await existingWindow.setFocus()
-        console.log('Focused existing logs window')
+        // focused existing logs window
       } else {
         // Create a new logs window using Tauri v2 WebviewWindow API
         const logsWindow = new WebviewWindow(windowKey.logsAppWindow, {
@@ -120,7 +120,7 @@ function General() {
 
         // Listen for window creation
         logsWindow.once('tauri://created', () => {
-          console.log('Logs window created')
+          // window ready
         })
 
         // Listen for window errors
