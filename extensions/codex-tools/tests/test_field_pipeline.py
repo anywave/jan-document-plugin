@@ -8,6 +8,7 @@ from models.operators import (
     FieldState, OperatorCluster, OperatorDef, OperatorPhase,
     OperatorResult, OPERATORS, PHASE_SEQUENCE,
 )
+from models.ra_thresholds import LUXIS_EGO_CAP
 from operators.field_pipeline import FieldPipeline
 
 
@@ -350,7 +351,7 @@ class TestSpecificOperators:
         result = pipe.advance()
         assert result.activated is True
         # Should be governed to prevent ego inflation
-        assert pipe.state.radiance_level <= 0.85
+        assert pipe.state.radiance_level <= LUXIS_EGO_CAP + 0.001
 
     def test_archon_encoding_quality(self):
         pipe = FieldPipeline()

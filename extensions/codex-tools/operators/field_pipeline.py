@@ -19,6 +19,28 @@ from models.operators import (
     OPERATORS,
     PHASE_SEQUENCE,
 )
+from models.ra_thresholds import (
+    ARCHON_WISDOM,
+    AURORA_HIGH_COHERENCE,
+    BINDING_THRESHOLD,
+    CALYPSO_INCUBATION,
+    COMPLEMENT_PHI,
+    HARMONIA_BREATH,
+    HARMONIA_EMOTION_MAX,
+    HARMONIA_LOGIC,
+    HARMONIA_SOMATIC_BREATH,
+    HARMONIA_SOMATIC_COHERENCE,
+    LIMITA_GOVERNOR,
+    LIMITA_TRIGGER,
+    LUXIS_EGO_CAP,
+    LUXIS_EGO_TRIGGER,
+    MORPHIS_COHERENCE,
+    PHI_NORM,
+    PHI_SQUARED,
+    RESONANCE_SIGMA_CODEX,
+    SYNTARA_ALIGNMENT_BONUS,
+    VECTIS_LOCK,
+)
 
 
 class FieldPipeline:
@@ -222,7 +244,7 @@ class FieldPipeline:
                 flags=['missing_prima'],
             )
         score = min(1.0, self.state.coherence_score * 1.2)
-        if score >= 0.3:
+        if score >= VECTIS_LOCK:
             return OperatorResult(
                 operator='VECTIS',
                 activated=True,
@@ -253,7 +275,7 @@ class FieldPipeline:
             self.state.emotional_charge * 0.3 +
             self.state.breath_symmetry * 0.3
         )
-        new_sigma = min(2.0, self.state.sigma_accumulated + accumulation)
+        new_sigma = min(PHI_SQUARED, self.state.sigma_accumulated + accumulation)
         return OperatorResult(
             operator='SIGMA',
             activated=True,
@@ -265,15 +287,15 @@ class FieldPipeline:
     def _eval_limita(self) -> OperatorResult:
         """LIMITA: Threshold governor. Activates if Sigma approaches capacity."""
         ratio = self.state.sigma_accumulated / max(0.01, self.state.structural_capacity)
-        if ratio > 0.9:
+        if ratio > LIMITA_TRIGGER:
             return OperatorResult(
                 operator='LIMITA',
                 activated=True,
-                score=1.0 - (ratio - 0.9) * 10,
+                score=1.0 - (ratio - LIMITA_TRIGGER) / (1.0 - LIMITA_TRIGGER),
                 message='Threshold governor active. Sigma bounded to prevent overflow.',
                 flags=['capacity_warning'],
                 field_mutations={
-                    'sigma_accumulated': self.state.structural_capacity * 0.85
+                    'sigma_accumulated': self.state.structural_capacity * LIMITA_GOVERNOR
                 },
             )
         # LIMITA passes through if not needed
@@ -287,7 +309,7 @@ class FieldPipeline:
     def _eval_calypso(self) -> OperatorResult:
         """CALYPSO: Concealment incubator. Stabilizes liminal interval."""
         # Need accumulated charge and intact consent
-        if self.state.sigma_accumulated < 0.3:
+        if self.state.sigma_accumulated < CALYPSO_INCUBATION:
             return OperatorResult(
                 operator='CALYPSO',
                 activated=False,
@@ -323,7 +345,7 @@ class FieldPipeline:
             )
         # MORPHIS succeeds when coherence is high enough to support restructuring
         score = self.state.coherence_score
-        if score >= 0.5 or self.state.resonance_sigma >= 0.88:
+        if score >= MORPHIS_COHERENCE or self.state.resonance_sigma >= RESONANCE_SIGMA_CODEX:
             return OperatorResult(
                 operator='MORPHIS',
                 activated=True,
@@ -355,7 +377,7 @@ class FieldPipeline:
             self.state.logic_aligned,
             self.state.somatic_grounded,
         ])
-        alignment_bonus = alignment_layers * 0.1
+        alignment_bonus = alignment_layers * SYNTARA_ALIGNMENT_BONUS
         score = min(1.0, self.state.coherence_score + alignment_bonus)
         flags = []
         if alignment_layers < 3:
@@ -381,9 +403,9 @@ class FieldPipeline:
         # Careful amplification — too much becomes ego inflation
         radiance = min(1.0, self.state.coherence_score * 0.8 + self.state.sigma_accumulated * 0.2)
         flags = []
-        if radiance > 0.9:
+        if radiance > LUXIS_EGO_TRIGGER:
             flags.append('ego_inflation_risk')
-            radiance = 0.85  # Governor
+            radiance = LUXIS_EGO_CAP
         return OperatorResult(
             operator='LUXIS',
             activated=True,
@@ -428,7 +450,7 @@ class FieldPipeline:
             (1.0 if self.state.consent_intact else 0.0) * 0.2 +
             self.state.breath_symmetry * 0.2
         ))
-        encoding = 'wisdom' if score >= 0.7 else 'experience'
+        encoding = 'wisdom' if score >= ARCHON_WISDOM else 'experience'
         return OperatorResult(
             operator='ARCHON',
             activated=True,
@@ -512,10 +534,10 @@ class FieldPipeline:
     def _eval_harmonia(self) -> OperatorResult:
         """HARMONIA: Multi-layer field alignment."""
         layers = {
-            'breath': self.state.breath_symmetry >= 0.7,
-            'emotion': self.state.emotional_charge > 0 and self.state.emotional_charge < 0.8,
-            'logic': self.state.coherence_score >= 0.5,
-            'somatic': self.state.breath_symmetry >= 0.5 and self.state.coherence_score >= 0.3,
+            'breath': self.state.breath_symmetry >= HARMONIA_BREATH,
+            'emotion': self.state.emotional_charge > 0 and self.state.emotional_charge < HARMONIA_EMOTION_MAX,
+            'logic': self.state.coherence_score >= HARMONIA_LOGIC,
+            'somatic': self.state.breath_symmetry >= HARMONIA_SOMATIC_BREATH and self.state.coherence_score >= HARMONIA_SOMATIC_COHERENCE,
         }
         aligned = sum(layers.values())
         score = aligned / 4.0
@@ -541,7 +563,7 @@ class FieldPipeline:
         # Detect new patterns by checking if current field state
         # differs significantly from historical baseline
         has_bloom = self.state.bloom_expressed
-        has_high_coherence = self.state.coherence_score >= 0.7
+        has_high_coherence = self.state.coherence_score >= AURORA_HIGH_COHERENCE
         has_restructured = self.state.restructured
         new_pattern = has_bloom and has_high_coherence and has_restructured
         self.state.operator_history.append('AURORA')
