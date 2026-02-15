@@ -21,6 +21,10 @@ export function ExtensionProvider({ children }: PropsWithChildren) {
       .registerActive()
       .then(() => ExtensionManager.getInstance().load())
       .then(() => setFinishedSetup(true))
+      .catch((err) => {
+        console.error('Extension loading failed:', err)
+        setFinishedSetup(true) // Show app UI even if extensions fail
+      })
   }, [])
 
   useEffect(() => {

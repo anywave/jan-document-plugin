@@ -172,11 +172,7 @@ function General() {
             setIsDialogOpen(false)
           } catch (error) {
             console.error(error)
-            toast.error(
-              error instanceof Error
-                ? error.message
-                : t('settings:general.failedToRelocateDataFolder')
-            )
+            toast.error(t('settings:general.failedToRelocateDataFolder'))
           }
         }, 1000)
       } catch (error) {

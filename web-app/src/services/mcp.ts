@@ -23,8 +23,12 @@ export const restartMCPServers = async () => {
  */
 export const getMCPConfig = async () => {
   const configString = (await window.core?.api?.getMcpConfigs()) ?? '{}'
-  const mcpConfig = JSON.parse(configString || '{}')
-  return mcpConfig
+  try {
+    return JSON.parse(configString || '{}')
+  } catch (err) {
+    console.error('Failed to parse MCP config:', err)
+    return { mcpServers: {} }
+  }
 }
 
 /**

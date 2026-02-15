@@ -84,7 +84,7 @@ export const useChat = () => {
     function setTools() {
       getTools().then((data: MCPTool[]) => {
         updateTools(data)
-      })
+      }).catch((err) => console.error('Failed to load MCP tools:', err))
     }
     setTools()
 
@@ -92,7 +92,7 @@ export const useChat = () => {
     listen(SystemEvent.MCP_UPDATE, setTools).then((unsub) => {
       // Unsubscribe from the event when the component unmounts
       unsubscribe = unsub
-    })
+    }).catch((err) => console.error('Failed to subscribe to MCP updates:', err))
     return unsubscribe
   }, [updateTools])
 

@@ -33,8 +33,9 @@ export function DataProvider() {
       setProviders(providers)
       // Force-activate llamacpp in case localStorage has stale active:false
       updateProvider('llamacpp', { active: true })
-    })
+    }).catch((err) => console.error('Failed to load providers:', err))
     getMCPConfig().then((data) => setServers(data.mcpServers ?? []))
+      .catch((err) => console.error('Failed to load MCP config:', err))
     getAssistants()
       .then((data) => {
         // Only update assistants if we have valid data
@@ -57,9 +58,9 @@ export function DataProvider() {
       threads.forEach((thread) =>
         fetchMessages(thread.id).then((messages) =>
           setMessages(thread.id, messages)
-        )
+        ).catch((err) => console.error(`Failed to load messages for ${thread.id}:`, err))
       )
-    })
+    }).catch((err) => console.error('Failed to load threads:', err))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

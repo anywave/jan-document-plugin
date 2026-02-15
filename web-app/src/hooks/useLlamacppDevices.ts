@@ -47,9 +47,8 @@ export const useLlamacppDevices = create<LlamacppDevicesStore>((set, get) => ({
 
       set({ devices: devicesWithActivation, loading: false })
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to fetch devices'
-      set({ error: errorMessage, loading: false })
+      console.error('Failed to fetch devices:', error)
+      set({ error: 'Failed to fetch devices', loading: false })
     }
   },
 

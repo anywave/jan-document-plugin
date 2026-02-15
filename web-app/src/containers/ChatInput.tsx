@@ -119,14 +119,17 @@ const ChatInput = ({ model, className, initialMessage }: ChatInputProps) => {
   const [showDocSearch, setShowDocSearch] = useState(false)
   const [smartProcessing, setSmartProcessing] = useState(false)
   const [ragEnabled, setRagEnabled] = useState(() => {
-    const stored = localStorage.getItem(localStorageKey.ragEnabled)
-    return stored === 'true'
+    try {
+      return localStorage.getItem(localStorageKey.ragEnabled) === 'true'
+    } catch {
+      return false
+    }
   })
 
   const toggleRag = () => {
     setRagEnabled((prev) => {
       const next = !prev
-      localStorage.setItem(localStorageKey.ragEnabled, String(next))
+      try { localStorage.setItem(localStorageKey.ragEnabled, String(next)) } catch { /* quota */ }
       return next
     })
   }

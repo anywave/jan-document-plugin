@@ -384,9 +384,7 @@ export const postMessageProcessing = async (
       let result = approved
         ? await callTool({
             toolName: toolCall.function.name,
-            arguments: toolCall.function.arguments.length
-              ? JSON.parse(toolCall.function.arguments)
-              : {},
+            arguments: toolParameters,
           }).catch((e) => {
             console.error('Tool call failed:', e)
             return {

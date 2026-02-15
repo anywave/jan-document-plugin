@@ -52,7 +52,7 @@ export const useMessages = create<MessageState>()((set, get) => ({
           ],
         },
       }))
-    })
+    }).catch((err) => console.error('Failed to persist message:', err))
   },
   deleteMessage: (threadId, messageId) => {
     deleteMessageExt(threadId, messageId)

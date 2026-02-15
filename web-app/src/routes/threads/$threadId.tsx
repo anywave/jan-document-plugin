@@ -226,7 +226,7 @@ function ThreadDetail() {
         // Update the messages in the store
         setMessages(threadId, fetchedMessages)
       }
-    })
+    }).catch((err) => console.error(`Failed to fetch messages for ${threadId}:`, err))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId])
 
