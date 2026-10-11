@@ -1,9 +1,9 @@
 {
   "mcpServers": {
     "codex-tools": {
-      "command": "C:/Users/abc/AppData/Roaming/com.anywave.mobius/python312/python.exe",
+      "command": "python",
       "args": [
-        "C:/ANYWAVEREPO/jan-ai-fork/extensions/codex-tools/mcp_server.py"
+        "extensions/codex-tools/mcp_server.py"
       ],
       "env": {
         "PYTHONUNBUFFERED": "1",

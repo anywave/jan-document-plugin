@@ -283,7 +283,7 @@
     "mcpCustomDesc": "We build custom MCP servers tailored to your workflow — connect MOBIUS to your internal APIs, databases, or specialized tools. Submit a request with your hardware profile and we'll evaluate what's possible.",
     "mcpRequestButton": "Request Custom MCP Server",
     "mcpEmailSubject": "Custom MCP Server Request — MOBIUS",
-    "mcpEmailSent": "Email client opened with your hardware profile attached."
+    "mcpEmailSent": "A GitHub issue form opened with your hardware profile. Issues are public; remove anything you do not want to share before submitting."
   },
   "httpsProxy": {
     "proxy": "Proxy",

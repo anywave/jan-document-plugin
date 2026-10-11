@@ -400,8 +400,8 @@ function Hardware() {
     ].join('\n')
 
     const subject = t('settings:hardware.mcpEmailSubject')
-    const mailto = `mailto:alex@anywavecreations.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-    window.open(mailto)
+    const issueUrl = `https://github.com/anywave/jan-document-plugin/issues/new?title=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    window.open(issueUrl)
     toast.success(t('settings:hardware.mcpEmailSent'))
   }, [hardwareData, calibration, t])
 

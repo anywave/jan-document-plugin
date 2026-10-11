@@ -9,11 +9,11 @@
 **Tech Stack:** Python 3.12 (engine), TypeScript/React (frontend), JSON-RPC stdio (MCP), Zustand (state), JSON files (persistence)
 
 **Base paths:**
-- Engine: `C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove/`
-- Frontend: `C:/ANYWAVEREPO/jan-ai-fork/web-app/src/`
-- Tests: `C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove/tests/`
+- Engine: `extensions/coherence-glove/`
+- Frontend: `web-app/src/`
+- Tests: `extensions/coherence-glove/tests/`
 
-**Test runner:** `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/ -v`
+**Test runner:** `cd extensions/coherence-glove && python -m pytest tests/ -v`
 
 ---
 
@@ -85,7 +85,7 @@ def unstable_state():
 
 **Step 2: Verify pytest runs**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/ -v --collect-only`
+Run: `cd extensions/coherence-glove && python -m pytest tests/ -v --collect-only`
 Expected: "no tests ran" (0 collected, no errors)
 
 **Step 3: Commit**
@@ -203,7 +203,7 @@ class TestSessionPhaseTransitions:
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/test_session.py -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/test_session.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'coherence.session'`
 
 **Step 3: Implement session data model**
@@ -442,7 +442,7 @@ class SessionManager:
 
 **Step 4: Run tests**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/test_session.py -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/test_session.py -v`
 Expected: All 7 tests PASS
 
 **Step 5: Commit**
@@ -516,7 +516,7 @@ class TestSessionManager:
 
 **Step 2: Run tests**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/test_session.py -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/test_session.py -v`
 Expected: All 13 tests PASS
 
 **Step 3: Commit**
@@ -611,7 +611,7 @@ class TestSubjectiveTracker:
 
 **Step 2: Run to verify failure**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/test_subjective.py -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/test_subjective.py -v`
 Expected: FAIL
 
 **Step 3: Implement**
@@ -712,7 +712,7 @@ class SubjectiveTracker:
 
 **Step 4: Run tests**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/test_subjective.py -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/test_subjective.py -v`
 Expected: All 7 tests PASS
 
 **Step 5: Commit**
@@ -819,7 +819,7 @@ class TestScouter:
 
 **Step 2: Run to verify failure**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/test_scouter.py -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/test_scouter.py -v`
 Expected: FAIL
 
 **Step 3: Implement SCOUTER**
@@ -1011,7 +1011,7 @@ class Scouter:
 
 **Step 4: Run tests**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/test_scouter.py -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/test_scouter.py -v`
 Expected: All 6 tests PASS
 
 **Step 5: Commit**
@@ -1126,7 +1126,7 @@ class TestSessionManagerArcs:
 
 **Step 2: Run to verify failure**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/test_arc.py -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/test_arc.py -v`
 Expected: FAIL
 
 **Step 3: Add ArcSession and ArcMetrics to session.py**
@@ -1329,7 +1329,7 @@ Also add arc support to `SessionManager`:
 
 **Step 4: Run tests**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/test_arc.py tests/test_session.py -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/test_arc.py tests/test_session.py -v`
 Expected: All tests PASS
 
 **Step 5: Commit**
@@ -1430,7 +1430,7 @@ class TestKuramotoNetwork:
 
 **Step 2: Run to verify failure**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/test_network.py -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/test_network.py -v`
 Expected: FAIL
 
 **Step 3: Implement**
@@ -1534,7 +1534,7 @@ class KuramotoNetwork:
 
 **Step 4: Run tests**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/test_network.py -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/test_network.py -v`
 Expected: All 7 tests PASS
 
 **Step 5: Commit**
@@ -1601,7 +1601,7 @@ Add to `__all__`:
 
 **Step 2: Run all tests**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/ -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/ -v`
 Expected: All tests PASS
 
 **Step 3: Commit**
@@ -1867,7 +1867,7 @@ In `_push_text` method, after `self.engine.process_window()`, add:
 
 **Step 6: Run full test suite**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/ -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/ -v`
 Expected: All tests PASS
 
 **Step 7: Commit**
@@ -2151,7 +2151,7 @@ class TestFullSessionLifecycle:
 
 **Step 2: Run full test suite**
 
-Run: `cd C:/ANYWAVEREPO/jan-ai-fork/extensions/coherence-glove && python -m pytest tests/ -v`
+Run: `cd extensions/coherence-glove && python -m pytest tests/ -v`
 Expected: All tests PASS across all test files
 
 **Step 3: Commit**
@@ -2166,8 +2166,8 @@ git commit -m "test: add integration tests for full session intelligence lifecyc
 ## Task 12: Final Commit — Update CLAUDE.md + Docs
 
 **Files:**
-- Modify: `C:/Users/abc/CLAUDE.md`
-- Modify: `C:/Users/abc/.claude/FP_WORK_STATE.json`
+- Modify: `~/CLAUDE.md`
+- Modify: `~/.claude/FP_WORK_STATE.json`
 
 **Step 1: Update CLAUDE.md IMMEDIATE CONTEXT**
 
@@ -2181,7 +2181,7 @@ Add the new features to the `coherenceGlove` section:
 **Step 3: Final commit**
 
 ```bash
-cd C:/ANYWAVEREPO/jan-ai-fork
+cd <repo root>
 git add -A extensions/coherence-glove/
 git status
 git log --oneline -10
