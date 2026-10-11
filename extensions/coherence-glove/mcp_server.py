@@ -88,6 +88,8 @@ BIOMETRIC_SAMPLE_RATE = 10.0  # Sensors push at 10 Hz (Nyquist for RAPID φ-band
 
 # Relay config
 BLOOM_RELAY_PORT = int(os.environ.get('BLOOM_RELAY_PORT', '7777'))
+# Loopback by default; set BLOOM_RELAY_HOST=0.0.0.0 to accept LAN sensors.
+BLOOM_RELAY_HOST = os.environ.get('BLOOM_RELAY_HOST', '127.0.0.1')
 BLOOM_RELAY_TOKEN = os.environ.get('BLOOM_RELAY_TOKEN', '')
 
 TOOLS = [
@@ -387,10 +389,10 @@ class CoherenceGloveServer:
                     self.end_headers()
 
         try:
-            self._relay_server = HTTPServer(('0.0.0.0', BLOOM_RELAY_PORT), BloomHandler)
+            self._relay_server = HTTPServer((BLOOM_RELAY_HOST, BLOOM_RELAY_PORT), BloomHandler)
             thread = threading.Thread(target=self._relay_server.serve_forever, daemon=True)
             thread.start()
-            log.info(f'Bloom relay listening on port {BLOOM_RELAY_PORT}')
+            log.info(f'Bloom relay listening on {BLOOM_RELAY_HOST}:{BLOOM_RELAY_PORT}')
         except OSError as e:
             log.error(f'Failed to start bloom relay: {e}')
 

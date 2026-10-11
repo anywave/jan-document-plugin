@@ -277,7 +277,7 @@ class CodexToolsServer:
         """Fetch current state from coherence-glove HTTP relay."""
         try:
             import urllib.request
-            token = os.environ.get('BLOOM_RELAY_TOKEN', 'radix-bloom-2026')
+            token = os.environ.get('BLOOM_RELAY_TOKEN', '')
             req = urllib.request.Request(
                 f'{COHERENCE_RELAY}/state',
                 headers={'Authorization': f'Bearer {token}'},

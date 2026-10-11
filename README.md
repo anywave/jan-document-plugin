@@ -1,5 +1,7 @@
 # Jan - Local AI Assistant
 
+> **About this branch.** `avachatter-v0.6.8-fork` is a modified fork of [Jan](https://github.com/janhq/jan) v0.6.8 by Anywave Creations (MOBIUS). It is not made or endorsed by the Jan team. Upstream Jan is licensed under Apache-2.0 (see [LICENSE](LICENSE)); files changed here carry Anywave changes on top of upstream. The text below is the upstream Jan README. For the MOBIUS changes see [MOBIUS_README.md](MOBIUS_README.md); to report a vulnerability see [SECURITY.md](SECURITY.md).
+
 ![Jan AI](docs/src/pages/docs/_assets/jan-app.png)
 
 <p align="center">

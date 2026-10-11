@@ -310,7 +310,6 @@ See [GitHub Issues](https://github.com/anywave/mobius/issues) for full list.
 
 - **Issues**: [GitHub Issues](https://github.com/anywave/mobius/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/anywave/mobius/discussions)
-- **Email**: support@anywave.com (coming soon)
 
 ### Reporting Bugs
 

@@ -5,7 +5,7 @@
  */
 
 const QWEN_MODEL_ID = 'qwen2.5-7b-instruct-q4_k_m'
-const QWEN_GGUF_DIR = 'C:\\Users\\abc\\Documents\\Jan Stuff\\Models\\Qwen2.5-7B-Instruct-GGUF'
+// The split GGUF parts are expected in Jan's data folder under llamacpp/models/<QWEN_MODEL_ID>/
 const QWEN_GGUF_FIRST_PART = 'qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf'
 
 const EXTRACTION_SYSTEM_PROMPT = `You are a factual document extraction assistant. Your task is to summarize and consolidate the provided document chunks into a concise, accurate context for answering a user's question.
@@ -63,10 +63,13 @@ export async function ensureQwenRegistered(): Promise<boolean> {
       return true
     }
 
-    // Check if the GGUF source files exist on disk
-    const ggufPath = `${QWEN_GGUF_DIR}\\${QWEN_GGUF_FIRST_PART}`
-    // We can't easily check external paths via Jan's fs API, so we attempt registration
-    // and let llamacpp validate at load time
+    // Only register when the GGUF parts are present in Jan's data folder.
+    // model_path is relative to Jan's data folder (llamacpp-extension resolves it).
+    const ggufPath = `llamacpp/models/${QWEN_MODEL_ID}/${QWEN_GGUF_FIRST_PART}`
+    if (!(await fs.existsSync(await joinPath([modelDir, QWEN_GGUF_FIRST_PART])))) {
+      console.warn(`[QwenExtraction] ${QWEN_GGUF_FIRST_PART} not found in Jan data folder; skipping registration`)
+      return false
+    }
 
     // Create the model directory
     if (!(await fs.existsSync(modelDir))) {
@@ -75,7 +78,7 @@ export async function ensureQwenRegistered(): Promise<boolean> {
 
     // Write model.yml pointing to the split GGUF
     // llamacpp handles split GGUFs automatically (reads -00001-of-NNNNN, loads all parts)
-    const modelYml = `model_path: "${ggufPath.replace(/\\/g, '/')}"
+    const modelYml = `model_path: "${ggufPath}"
 name: "Qwen 2.5 7B Instruct (Q4_K_M) — Extraction"
 size_bytes: 4731174912
 ctx_len: 4096
