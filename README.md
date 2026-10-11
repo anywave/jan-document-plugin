@@ -5,7 +5,9 @@
 [![Platform: Windows](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 [![Version](https://img.shields.io/badge/version-2.0.0--beta-orange.svg)](https://github.com/anywave/jan-document-plugin/releases)
 
-**Self-contained offline AI assistant with document RAG, voice input, and local LLM inference.** Everything runs on your machine — no cloud, no API keys, no data leaving your computer.
+**Self-contained offline AI assistant with document RAG, voice input, and local LLM inference.** Inference, embeddings and your documents stay on your machine — no cloud LLM and no API keys. The only network traffic is downloading components during setup (Python, Tesseract, models) and, if you choose to, opening a pre-filled GitHub issue from the Debug panel.
+
+> This is an independent project by Anywave Creations. It is not made or endorsed by the Jan team (janhq). "Jan" names the app it works with.
 
 ---
 
@@ -407,6 +409,18 @@ self.chunker = SemanticChunker(chunk_size=500)  # Default is 1000
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+The source in this repository is MIT. The installer also bundles third-party components that keep their own licences, including:
+
+- [PyMuPDF](https://github.com/pymupdf/PyMuPDF) — AGPL-3.0 (or a commercial licence from Artifex)
+- [llama.cpp](https://github.com/ggml-org/llama.cpp) — MIT
+- [Qwen 2.5 7B Instruct](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF) — see the model card for its licence
+- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) — Apache-2.0
+- [ChromaDB](https://github.com/chroma-core/chroma) — Apache-2.0
+
+## Security
+
+See [SECURITY.md](SECURITY.md) to report a vulnerability privately.
 
 ---
 

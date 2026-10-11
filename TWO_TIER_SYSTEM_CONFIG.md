@@ -80,7 +80,7 @@ ollama pull qwen2.5:7b-instruct  # 4.7 GB
 
 # Tier 2: Chat interface (required)
 ollama create jan-nano:128k -f Modelfile.jan-nano
-# Uses: C:\Users\abc\Documents\Jan Stuff\Previous Jan\jan-nano-128k-iQ4_XS.gguf
+# Uses: <path to your jan-nano-128k-iQ4_XS.gguf>
 
 # Optional: Small fallback model
 ollama pull qwen2.5:0.5b  # 397 MB (can be removed if not needed)
