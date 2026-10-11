@@ -98,7 +98,7 @@ $modelYml = "$env:APPDATA\jan\data\llamacpp\models\*\model.yml"
 Get-Content $modelYml | Select-String "model_path"
 
 # Parse actual model path from model.yml
-# Example: model_path: C:\Users\abc\Documents\...\jan-nano-128k-iQ4_XS.gguf
+# Example: model_path: %USERPROFILE%\Documents\...\jan-nano-128k-iQ4_XS.gguf
 ```
 
 **Test:** .gguf file exists at parsed path = PASS
